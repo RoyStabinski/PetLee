@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
+             version="3.1">
+
+    <!--
+      Pet-Lee persistence unit.
+
+      JTA, not RESOURCE_LOCAL: the application server owns transactions and connection
+      handling. Services therefore use @Transactional and repositories an injected
+      @PersistenceContext EntityManager (T-05). There is deliberately no
+      EntityManagerFactory bootstrap, no ServletContextListener and no transaction helper
+      anywhere in this project — the container does all three. See ADR-003.
+    -->
+    <persistence-unit name="petlee-pu" transaction-type="JTA">
+
+        <!--
+          No <provider> element, on purpose.
+
+          Omitting it lets each server use its own JPA provider — EclipseLink on Payara and
+          GlassFish, Hibernate on WildFly. Naming one would tie the WAR to a single server and
+          contradict specification §4's portability requirement. Nothing below is
+          provider-specific, so the same file deploys unchanged to all three.
+        -->
+
+        <!--
+          Connection pooling lives in the server, not in the application (specification §4).
+          jdbc/petlee is a JDBC resource backed by a pooled connection pool defined on the
+          server; its URL, user and password are configured there and are never present in
+          this file or anywhere else in the repository.
+          Setup steps: docs/deployment/datasource-setup.md.
+        -->
+        <jta-data-source>jdbc/petlee</jta-data-source>
+
+        <!--
+          Every entity is listed explicitly and unlisted classes are excluded, so adding an
+          entity without registering it here fails at deployment with a clear message rather
+          than surfacing later as an unexplained "Unknown entity" at runtime.
+        -->
+        <class>com.petlee.model.User</class>
+        <class>com.petlee.model.Category</class>
+        <class>com.petlee.model.Pet</class>
+        <class>com.petlee.model.PetImage</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+
+        <properties>
+            <!--
+              The schema is owned by schema.sql (T-03). The provider must never create, drop
+              or alter it, so schema generation is switched off rather than left at its
+              default.
+            -->
+            <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
+
+            <!--
+              Bean Validation is disabled at the persistence layer. Validation belongs to the
+              service layer (T-13, T-15), where a violation can be turned into the error shape
+              api-contract.md specifies; a ConstraintViolationException thrown from flush()
+              cannot be.
+            -->
+            <property name="jakarta.persistence.validation.mode" value="NONE"/>
+        </properties>
+
+        <!--
+          TRADE-OFF, recorded here so it is not rediscovered the hard way.
+
+          Only JPA-standard jakarta.persistence.* property keys are used; no provider-specific
+          ones appear anywhere in this file (ADR-003). That is what keeps it portable, but it
+          also means there is no provider-specific schema validation
+          (Hibernate's hbm2ddl.auto=validate has no portable equivalent), so a mismatch
+          between an entity mapping and the real table is NOT caught at deployment any more.
+
+          That safety net moved to T-38: the repository integration tests run against the real
+          PostgreSQL schema and fail on any entity/table mismatch. If you change an entity or
+          schema.sql, T-38 is the check that catches you — run it.
+        -->
+    </persistence-unit>
+</persistence>

@@ -8,63 +8,138 @@
     <groupId>com.petlee</groupId>
     <artifactId>pet-lee</artifactId>
     <version>1.0</version>
+
+    <!-- A WAR deployed to a Jakarta EE 10 application server (reference target: Payara 6).
+         finalName fixes the context path to /pet-lee, which T-24 and T-42 assume. -->
     <packaging>war</packaging>
 
+    <name>Pet-Lee</name>
+    <description>Pet adoption and rehoming platform — JSF, JPA and Jakarta REST on Jakarta EE 10.</description>
+
     <properties>
-        <maven.compiler.source>16</maven.compiler.source>
-        <maven.compiler.target>16</maven.compiler.target>
+        <!-- Jakarta EE 10 requires Java 11 or later; 17 is the current LTS.
+             'release' is used instead of source/target: it compiles against the Java 17 API
+             signatures, so a newer local JDK cannot silently leak a newer method into the build. -->
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <jakartaee.version>10.0.0</jakartaee.version>
+        <postgresql.version>42.6.0</postgresql.version>
+        <junit.version>5.10.0</junit.version>
+
+        <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+        <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
+        <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.1.2</maven-failsafe-plugin.version>
     </properties>
 
+    <!--
+      The dependency list is closed — see docs/decisions/ADR-003-technology-constraint.md.
+      Exactly three entries, none of them shipped inside the WAR except the JDBC driver.
+      JSF, JPA, Jakarta REST, CDI, JTA, JSON-B and connection pooling are platform services
+      supplied by the application server. Bundling a second copy of any of them causes
+      classloader conflicts at deployment. Adding a dependency requires a new ADR.
+    -->
     <dependencies>
-        <!-- JPA provider: Hibernate -->
+
+        <!-- The whole Jakarta EE 10 platform API in one artifact: JSF, JPA, Jakarta REST,
+             CDI, JTA, Servlet, Bean Validation, JSON-B.
+             Scope 'provided' — compile against it, but let the server supply it at runtime. -->
         <dependency>
-            <groupId>org.hibernate.orm</groupId>
-            <artifactId>hibernate-core</artifactId>
-            <version>6.2.7.Final</version>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-api</artifactId>
+            <version>${jakartaee.version}</version>
+            <scope>provided</scope>
         </dependency>
 
-        <!-- PostgreSQL JDBC driver -->
+        <!-- PostgreSQL JDBC driver (specification §8).
+             Scope 'runtime' — no code compiles against it; it is loaded by name.
+             In production the driver is installed into the server and reached through the
+             JNDI data source (T-02, T-42); this dependency puts it on the test classpath. -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.6.0</version>
+            <version>${postgresql.version}</version>
+            <scope>runtime</scope>
+            <exclusions>
+                <!-- checker-qual carries compile-time nullness annotations only. It is dead
+                     weight inside the WAR, so it is excluded rather than shipped. -->
+                <exclusion>
+                    <groupId>org.checkerframework</groupId>
+                    <artifactId>checker-qual</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
-        <!-- JAX-RS: Jersey + JSON-B -->
+        <!-- JUnit 5 — the single library not named in specification §7, recorded as an
+             explicit exception in ADR-003. Scope 'test' keeps it out of the WAR. -->
         <dependency>
-            <groupId>org.glassfish.jersey.containers</groupId>
-            <artifactId>jersey-container-servlet</artifactId>
-            <version>3.1.3</version>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.inject</groupId>
-            <artifactId>jersey-hk2</artifactId>
-            <version>3.1.3</version>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-json-binding</artifactId>
-            <version>3.1.3</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
         </dependency>
 
-        <!-- JSF: Mojarra (Jakarta Faces) -->
-        <dependency>
-            <groupId>org.glassfish</groupId>
-            <artifactId>jakarta.faces</artifactId>
-            <version>4.0.1</version>
-        </dependency>
-
-        <!-- Servlet API — provided by the server, not bundled -->
-        <dependency>
-            <groupId>jakarta.servlet</groupId>
-            <artifactId>jakarta.servlet-api</artifactId>
-            <version>6.0.0</version>
-            <scope>provided</scope>
-        </dependency>
     </dependencies>
 
     <build>
         <finalName>pet-lee</finalName>
+
+        <plugins>
+
+            <!-- Compile to Java 17 bytecode. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+            </plugin>
+
+            <!-- Package the WAR. web.xml arrives in T-17; until then its absence is not an error. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>${maven-war-plugin.version}</version>
+                <configuration>
+                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                </configuration>
+            </plugin>
+
+            <!-- Unit tests: *Test.java, run during 'mvn test'. No database, no server. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+
+            <!-- Integration tests: *IT.java, run during 'mvn verify' against a real
+                 PostgreSQL database (T-38) and a deployed server (T-39). The executions
+                 are required — without them Failsafe is declared but never runs. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
     </build>
+
 </project>

@@ -37,3 +37,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+### Pet-Lee ###
+# Uploaded pet images written by ImageStorageService (T-16) — runtime data, never committed
+/uploads/
+# Server and application logs
+*.log

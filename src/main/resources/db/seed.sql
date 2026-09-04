@@ -19,23 +19,24 @@ INSERT INTO category (category_name) VALUES
 ON CONFLICT (LOWER(category_name)) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- Administrator account — BLOCKED ON T-10
+-- Administrator account
 -- ---------------------------------------------------------------------------
--- The single ADMIN user (admin / Admin123!) that specification §8's admin screens need.
+-- The single ADMIN user specification §8's admin screens need: admin / Admin123!
 --
--- password_hash must be a real PBKDF2 digest produced by the T-10 PasswordHasher, in the
--- exact encoding it emits. It is deliberately NOT written here: a placeholder string would
--- either fail verification silently or, worse, be mistaken for a working credential.
+-- The digest below is a real PBKDF2-HMAC-SHA256 value emitted by T-10's PasswordHasher
+-- (PasswordHasherCli "Admin123!"): 210 000 iterations, its own random salt, 90 characters,
+-- inside password_hash VARCHAR(255). It was checked to verify against "Admin123!" before being
+-- pasted here, so a failed admin login means a code change, not a bad paste.
 --
--- To enable, run T-10's hasher over "Admin123!", paste the result below, and uncomment.
---
--- INSERT INTO users (user_name, password_hash, full_name, email, phone_number, region, role, created_at)
--- VALUES ('admin',
---         '<PBKDF2 digest from T-10 PasswordHasher for Admin123!>',
---         'System Administrator',
---         'admin@petlee.local',
---         NULL,
---         NULL,
---         'ADMIN',
---         CURRENT_TIMESTAMP)
--- ON CONFLICT (user_name) DO NOTHING;
+-- This is a known demo credential in a seeded reference database, not a secret. T-42's runbook
+-- changes it before any deployment other people can reach.
+INSERT INTO users (user_name, password_hash, full_name, email, phone_number, region, role, created_at)
+VALUES ('admin',
+        'pbkdf2_sha256$210000$AflWj/mcDXuVECDgN2QhEg==$xyXdFLYbGqYvklSvSccsiRTh2F1Gs+lvmQApdARlwts=',
+        'System Administrator',
+        'admin@petlee.local',
+        NULL,
+        NULL,
+        'ADMIN',
+        CURRENT_TIMESTAMP)
+ON CONFLICT (user_name) DO NOTHING;

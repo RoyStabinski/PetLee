@@ -52,9 +52,11 @@ import java.util.logging.Logger;
  * <h2>Writing a subclass</h2>
  * A subclass supplies the entity class through the constructor and its own queries — nothing else.
  * It must be a concrete, non-final class with a public no-argument constructor, because
- * {@code @ApplicationScoped} is a normal scope and the container has to proxy it:
+ * {@code @ApplicationScoped} is a normal scope and the container has to proxy it, and it must
+ * <strong>carry {@code @ApplicationScoped} itself</strong>:
  *
  * <pre>{@code
+ * @ApplicationScoped
  * public class PetRepository extends AbstractRepository<Pet, Long> {
  *     public PetRepository() {
  *         super(Pet.class);
@@ -62,6 +64,19 @@ import java.util.logging.Logger;
  *     // queries of its own, built from getEntityManager()
  * }
  * }</pre>
+ *
+ * Repeating the annotation looks redundant, because the scope annotation is {@code @Inherited} and
+ * the subclass really does have the scope. Discovery is the part that is not inherited: this WAR is
+ * an implicit bean archive (it has no {@code beans.xml}), so the container only registers classes
+ * that carry a bean-defining annotation of their own. Leave it off and the deployment fails with
+ * {@code WELD-001408: Unsatisfied dependencies} at the first injection point — verified on
+ * Payara 6.
+ *
+ * <p>The annotation on this class is therefore documentation of the hierarchy's scope rather than
+ * the thing that registers anything; an abstract class is never a bean. Payara says so at every
+ * deployment, and the line is expected rather than a fault to chase:
+ * {@code WELD-000167: Class ... AbstractRepository is annotated with @ApplicationScoped but it does
+ * not declare an appropriate constructor therefore is not registered as a bean!}
  *
  * @param <T>  the entity type
  * @param <ID> the type of that entity's identifier

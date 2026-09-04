@@ -57,6 +57,7 @@ them first:
 
 ```sql
 SELECT LOWER(email), count(*) FROM users GROUP BY 1 HAVING count(*) > 1;
+SELECT LOWER(category_name), count(*) FROM category GROUP BY 1 HAVING count(*) > 1;
 ```
 
 ## The application's database role
@@ -85,6 +86,7 @@ repository.
 SELECT count(*) FROM category;         -- 6
 \d pet_image                           -- shows partial unique index ux_pet_image_main
 \d users                               -- shows unique index ux_users_email_lower
+\d category                            -- shows unique index ux_category_name_lower
 ```
 
 ## Administrator account

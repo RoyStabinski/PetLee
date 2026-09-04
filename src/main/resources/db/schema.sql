@@ -52,8 +52,21 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
 -- than only in Java means two concurrent admin requests cannot both win the check.
 CREATE TABLE IF NOT EXISTS category (
     category_id   SERIAL      PRIMARY KEY,
-    category_name VARCHAR(50) NOT NULL UNIQUE
+    -- No column-level UNIQUE: uniqueness is case-insensitive here and is enforced by
+    -- ux_category_name_lower below, which implies the exact-match constraint anyway.
+    category_name VARCHAR(50) NOT NULL
 );
+
+-- One label, one category. CategoryRepository.existsByName compares
+-- LOWER(c.categoryName) = LOWER(:name), so the database must agree: a plain UNIQUE on the
+-- column compares exactly and would accept 'dogs' beside a stored 'Dogs', giving the filter
+-- dropdown two entries that read the same. Same reasoning, and same fix, as
+-- ux_users_email_lower above.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_category_name_lower ON category (LOWER(category_name));
+
+-- Migration for databases created before ux_category_name_lower existed. A no-op on a fresh
+-- database and on every re-run, so the file stays re-runnable.
+ALTER TABLE category DROP CONSTRAINT IF EXISTS category_category_name_key;
 
 -- ---------------------------------------------------------------------------
 -- pet

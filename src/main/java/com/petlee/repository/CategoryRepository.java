@@ -17,13 +17,10 @@ import java.util.Optional;
  * A category is a label chosen by an administrator, and {@code Dogs} and {@code dogs} would be the
  * same label to every user looking at the dropdown.
  *
- * <p><strong>The database does not agree yet.</strong> {@code category.category_name} carries a
- * plain {@code UNIQUE} constraint, which compares exactly, so it would accept {@code dogs} beside a
- * stored {@code Dogs}. {@link #existsByName(String)} is therefore stricter than the constraint
- * behind it: T-34 checks first and rejects, but two admin requests racing past that check would
- * both be accepted by the database. This is the same defect the {@code users.email} column had, and
- * it is closed the same way — a unique index on {@code LOWER(category_name)}. Until that lands,
- * {@link #findByName(String)} may legitimately see more than one row and returns the first.
+ * <p>The database agrees: {@code ux_category_name_lower} is a unique index on
+ * {@code LOWER(category_name)}, so {@link #existsByName(String)} is exactly as strict as the
+ * constraint behind it. T-34's check is not the only guarantee — two admin requests racing past it
+ * still lose at the database.
  *
  * <h2>Every query is a literal with named parameters</h2>
  * The four queries below are string literals declared at their call site, and every caller-supplied
@@ -59,10 +56,10 @@ public class CategoryRepository extends AbstractRepository<Category, Integer> {
      * Finds the category with this name, ignoring case.
      *
      * <p>A missing category gives {@link Optional#empty()}; a {@code null} argument does the same
-     * without a query. The first match is returned rather than the only one, because the database
-     * constraint is case-sensitive and cannot yet rule out a second row differing only in case —
-     * see the class Javadoc. That also keeps this method from throwing where
-     * {@code getSingleResult()} would.
+     * without a query. At most one row can match, since {@code ux_category_name_lower} is unique;
+     * the result is still read as the first of a stream rather than through
+     * {@code getSingleResult()}, which turns "no row" into an exception instead of an empty
+     * result.
      *
      * @param name the category name, in any case, may be {@code null}
      * @return the category, or empty when no such name exists; never {@code null}

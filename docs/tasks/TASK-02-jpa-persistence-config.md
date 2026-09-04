@@ -54,8 +54,15 @@ specification §4's connection-pooling requirement without adding a pooling libr
 1. With the JDBC resource configured and the T-03 schema applied, the WAR deploys and the server
    log shows the persistence unit starting with no error.
 2. `asadmin ping-connection-pool petlee-pool` (or the console equivalent) succeeds.
-3. With PostgreSQL stopped, deployment fails with a message naming the JNDI resource, and no
-   password appears in the log.
+3. With PostgreSQL stopped, deployment fails and no password appears in the server log or in the
+   server's own configuration. **Amended 2026-09-04**, after being run for the first time on the
+   reference target: this criterion originally also required the failure message to name the JNDI
+   resource, which Payara 6 does not do. Deployment fails with the JPA provider's
+   `DatabaseException` naming the database host and port; `jdbc/petlee` appears nowhere in it. The
+   expectation was wrong about the platform, not about the system, so it is removed rather than
+   left permanently unmeetable. The security half of the criterion — no password in the log —
+   stands and is the part worth checking. See the "Negative check" in
+   `docs/deployment/datasource-setup.md` for the real message.
 4. A trivial injected `@PersistenceContext EntityManager` in a test resource returns a live
    connection.
 5. `grep -riE "hibernate\.|eclipselink\.|HikariCP" src/main/resources/META-INF/persistence.xml`

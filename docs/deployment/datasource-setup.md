@@ -208,9 +208,24 @@ asadmin delete-password-alias petlee-db-password
 ## WildFly 31
 
 The same WAR deploys unchanged; only this resource is redefined, which is the portability claim
-`persistence.xml` makes by omitting `<provider>`. Add the driver as a module, then:
+`persistence.xml` makes by omitting `<provider>`. **Verified on WildFly 31.0.1.Final** — see
+"What differed" below.
+
+Add the driver as a module first. This runs offline, before the server starts:
 
 ```bash
+jboss-cli.sh --command="module add --name=org.postgresql \
+  --resources=/path/to/postgresql-42.6.0.jar \
+  --dependencies=jakarta.transaction.api,java.sql"
+```
+
+Then start the server and register the driver and the data source:
+
+```bash
+jboss-cli.sh --connect --command="/subsystem=datasources/jdbc-driver=postgresql:add(\
+  driver-name=postgresql, driver-module-name=org.postgresql, \
+  driver-class-name=org.postgresql.Driver)"
+
 jboss-cli.sh --connect --command="data-source add \
   --name=petlee-pool \
   --jndi-name=java:/jdbc/petlee \
@@ -220,11 +235,40 @@ jboss-cli.sh --connect --command="data-source add \
   --min-pool-size=2 --max-pool-size=10 \
   --validate-on-match=true \
   --valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker"
+
+jboss-cli.sh --connect --command="/subsystem=datasources/data-source=petlee-pool:test-connection-in-pool"
+jboss-cli.sh --connect --command="deploy --force target/pet-lee.war"
 ```
 
 WildFly resolves the unqualified name `jdbc/petlee` in `persistence.xml` against `java:/`, so no
-application change is needed. Use a vault expression rather than a literal password for anything
-beyond a local machine.
+application change is needed — confirmed: the log shows `WFLYJCA0001: Bound data source
+[java:/jdbc/petlee]` and then `WFLYJPA0002: Read persistence.xml for petlee-pu` with no
+configuration change of any kind. Use a vault expression rather than a literal password for
+anything beyond a local machine.
+
+Two mechanics if you are following this on Windows or beside a running Payara:
+
+- `jboss-cli.bat` ends with `pause`, so a scripted run appears to hang after each command. Feed it
+  a command file and close stdin: `jboss-cli.bat --connect --file=setup.cli < NUL`.
+- To run WildFly alongside Payara, offset its ports:
+  `standalone.bat -Djboss.socket.binding.port-offset=100` puts HTTP on 8180 and management on
+  10090, and `--controller=remote+http://localhost:10090` reaches it.
+
+### What differed
+
+The same WAR ran identically on both servers, but the JPA provider underneath is not the same one —
+Payara supplies **EclipseLink 4.0.7**, WildFly supplies **Hibernate ORM 6.4.4**. Two differences
+showed up under the same test, and application code must not depend on either:
+
+| | EclipseLink (Payara) | Hibernate (WildFly) |
+|---|---|---|
+| `@Version` after the first insert | `1` | `0` |
+| Duplicate key surfaces as | `PersistenceException` | `ConstraintViolationException` |
+
+Nothing in the codebase assumes a starting version number or a specific wrapper exception, which is
+why both passed. T-15 and T-38 should keep it that way: compare versions for *change*, never against
+a literal, and match on `jakarta.persistence.OptimisticLockException` — which both providers do
+throw as itself.
 
 ## Related
 

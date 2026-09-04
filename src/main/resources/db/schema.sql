@@ -22,7 +22,10 @@ CREATE TABLE IF NOT EXISTS users (
     -- No column-level UNIQUE: uniqueness is case-insensitive here and is enforced by
     -- ux_users_email_lower below, which implies the exact-match constraint anyway.
     email         VARCHAR(100) NOT NULL,
-    phone_number  VARCHAR(10),
+    -- 20, not 10: api-contract.md's own registration example sends "050-1234567", which is 11
+    -- characters. At VARCHAR(10) the contract's example body failed the INSERT outright. 20 also
+    -- leaves room for an international format.
+    phone_number  VARCHAR(20),
     -- ADR-002 #1: POST /api/users/register sends "region" and the contract is frozen,
     -- so the schema carries it. Nullable, and never returned in UserDTO.
     region        VARCHAR(100),
@@ -43,6 +46,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (LOWER(email));
 -- still carries the exact-match UNIQUE that the index above supersedes. Dropping it is a
 -- no-op on a fresh database and on every re-run, so the file stays re-runnable.
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
+
+-- Migration for databases created while phone_number was VARCHAR(10). Widening a varchar needs
+-- no table rewrite, and re-running it on an already-widened column changes nothing, so the file
+-- stays re-runnable.
+ALTER TABLE users ALTER COLUMN phone_number TYPE VARCHAR(20);
 
 -- ---------------------------------------------------------------------------
 -- category

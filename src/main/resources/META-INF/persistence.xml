@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
+             version="3.1">
+
+    <!--
+      JTA, not RESOURCE_LOCAL: the server owns transactions and connections, so there is no
+      EntityManagerFactory bootstrap and no transaction helper anywhere in this project.
+    -->
+    <persistence-unit name="petlee-pu" transaction-type="JTA">
+
+        <!-- No <provider>, on purpose: each server uses its own, and nothing here is
+             provider-specific. The pool behind jdbc/petlee is configured on the server, so no
+             URL, user or password appears in this repository. -->
+        <jta-data-source>jdbc/petlee</jta-data-source>
+
+        <!-- Listed explicitly, so a missing registration fails at deployment rather than as
+             an "Unknown entity" at runtime. -->
+        <class>com.petlee.model.User</class>
+        <class>com.petlee.model.Category</class>
+        <class>com.petlee.model.Pet</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+
+        <properties>
+            <!-- schema.sql owns the schema; the provider must never touch it. -->
+            <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
+
+            <!-- Validation belongs to the service layer, where a violation can be turned into
+                 the contract's error shape; one thrown from flush() cannot be. -->
+            <property name="jakarta.persistence.validation.mode" value="NONE"/>
+        </properties>
+
+        <!-- Trade-off: only JPA-standard property keys are used, which keeps this portable
+             but leaves no schema validation at deployment. Change an entity or schema.sql and
+             check the other by hand. -->
+    </persistence-unit>
+</persistence>

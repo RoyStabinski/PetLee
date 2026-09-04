@@ -12,7 +12,11 @@ INSERT INTO category (category_name) VALUES
     ('Rodents'),
     ('Birds'),
     ('Reptiles')
-ON CONFLICT (category_name) DO NOTHING;
+-- Infer the conflict from ux_category_name_lower, the unique index on LOWER(category_name).
+-- Plain "ON CONFLICT (category_name)" fails with "there is no unique or exclusion constraint
+-- matching the ON CONFLICT specification" — the column's own UNIQUE was replaced by the
+-- functional index, and inference matches the indexed expression, not the column.
+ON CONFLICT (LOWER(category_name)) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- Administrator account — BLOCKED ON T-10

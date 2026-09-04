@@ -42,8 +42,9 @@ first.
 
 ## Step 0 — install the PostgreSQL JDBC driver into the server
 
-The driver is a `runtime` dependency in `pom.xml` for the test classpath, but the *server* needs its
-own copy to open connections on the application's behalf.
+The driver is a `provided` dependency in `pom.xml`, so it is on the compile and test classpaths but
+is **not** packaged into the WAR. The *server* needs its own copy — it is the server's pool, not the
+application, that opens connections.
 
 ```bash
 # Payara 6 / GlassFish 7 — then restart the domain

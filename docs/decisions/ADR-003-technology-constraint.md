@@ -25,7 +25,7 @@ services. The build therefore adds *no* runtime libraries at all.
 | Dependency | Scope | Why |
 |---|---|---|
 | `jakarta.jakartaee-api` | `provided` | Compile against the platform; the server supplies it at runtime |
-| `postgresql` (JDBC driver) | `runtime` | Specification §8. Installed into the server as a JDBC resource |
+| `postgresql` (JDBC driver) | `provided` | Specification §8. Installed into the server as a JDBC resource |
 | `junit-jupiter` | `test` | See "The single exception" below |
 
 **Reference target: Payara 6.** GlassFish 7 and WildFly 31 are drop-in alternatives — all three
@@ -67,6 +67,19 @@ recorded here so the exception is visible rather than assumed.
 - **`pom.xml` shrinks substantially.** The committed file bundles Hibernate, Jersey and Mojarra
   into the WAR; on a Jakarta EE server all three are platform services and must not be bundled, or
   they will conflict with the server's own copies at deployment.
+
+## Amendment, 2026-09-04 — the driver's scope
+
+This table originally gave the PostgreSQL driver scope `runtime`, which packages it into
+`WEB-INF/lib`. Deploying to both reference servers showed that copy is never used: connections come
+from the server's pool behind `jdbc/petlee`, made with the driver installed into the server. WildFly
+made the redundancy visible by registering a second driver service out of the WAR
+(`Started Driver service with driver-name = pet-lee.war_org.postgresql.Driver_42_6`).
+
+The scope is now `provided`, so `WEB-INF/lib` is empty and the decision above — "the build adds *no*
+runtime libraries at all" — is literally true rather than nearly true. `provided` still puts the
+driver on the compile and test classpaths, so T-38's tests, which open their own JDBC connection,
+are unaffected. The dependency list is still exactly three entries; nothing was added or removed.
 
 ## Standing rule
 **Adding any dependency to `pom.xml` requires a new ADR.** "It would be convenient" is not

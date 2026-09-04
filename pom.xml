@@ -36,7 +36,7 @@
 
     <!--
       The dependency list is closed — see docs/decisions/ADR-003-technology-constraint.md.
-      Exactly three entries, none of them shipped inside the WAR except the JDBC driver.
+      Exactly three entries, none of them shipped inside the WAR: WEB-INF/lib is empty.
       JSF, JPA, Jakarta REST, CDI, JTA, JSON-B and connection pooling are platform services
       supplied by the application server. Bundling a second copy of any of them causes
       classloader conflicts at deployment. Adding a dependency requires a new ADR.
@@ -54,14 +54,17 @@
         </dependency>
 
         <!-- PostgreSQL JDBC driver (specification §8).
-             Scope 'runtime' — no code compiles against it; it is loaded by name.
-             In production the driver is installed into the server and reached through the
-             JNDI data source (T-02, T-42); this dependency puts it on the test classpath. -->
+             Scope 'provided', not 'runtime': the SERVER owns this driver. Connections are made by
+             the server's pool behind jdbc/petlee, using the copy installed into the server
+             (T-02, T-42) — the WAR's copy was never used for that and only registered a second,
+             redundant driver service on deployment. 'provided' still puts it on the compile and
+             test classpaths, so T-38's tests, which open their own JDBC connection, are unaffected;
+             it only stops the jar being packaged into WEB-INF/lib. -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>${postgresql.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
             <exclusions>
                 <!-- checker-qual carries compile-time nullness annotations only. It is dead
                      weight inside the WAR, so it is excluded rather than shipped. -->

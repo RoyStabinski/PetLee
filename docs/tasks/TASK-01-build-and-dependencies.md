@@ -27,10 +27,14 @@ Jakarta EE 10 server, which supplies every technology specification §7 names.
 2. The dependency list becomes exactly three entries:
    - `jakarta.platform:jakarta.jakartaee-api:10.0.0` — scope **`provided`**. Compiles against JSF,
      JPA, Jakarta REST, CDI, JTA and the Servlet API in one artifact.
-   - `org.postgresql:postgresql:42.6.0` — scope **`runtime`**. Specification §8. It is also
-     installed into the server as a JDBC driver (T-42); the `runtime` scope here is for tests.
-     Exclude its `org.checkerframework:checker-qual` transitive — compile-time annotations only,
-     dead weight inside the WAR.
+   - `org.postgresql:postgresql:42.6.0` — scope **`provided`**. Specification §8. The driver is
+     installed into the server as a JDBC resource (T-02, T-42) and the server's pool is what uses
+     it; `provided` keeps it on the compile and test classpaths without packaging it.
+     **Amended 2026-09-04**: this was `runtime`, which packages the jar into `WEB-INF/lib`. Both
+     reference servers turned out to supply their own driver, so that copy was never used — WildFly
+     made it visible by registering a second driver service out of the WAR. See the amendment in
+     ADR-003. Exclude its `org.checkerframework:checker-qual` transitive — compile-time annotations
+     only, dead weight anywhere.
    - `org.junit.jupiter:junit-jupiter:5.10.0` — scope **`test`**. The single exception permitted by
      ADR-003.
 3. Keep `<packaging>war</packaging>` and `<finalName>pet-lee</finalName>` — the context path
@@ -61,7 +65,11 @@ Jakarta EE 10 server, which supplies every technology specification §7 names.
    this is the definitive check that ADR-003 holds. `jar` is used rather than `unzip` because it
    ships with the JDK the build already requires.
 3. `mvn dependency:tree` lists exactly three direct dependencies, and
-   `jar tf target/pet-lee.war | grep '^WEB-INF/lib/'` lists only `postgresql-42.6.0.jar`.
+   `jar tf target/pet-lee.war | grep '^WEB-INF/lib/'` returns **nothing** (grep exits 1).
+   **Amended 2026-09-04**: this originally expected `postgresql-42.6.0.jar` to be listed, because
+   the driver was scoped `runtime`. It is now `provided` and the WAR carries no jar at all, which
+   makes ADR-003's "the build adds no runtime libraries" literally true. The dependency count is
+   unchanged at three.
 4. The WAR deploys to Payara 6 with no `LinkageError`, `ClassCastException` or duplicate-provider
    warning in `domains/domain1/logs/server.log`:
    `asadmin start-domain` → `asadmin deploy target/pet-lee.war` → `asadmin undeploy pet-lee`.

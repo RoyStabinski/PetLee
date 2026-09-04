@@ -20,8 +20,11 @@ public class PetImage {
     @Column(name = "image_url", nullable = false, length = 512)
     private String imageUrl;
 
+    // Defaulted here so a caller that never touches the flag cannot violate the NOT NULL
+    // column. The database also defaults it, but an INSERT sent by JPA always names the
+    // column, so the default would never apply.
     @Column(name = "is_main", nullable = false)
-    private Boolean isMain;
+    private Boolean isMain = Boolean.FALSE;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
@@ -72,5 +75,30 @@ public class PetImage {
 
     public void setUpdatedAt(LocalDateTime updatedAt){
         this.updatedAt = updatedAt;
+    }
+
+    // Identity comparison on the id alone. Two unpersisted images are never equal, even when
+    // every other field matches — they are two distinct rows waiting to be written.
+    @Override
+    public boolean equals(Object o){
+        if(this == o){
+            return true;
+        }
+        if(!(o instanceof PetImage other)){
+            return false;
+        }
+        return imageId != null && imageId.equals(other.imageId);
+    }
+
+    // Constant, deliberately. A hash derived from the id would change when the provider
+    // assigns one on persist, and an entity already inside a HashSet would become unfindable.
+    @Override
+    public int hashCode(){
+        return PetImage.class.hashCode();
+    }
+
+    @Override
+    public String toString(){
+        return "PetImage{imageId=" + imageId + ", imageUrl='" + imageUrl + "'}";
     }
 }

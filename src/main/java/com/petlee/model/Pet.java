@@ -26,10 +26,10 @@ public class Pet {
     @Column(name = "pet_id")
     private Long petId;
 
-    @Column(name = "pet_name", nullable = false)
+    @Column(name = "pet_name", nullable = false, length = 100)
     private String petName;
 
-    @Column(name = "breed")
+    @Column(name = "breed", length = 100)
     private String breed;
 
     @Column(name = "age")
@@ -64,12 +64,19 @@ public class Pet {
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<PetImage> images = new ArrayList<>();
 
-    @Column(name = "created_at", nullable = false, updatable = true)
+    // updatable = false: specification §11 orders the gallery newest-first on created_at, so an
+    // edit must never silently reorder listings. ADR-002 #4.
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Version
     @Column(name = "version")
     private Long version;
+
+    // Explicit, so that adding a second constructor later cannot silently remove the
+    // no-arg one JPA requires.
+    public Pet(){
+    }
 
     @PrePersist
         protected void onCreated(){
@@ -111,11 +118,14 @@ public class Pet {
         this.age = age;
     }
     
-    public PetSize getPetSize(){
+    // Named getSize/setSize rather than with the old pet- prefix: JSON-B and JSF EL both
+    // derive the property name from the accessor, so the previous names serialised the
+    // contract's "size" key as "petSize". ADR-002 #2.
+    public PetSize getSize(){
         return size;
     }
 
-    public void setPetSize(PetSize size){
+    public void setSize(PetSize size){
         this.size = size;
     }
 
@@ -179,7 +189,35 @@ public class Pet {
         return createdAt;
     }
 
-    public long getVersion(){
+    // Long, not long: version is null until the row is first written, and unboxing that null
+    // threw NullPointerException on every unpersisted Pet. ADR-002 #3.
+    // No setter — the persistence provider owns this field.
+    public Long getVersion(){
         return version;
+    }
+
+    // Identity comparison on the id alone. Two unpersisted pets are never equal, even when
+    // every other field matches — they are two distinct rows waiting to be written.
+    @Override
+    public boolean equals(Object o){
+        if(this == o){
+            return true;
+        }
+        if(!(o instanceof Pet other)){
+            return false;
+        }
+        return petId != null && petId.equals(other.petId);
+    }
+
+    // Constant, deliberately. A hash derived from the id would change when the provider
+    // assigns one on persist, and an entity already inside a HashSet would become unfindable.
+    @Override
+    public int hashCode(){
+        return Pet.class.hashCode();
+    }
+
+    @Override
+    public String toString(){
+        return "Pet{petId=" + petId + ", petName='" + petName + "'}";
     }
 }

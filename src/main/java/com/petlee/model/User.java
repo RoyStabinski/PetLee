@@ -38,7 +38,8 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(name = "phone_number", length = 10)
+    // 20 to match schema.sql: the contract's example "050-1234567" is 11 characters. ADR-002 #9.
+    @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
     // POST /api/users/register sends "region" and the contract is frozen, so the entity

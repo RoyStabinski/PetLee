@@ -18,14 +18,10 @@ import java.util.Optional;
  * </ul>
  * T-13 and T-37 both depend on this asymmetry; it is stated here so neither has to infer it.
  *
- * <h2>Known gap: case-insensitive email uniqueness is not enforced by the database</h2>
- * The {@code users.email} column carries a plain {@code UNIQUE} constraint, which compares
- * exactly. {@link #existsByEmail(String)} is therefore stricter than the constraint: it reports a
- * clash the database would happily accept. That ordering is safe — the check runs first and
- * rejects the registration — but it means the guarantee lives in T-13, not in the schema. Closing
- * it needs a unique index on {@code LOWER(email)}, which is a schema change and belongs to
- * whichever task revisits T-03. Until then {@link #findByEmail(String)} may legitimately see more
- * than one row and returns the first rather than throwing.
+ * <p>The database agrees with both rules: {@code users.user_name} is {@code UNIQUE} and
+ * {@code ux_users_email_lower} is a unique index on {@code LOWER(email)}, so
+ * {@link #existsByEmail(String)} is exactly as strict as the constraint behind it. Neither check
+ * is the only guarantee — two registrations racing past either one still lose at the database.
  *
  * <h2>Every query is a literal with named parameters</h2>
  * The four queries below are string literals declared at their call site, and every caller-supplied
@@ -67,10 +63,10 @@ public class UserRepository extends AbstractRepository<User, Long> {
      * Finds the user registered with this email address, ignoring case.
      *
      * <p>A missing user gives {@link Optional#empty()}; a {@code null} argument does the same
-     * without a query. The first match is returned rather than the only one, because the database
-     * constraint is case-sensitive and cannot rule out a second row differing only in case — see
-     * the class Javadoc. That also keeps this method from throwing where
-     * {@code getSingleResult()} would.
+     * without a query. At most one row can match, since {@code ux_users_email_lower} is unique;
+     * the result is still read as the first of a stream rather than through
+     * {@code getSingleResult()}, which turns "no row" into an exception instead of an empty
+     * result.
      *
      * @param email the address, in any case, may be {@code null}
      * @return the user, or empty when the address is unknown; never {@code null}

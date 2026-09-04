@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS users (
     -- Stores a PBKDF2 digest (T-10), never a password. The column name says so.
     password_hash VARCHAR(255) NOT NULL,
     full_name     VARCHAR(50)  NOT NULL,
-    email         VARCHAR(100) NOT NULL UNIQUE,
+    -- No column-level UNIQUE: uniqueness is case-insensitive here and is enforced by
+    -- ux_users_email_lower below, which implies the exact-match constraint anyway.
+    email         VARCHAR(100) NOT NULL,
     phone_number  VARCHAR(10),
     -- ADR-002 #1: POST /api/users/register sends "region" and the contract is frozen,
     -- so the schema carries it. Nullable, and never returned in UserDTO.
@@ -28,6 +30,19 @@ CREATE TABLE IF NOT EXISTS users (
     created_at    TIMESTAMP    NOT NULL,
     CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
+
+-- One mailbox, one account. UserRepository.existsByEmail compares
+-- LOWER(u.email) = LOWER(:email), so the database must agree: a plain UNIQUE on the column
+-- compares exactly and would accept A@B.com beside a stored a@b.com, letting one mailbox
+-- register twice whenever two registrations race past the Java check. A functional unique
+-- index makes it the database's decision, and gives that query an index it can actually use —
+-- LOWER(email) cannot use a plain index on email.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (LOWER(email));
+
+-- Migration for databases created before ux_users_email_lower existed: their email column
+-- still carries the exact-match UNIQUE that the index above supersedes. Dropping it is a
+-- no-op on a fresh database and on every re-run, so the file stays re-runnable.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
 
 -- ---------------------------------------------------------------------------
 -- category

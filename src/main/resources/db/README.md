@@ -41,13 +41,23 @@ actions, and `ux_pet_image_main` never appears.
 Before trusting an existing database, check for the columns and constraints only this schema has:
 
 ```sql
-\d users        -- must show password_hash and region, not password
+\d users        -- must show password_hash and region, not password, plus the unique
+                --   index ux_users_email_lower and NO users_email_key constraint
 \d pet_image    -- must show ux_pet_image_main and ON DELETE CASCADE
 \d pet          -- category_id FK must be ON DELETE RESTRICT; version NOT NULL DEFAULT 0
 ```
 
 If any is missing, drop the database and re-apply both scripts. There is no migration path from an
 auto-generated schema, and no migration tool in this project by design (ADR-003).
+
+One statement in `schema.sql` can fail on a populated database rather than being skipped:
+`ux_users_email_lower` cannot be created if two existing rows hold the same address in different
+cases. That is the point of the index, so the fix is to reconcile the rows, not to skip it. Find
+them first:
+
+```sql
+SELECT LOWER(email), count(*) FROM users GROUP BY 1 HAVING count(*) > 1;
+```
 
 ## The application's database role
 
@@ -74,6 +84,7 @@ repository.
 \dt                                    -- users, category, pet, pet_image
 SELECT count(*) FROM category;         -- 6
 \d pet_image                           -- shows partial unique index ux_pet_image_main
+\d users                               -- shows unique index ux_users_email_lower
 ```
 
 ## Administrator account

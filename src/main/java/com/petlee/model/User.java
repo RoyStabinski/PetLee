@@ -32,6 +32,9 @@ public class User {
     @Column(name = "full_name", nullable = false, length = 50)
     private String fullName;
 
+    // unique = true is documentation only (schema generation is off). The real constraint is
+    // ux_users_email_lower, a unique index on LOWER(email): one mailbox, one account, whatever
+    // case it is typed in.
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 

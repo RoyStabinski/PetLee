@@ -2,6 +2,8 @@ package com.petlee.repository;
 
 import com.petlee.model.User;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.util.Optional;
 
 /**
@@ -32,6 +34,14 @@ import java.util.Optional;
  * No hashing, no password comparison, no validation, no DTO conversion. The repository stores
  * whatever string it is handed; T-10 hashes and T-13 decides.
  */
+// @ApplicationScoped is repeated here rather than left to be inherited from
+// AbstractRepository. The scope annotation IS @Inherited, so the subclass genuinely has the
+// scope — but in an implicit bean archive (no beans.xml) the container only DISCOVERS classes
+// carrying a bean-defining annotation of their own, and an inherited one does not count.
+// Without this line Payara 6 refuses the deployment outright:
+//   WELD-001408: Unsatisfied dependencies for type UserRepository with qualifiers @Default
+// Every repository subclass needs it. See AbstractRepository's "Writing a subclass".
+@ApplicationScoped
 public class UserRepository extends AbstractRepository<User, Long> {
 
     public UserRepository() {

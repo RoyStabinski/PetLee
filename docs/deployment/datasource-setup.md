@@ -12,6 +12,10 @@ database URL, user and password are configured **only** in the pool below. They 
 Reference target is **Payara 6**; the console paths and `asadmin` commands below are Payara's and
 apply unchanged to GlassFish 7. WildFly's equivalent is at the end.
 
+Everything on this page was run against Payara 6.2025.11 on JDK 21. That combination prints
+`WARNING: You are running the product on an unsupported JDK version` at `start-domain` and then
+works normally; JDK 17 is the version Payara 6 states support for.
+
 ## What gets created
 
 | Setting | Value |
@@ -43,9 +47,15 @@ own copy to open connections on the application's behalf.
 
 ```bash
 # Payara 6 / GlassFish 7 — then restart the domain
+mkdir -p "$PAYARA_HOME/glassfish/domains/domain1/lib/ext"
 cp postgresql-42.6.0.jar "$PAYARA_HOME/glassfish/domains/domain1/lib/ext/"
 asadmin restart-domain
 ```
+
+`lib/ext` is **not** present in the Payara 6 distribution — the domain ships `lib/applibs`,
+`lib/classes`, `lib/databases` and `lib/warlibs` only. Create it, or the copy silently becomes a
+file named `ext` and the driver is never found. (Verified on Payara 6.2025.11: the domain starts
+and the jar loads from `lib/ext` once the directory exists.)
 
 The jar is in your local Maven repository at
 `~/.m2/repository/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar`, or from
@@ -60,6 +70,15 @@ password out of both.
 ```bash
 asadmin create-password-alias petlee-db-password
 # prompts twice for the value; nothing is echoed
+```
+
+For a scripted setup, the same command reads the value from a file instead of prompting — delete
+the file afterwards:
+
+```bash
+printf 'AS_ADMIN_ALIASPASSWORD=<the password>\n' > alias.txt
+asadmin --passwordfile alias.txt create-password-alias petlee-db-password
+rm alias.txt
 ```
 
 Refer to it later as `${ALIAS=petlee-db-password}`. If you skip this step, substitute the literal
@@ -144,16 +163,39 @@ The server log should show `petlee-pu` starting with no error.
 
 ### Negative check
 
-Stop PostgreSQL and redeploy. Deployment must fail with a message naming `jdbc/petlee`, and the log
-must not contain the password — that is what Step 1's alias buys you.
+Make the database unreachable and redeploy. Deployment must fail, and the log must not contain the
+password — that is what Step 1's alias buys you.
 
 ```bash
-sudo systemctl stop postgresql       # Linux
-# net stop postgresql-x64-14         # Windows
+sudo systemctl stop postgresql          # Linux
+# net stop postgresql-x64-18            # Windows, matching your installed major version
 asadmin deploy --force=true target/pet-lee.war   # expected to fail
 grep -ri "<the password>" "$PAYARA_HOME/glassfish/domains/domain1/logs/server.log"   # expect no match
 sudo systemctl start postgresql
 ```
+
+Without stopping the service, pointing the pool at a closed port produces the same failure and
+touches nothing else:
+
+```bash
+asadmin set resources.jdbc-connection-pool.petlee-pool.property.portNumber=5433
+asadmin ping-connection-pool petlee-pool          # fails
+asadmin deploy --force=true target/pet-lee.war    # fails
+asadmin set resources.jdbc-connection-pool.petlee-pool.property.portNumber=5432
+```
+
+**What the failure actually says.** Expect the JPA provider's exception, naming the host and port —
+not the JNDI name:
+
+```
+Error occurred during deployment: Exception [EclipseLink-4002] ... DatabaseException
+Internal Exception: java.sql.SQLException: Error in allocating a connection. Cause: Connection
+could not be allocated because: Connection to localhost:5433 refused.
+```
+
+`jdbc/petlee` does not appear in it, so search the log for the host and port rather than the
+resource name. The password does not appear anywhere in the log, and `domain.xml` stores
+`${ALIAS=petlee-db-password}` rather than the value — both verified on Payara 6.2025.11.
 
 ## Removing it again
 

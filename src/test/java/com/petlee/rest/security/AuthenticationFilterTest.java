@@ -2,13 +2,10 @@ package com.petlee.rest.security;
 
 import com.petlee.model.User;
 
-import jakarta.ws.rs.container.ResourceInfo;
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -17,59 +14,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /**
  * The filter's decisions, without a server: who is let through, and what each refusal says.
  *
- * <p>{@link AuthenticationFilter#decide()} is asserted rather than {@code filter(...)} because
+ * <p>{@link AuthenticationFilter#decide} is asserted rather than {@code filter(...)} because
  * building a {@code Response} needs a Jakarta REST runtime, and ADR-003 keeps one off the test
  * classpath. The status and code carried by a {@code Rejection} are the ones the client receives;
  * that they arrive as JSON over the wire is T-20's and T-22's criteria, against a deployed server.
  */
 class AuthenticationFilterTest {
 
-    /** A resource whose methods stand in for the real ones; only the annotations are read. */
-    static class ExampleResource {
+    /** {@code false} is what AuthenticationFilter passes; {@code true} is AdminOnlyFilter's. */
+    private static final boolean SECURED = false;
+    private static final boolean ADMIN_ONLY = true;
 
-        @Secured
-        public void createPet() {
-        }
-
-        @AdminOnly
-        public void deleteAnyPet() {
-        }
-
-        public void listPets() {
-        }
-    }
-
-    @AdminOnly
-    static class ExampleAdminResource {
-
-        public void inheritsTheClassAnnotation() {
-        }
-    }
-
-    private static Method method(Class<?> type, String name) {
-        try {
-            return type.getMethod(name);
-        } catch (NoSuchMethodException e) {
-            throw new AssertionError(e);
-        }
-    }
-
-    private static ResourceInfo resource(Class<?> type, String methodName) {
-        return new ResourceInfo() {
-            @Override
-            public Method getResourceMethod() {
-                return method(type, methodName);
-            }
-
-            @Override
-            public Class<?> getResourceClass() {
-                return type;
-            }
-        };
-    }
-
-    private static AuthenticationFilter.Rejection decide(TestRequest request, ResourceInfo info) {
-        return new AuthenticationFilter(request.asServletRequest(), info).decide();
+    private static AuthenticationFilter.Rejection decide(TestRequest request, boolean adminRequired) {
+        return AuthenticationFilter.decide(request.asServletRequest(), adminRequired);
     }
 
     private static AuthenticationFilter.Rejection rejection(AuthenticationFilter.Rejection actual,
@@ -85,7 +42,7 @@ class AuthenticationFilterTest {
     @DisplayName("criterion 1 — no session on a @Secured endpoint is 401 NOT_AUTHENTICATED")
     void noSessionIsUnauthorised() {
         AuthenticationFilter.Rejection refused = rejection(
-                decide(TestRequest.withoutSession(), resource(ExampleResource.class, "createPet")),
+                decide(TestRequest.withoutSession(), SECURED),
                 Response.Status.UNAUTHORIZED, "NOT_AUTHENTICATED");
 
         assertEquals("You must be logged in to perform this action.", refused.message);
@@ -101,7 +58,7 @@ class AuthenticationFilterTest {
                 new SessionUser(7L, "donaldt", "Donald Trump", User.Role.USER));
         request.session().invalidate();
 
-        rejection(decide(request, resource(ExampleResource.class, "createPet")),
+        rejection(decide(request, SECURED),
                 Response.Status.UNAUTHORIZED, "NOT_AUTHENTICATED");
     }
 
@@ -111,7 +68,7 @@ class AuthenticationFilterTest {
         TestRequest request = TestRequest.loggedInAs(
                 new SessionUser(7L, "donaldt", "Donald Trump", User.Role.USER));
 
-        assertNull(decide(request, resource(ExampleResource.class, "createPet")),
+        assertNull(decide(request, SECURED),
                 "the request must reach the resource, so nothing is refused");
     }
 
@@ -122,7 +79,7 @@ class AuthenticationFilterTest {
                 new SessionUser(7L, "donaldt", "Donald Trump", User.Role.USER));
 
         AuthenticationFilter.Rejection refused = rejection(
-                decide(request, resource(ExampleResource.class, "deleteAnyPet")),
+                decide(request, ADMIN_ONLY),
                 Response.Status.FORBIDDEN, "NOT_ADMIN");
 
         assertEquals("donaldt is not an administrator", refused.reason);
@@ -134,27 +91,24 @@ class AuthenticationFilterTest {
         TestRequest request = TestRequest.loggedInAs(
                 new SessionUser(3L, "admin", "Site Administrator", User.Role.ADMIN));
 
-        assertNull(decide(request, resource(ExampleResource.class, "deleteAnyPet")));
+        assertNull(decide(request, ADMIN_ONLY));
     }
 
     @Test
     @DisplayName("@AdminOnly implies @Secured — a guest gets 401 there, not 403")
     void guestOnAdminEndpointIsUnauthorisedNotForbidden() {
         // 403 would tell an anonymous caller that the endpoint exists and is an admin one.
-        rejection(decide(TestRequest.withoutSession(),
-                        resource(ExampleResource.class, "deleteAnyPet")),
+        rejection(decide(TestRequest.withoutSession(), ADMIN_ONLY),
                 Response.Status.UNAUTHORIZED, "NOT_AUTHENTICATED");
     }
 
     @Test
-    @DisplayName("@AdminOnly on the resource class covers its methods")
-    void classLevelAdminOnly() {
+    @DisplayName("the admin check is the same check plus a role test")
+    void adminFilterRunsTheAuthenticationCheckToo() {
         TestRequest request = TestRequest.loggedInAs(
                 new SessionUser(7L, "donaldt", "Donald Trump", User.Role.USER));
 
-        rejection(decide(request,
-                        resource(ExampleAdminResource.class, "inheritsTheClassAnnotation")),
-                Response.Status.FORBIDDEN, "NOT_ADMIN");
+        rejection(decide(request, ADMIN_ONLY), Response.Status.FORBIDDEN, "NOT_ADMIN");
     }
 
     @Test
@@ -162,7 +116,7 @@ class AuthenticationFilterTest {
     void rejectionCreatesNoSession() {
         TestRequest request = TestRequest.withoutSession();
 
-        decide(request, resource(ExampleResource.class, "createPet"));
+        decide(request, SECURED);
 
         assertEquals(0, request.sessionsCreated());
     }

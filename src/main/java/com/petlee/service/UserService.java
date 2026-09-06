@@ -177,13 +177,18 @@ public class UserService {
     }
 
     /**
-     * Looks a user up by id — T-18 calls it once per request to rehydrate the session user, so
-     * that a session cannot outlive a deleted account.
+     * Looks a user up by id.
+     *
+     * <p>This was written expecting T-18's filter to call it once per request to rehydrate the
+     * session user. It does not: T-18 requirement 8 forbids the filter from querying the database,
+     * because a per-request lookup puts a round trip on the hot path of every protected call, and
+     * what it would detect — a role or account changed mid-session — is not something this system
+     * does. The session snapshot is authoritative until the next login. The method stays for the
+     * web tier, which needs a user by id for the profile screen (T-32).
      *
      * @param id the user id, may be {@code null}
      * @return the user, or empty for a {@code null} or unknown id; never {@code null}. Absence is
-     *         the ordinary answer here, not a 404: T-18 turns it into a 401 by dropping the
-     *         session.
+     *         the ordinary answer here rather than a 404 — the caller decides what it means.
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public Optional<UserDTO> findById(Long id) {

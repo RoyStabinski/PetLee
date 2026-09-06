@@ -7,13 +7,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
-import jakarta.ws.rs.container.ResourceInfo;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
-import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -23,11 +21,17 @@ import java.util.logging.Logger;
  * carries them.
  *
  * <h2>Name binding: it runs for annotated endpoints only</h2>
- * The two annotations on this class are what bind it. A {@code @Provider} filter with no name
- * binding runs on <em>every</em> request, which would 401 the open endpoints the contract
+ * The {@link Secured} annotation on this class is what binds it. A {@code @Provider} filter with
+ * no name binding runs on <em>every</em> request, which would 401 the open endpoints the contract
  * requires to work for guests — {@code GET /api/pets}, {@code GET /api/categories},
- * {@code /api/health}. Binding to both annotations rather than only {@link Secured} is how
- * {@code @AdminOnly} comes to imply {@code @Secured} without the caller having to write both.
+ * {@code /api/health}.
+ *
+ * <p>It is bound to {@code @Secured} <em>only</em>, and {@link AdminOnlyFilter} is a separate
+ * provider bound to {@code @AdminOnly}, because name bindings intersect rather than union: a
+ * provider carrying two of them applies to a method carrying <em>both</em>. One filter annotated
+ * with both therefore protects nothing that is only {@code @Secured} — which is not a theoretical
+ * reading, it is what a deployed server did with the first version of this class, answering 204 to
+ * a logout with no session. The shared decision below is what keeps the two filters from drifting.
  *
  * <h2>Order</h2>
  * {@code Priorities.AUTHENTICATION} is the lowest-numbered standard priority, so this runs before
@@ -46,7 +50,6 @@ import java.util.logging.Logger;
  */
 @Provider
 @Secured
-@AdminOnly
 @Priority(Priorities.AUTHENTICATION)
 public class AuthenticationFilter implements ContainerRequestFilter {
 
@@ -63,26 +66,21 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     @Context
     private HttpServletRequest request;
 
-    /**
-     * The resource class and method this request matched. It is how the filter tells a
-     * {@link Secured} endpoint from an {@link AdminOnly} one while being bound to both.
-     */
-    @Context
-    private ResourceInfo resourceInfo;
-
-    /** For the container, which instantiates providers with a no-argument constructor. */
-    public AuthenticationFilter() {
-    }
-
-    /** For tests, which have no container to perform {@code @Context} injection. */
-    AuthenticationFilter(HttpServletRequest request, ResourceInfo resourceInfo) {
-        this.request = request;
-        this.resourceInfo = resourceInfo;
-    }
-
     @Override
     public void filter(ContainerRequestContext context) {
-        Rejection rejection = decide();
+        apply(context, request, false);
+    }
+
+    /**
+     * The check both filters run: refuse the request, or let it through.
+     *
+     * @param context       the request being filtered, aborted on refusal
+     * @param request       the Servlet request carrying the session
+     * @param adminRequired whether the endpoint is {@link AdminOnly}
+     */
+    static void apply(ContainerRequestContext context, HttpServletRequest request,
+                      boolean adminRequired) {
+        Rejection rejection = decide(request, adminRequired);
         if (rejection == null) {
             return;
         }
@@ -106,9 +104,11 @@ public class AuthenticationFilter implements ContainerRequestFilter {
      * server. The split is not merely a testing device either: what to decide and how to say it are
      * two different concerns, and T-19 draws the same line through the exception mappers.
      *
+     * @param request       the Servlet request carrying the session
+     * @param adminRequired whether the endpoint is {@link AdminOnly}
      * @return the rejection to send, or {@code null} when the request may proceed
      */
-    Rejection decide() {
+    static Rejection decide(HttpServletRequest request, boolean adminRequired) {
         Optional<SessionUser> caller = CurrentUser.from(request);
 
         if (caller.isEmpty()) {
@@ -121,7 +121,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
         }
 
         SessionUser user = caller.get();
-        if (adminRequired() && !user.isAdmin()) {
+        if (adminRequired && !user.isAdmin()) {
             return new Rejection(Response.Status.FORBIDDEN, NOT_ADMIN,
                     "Administrator privileges are required for this action.",
                     user.getUsername() + " is not an administrator");
@@ -149,35 +149,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
             this.message = message;
             this.reason = reason;
         }
-    }
-
-    /**
-     * @return whether the matched endpoint carries {@link AdminOnly}, on the method or on its
-     *         resource class. A missing {@code ResourceInfo} — which no container produces, but a
-     *         mistake in a test would — is treated as not requiring admin, because the
-     *         authentication check above has already run and the alternative would be to deny
-     *         every request for a reason that has nothing to do with the caller.
-     */
-    private boolean adminRequired() {
-        if (resourceInfo == null) {
-            return false;
-        }
-
-        Method method = resourceInfo.getResourceMethod();
-        if (method != null && method.isAnnotationPresent(AdminOnly.class)) {
-            return true;
-        }
-
-        Class<?> resource = resourceInfo.getResourceClass();
-        return resource != null && resource.isAnnotationPresent(AdminOnly.class);
-    }
-
-    private static void abort(ContainerRequestContext context, Response.Status status,
-                              String code, String message) {
-        context.abortWith(Response.status(status)
-                .type(MediaType.APPLICATION_JSON)
-                .entity(new ErrorDTO(code, message))
-                .build());
     }
 
     /**

@@ -20,8 +20,9 @@ Implement the business rules behind `POST /api/users/register` and `POST /api/au
      offending field:
      `username` 3–20 chars, `[A-Za-z0-9_]` only; `password` minimum 8 characters;
      `fullName` non-blank, ≤ 50; `email` non-blank, ≤ 100, matches a basic address pattern;
-     `phone` optional but if present ≤ 10 characters (matching `phone_number VARCHAR(10)` in T-03
-     — a longer value would otherwise fail as a 500 at the database);
+     `phone` optional but if present ≤ 20 characters (matching `phone_number VARCHAR(20)` — the
+     column was widened from 10 by **ADR-002 #9**, because the contract's own example sends the
+     11-character `"050-1234567"`; a longer value would otherwise fail as a 500 at the database);
      `region` optional, ≤ 100.
    - Check `existsByUsername` and `existsByEmail`. Either hit throws `ConflictException` → **409**,
      as `api-contract.md` requires: *"409 if username/email already exists"*.
@@ -58,7 +59,8 @@ Implement the business rules behind `POST /api/users/register` and `POST /api/au
 2. Registering the same username again throws `ConflictException`; the same for a duplicate email
    differing only in letter case.
 3. A 7-character password throws `ValidationException` naming field `password`.
-4. An 11-character phone throws `ValidationException`, not a database error.
+4. A 21-character phone throws `ValidationException`, not a database error; a 20-character one
+   is accepted. (Was "11-character" before ADR-002 #9 widened the column to `VARCHAR(20)`.)
 5. After registering, the stored `password_hash` in the database does not equal the plaintext and
    begins with `pbkdf2_sha256$`.
 6. `authenticate` with correct credentials returns the `UserDTO`; with a wrong password and with an

@@ -45,9 +45,14 @@ the "exactly one main image" invariant (specification §11).
    but no thumbnail would render a broken gallery card.
 10. Writing the file and inserting the row must not leave the two out of step: if the database
     insert fails, delete the just-written file before rethrowing.
-11. `void deleteImage(Integer imageId, Long callerUserId)` — owner-or-admin, removes both the row
+11. `void deleteImage(Integer imageId, Long callerUserId, boolean callerIsAdmin)` — owner-or-admin,
+    removes both the row
     and the file. Deleting the current main image promotes the oldest remaining image to main so
     the invariant "a pet with images has a main image" survives.
+    The `callerIsAdmin` flag is not in the original signature; it is here because the requirement
+    says "owner-or-admin" and a service must never work the caller's role out for itself (T-15,
+    requirement 8) — it is decided by the REST tier from the session, exactly as `PetService.delete`
+    takes it.
 
 ## Out of scope
 - No image resizing, thumbnail generation, or EXIF stripping. Not required by the specification.
@@ -75,5 +80,8 @@ the "exactly one main image" invariant (specification §11).
 - [ ] `mvn clean package` succeeds.
 - [ ] All ten acceptance criteria demonstrated; 3 and 5 are security criteria and must be
       automated tests, not manual checks.
-- [ ] The upload directory default is documented in `application.properties` and in T-42's runbook.
+- [ ] The upload directory default is documented in `docs/deployment/upload-directory.md` and in
+      T-42's runbook. **Not** `application.properties`: the project has no properties-file
+      mechanism and ADR-003 keeps the dependency list closed, so nothing would read one, and a
+      file documenting a setting no code loads is worse than no file.
 - [ ] No user-supplied string ever reaches a `File`/`Path` constructor.

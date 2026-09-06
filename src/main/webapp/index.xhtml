@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Placeholder landing page. T-29 replaces it with the gallery; T-25 gives it a template.
+
+    Until then it earns its place by proving the platform is wired: the literal expression proves
+    Faces is mapped and EL is evaluating, and the bean expression proves CDI discovered
+    WEB-INF/beans.xml. If either renders as raw text, the problem is the container, not the code
+    written in the tasks that follow.
+-->
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="jakarta.faces.html">
+<h:head>
+    <title>Pet-Lee</title>
+</h:head>
+<h:body>
+    <h1>Pet-Lee</h1>
+
+    <p>Faces and EL: 1 + 1 = #{1 + 1}</p>
+    <p>CDI: #{bootstrapCheck.cdiStatus}</p>
+    <p>REST: <a href="#{request.contextPath}/api/health">/api/health</a></p>
+</h:body>
+</html>

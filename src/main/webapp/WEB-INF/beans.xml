@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CDI 4.0 bean archive marker.
+
+  bean-discovery-mode="annotated": only classes carrying a bean-defining annotation
+  (@ApplicationScoped, @RequestScoped, @Named, ...) become beans. That is deliberate - "all" would
+  turn every DTO and every mapper into a @Dependent bean, and an ambiguous injection point is a
+  deployment failure rather than a warning.
+
+  The consequence, and it has bitten this project before: a class that is injected anywhere must
+  carry the annotation itself. An inherited scope does not count, which is why every repository
+  subclass declares @ApplicationScoped, and why resource classes declare @RequestScoped rather than
+  relying on Jakarta REST's own lifecycle.
+
+  Without this file the archive is still an implicit bean archive on most servers, but nothing
+  guarantees it: #{userBean} would resolve to null and no error would be logged. CDI itself is a
+  platform service - no implementation is bundled (ADR-003).
+-->
+<beans xmlns="https://jakarta.ee/xml/ns/jakartaee"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                           https://jakarta.ee/xml/ns/jakartaee/beans_4_0.xsd"
+       version="4.0"
+       bean-discovery-mode="annotated">
+</beans>

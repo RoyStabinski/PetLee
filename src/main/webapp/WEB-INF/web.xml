@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pet-Lee deployment descriptor.
+
+  What is NOT here matters as much as what is:
+
+  * No <servlet> for Faces. A Jakarta EE 10 server registers the Faces servlet automatically when
+    Faces artifacts are present, mapped to *.xhtml among others. Declaring it by hand risks a
+    duplicate mapping, and on some servers a deployment failure. (T-17 criterion 6.)
+  * No <servlet> for Jakarta REST. @ApplicationPath("/api") on JakartaRestApplication is the
+    declaration; a hand-written mapping would collide with it.
+  * No <error-page>. T-33 owns the error pages, so that JSF error handling stays in one place and
+    REST error handling stays in T-19's exception mappers.
+  * metadata-complete is left at its default of false: the annotations above are only found if the
+    server scans the classes.
+-->
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+    <display-name>Pet-Lee</display-name>
+
+    <!--
+      Faces project stage. 'Development' adds validation warnings to the rendered page and shows
+      the exception detail on the error view - useful locally, and an information leak in front of
+      real users. Every deployed environment sets 'Production' here; T-42's runbook makes that a
+      step of the deployment rather than a code change, which is why the value lives in a context
+      parameter and is not hard-coded anywhere in Java.
+    -->
+    <context-param>
+        <param-name>jakarta.faces.PROJECT_STAGE</param-name>
+        <param-value>Development</param-value>
+    </context-param>
+
+    <!--
+      The Secure flag on the session cookie. Read by SessionCookieConfigurator, which applies it at
+      start-up; <cookie-config> below cannot be parameterised, and this flag has to differ between
+      environments. 'false' locally, because a Secure cookie is never sent over plain HTTP and
+      login would appear to succeed and then silently forget itself. T-42 sets it to 'true' the
+      moment the deployment is behind TLS.
+    -->
+    <context-param>
+        <param-name>petlee.session.cookie.secure</param-name>
+        <param-value>false</param-value>
+    </context-param>
+
+    <!--
+      Sessions are the whole authentication model: T-20 stores the logged-in user in one, T-18's
+      filter reads it on every modifying request, and T-24 forwards the browser's JSESSIONID from
+      the JSF tier to the REST tier over loopback (ADR-001).
+
+      30 minutes is the specification's idle window.
+
+      http-only keeps JavaScript away from document.cookie's JSESSIONID. Since the cookie IS the
+      credential here - there is no bearer token to steal instead - an injected script that could
+      read it would own the account. This is the one line of web.xml with a direct security
+      consequence, and T-17 criterion 3 asserts on the Set-Cookie header it produces.
+
+      secure is set programmatically from the context parameter above, so it is deliberately
+      absent here: a value in this element would be applied first and then overwritten, which
+      reads as though it were in force when it is not.
+    -->
+    <session-config>
+        <session-timeout>30</session-timeout>
+        <cookie-config>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
+    <!--
+      The landing page. index.xhtml is replaced by the real gallery in T-29; until then it proves
+      Faces, EL and CDI are wired (T-17 criteria 4 and 5).
+    -->
+    <welcome-file-list>
+        <welcome-file>index.xhtml</welcome-file>
+    </welcome-file-list>
+
+</web-app>

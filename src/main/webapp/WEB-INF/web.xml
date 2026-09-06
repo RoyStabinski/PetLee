@@ -8,7 +8,11 @@
     Faces artifacts are present, mapped to *.xhtml among others. Declaring it by hand risks a
     duplicate mapping, and on some servers a deployment failure. (T-17 criterion 6.)
   * No <servlet> for Jakarta REST. @ApplicationPath("/api") on JakartaRestApplication is the
-    declaration; a hand-written mapping would collide with it.
+    declaration; a hand-written mapping would collide with it. T-23 needs multipart limits on that
+    servlet and they are set programmatically in MultipartConfigurator instead, because naming the
+    servlet here - even with no class and no mapping, purely to add <multipart-config> - makes
+    RESTEasy conclude the application is configured by hand and skip registering it. On WildFly
+    that produced a deployment that started cleanly and answered 404 to every /api path.
   * No <error-page>. T-33 owns the error pages, so that JSF error handling stays in one place and
     REST error handling stays in T-19's exception mappers.
   * metadata-complete is left at its default of false: the annotations above are only found if the

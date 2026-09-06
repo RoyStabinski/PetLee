@@ -33,8 +33,13 @@ public class UserResource {
 
     private UserService users;
 
-    /** For CDI, which needs a no-argument constructor to proxy this bean. */
-    protected UserResource() {
+    /**
+     * For the container. It is {@code public}, not {@code protected}: CDI only needs something it
+     * can proxy, but the Jakarta REST specification requires a root resource class to have a
+     * public constructor, and RESTEasy enforces it — a protected one deploys on Payara and fails
+     * on WildFly with "could not find constructor for class".
+     */
+    public UserResource() {
     }
 
     @Inject

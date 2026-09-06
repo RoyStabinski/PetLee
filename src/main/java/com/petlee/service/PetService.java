@@ -102,7 +102,7 @@ public class PetService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public PetDetailDTO findDetail(Long id, Long callerUserId) {
-        Pet pet = requirePet(id);
+        Pet pet = requireById(id);
         return PetMapper.toDetailDto(pet, callerUserId != null);
     }
 
@@ -178,7 +178,7 @@ public class PetService {
      */
     @Transactional
     public PetDTO update(Long petId, PetForm form, Long callerUserId) {
-        Pet pet = requirePet(petId);
+        Pet pet = requireById(petId);
 
         if (!isSameUser(pet.getOwner(), callerUserId)) {
             throw new ForbiddenException("NOT_OWNER", "Only the owner of a listing can edit it");
@@ -218,7 +218,7 @@ public class PetService {
      */
     @Transactional
     public void delete(Long petId, Long callerUserId, boolean callerIsAdmin) {
-        Pet pet = requirePet(petId);
+        Pet pet = requireById(petId);
 
         if (!callerIsAdmin && !isSameUser(pet.getOwner(), callerUserId)) {
             throw new ForbiddenException("NOT_OWNER_OR_ADMIN",
@@ -270,12 +270,24 @@ public class PetService {
     }
 
     /**
-     * Loads a pet with its category, owner and images, or reports 404.
+     * The pet as a <strong>managed entity</strong>, with its category, owner and images loaded, or
+     * a 404.
      *
-     * <p>Every method that names a pet by id goes through here, so "unknown id is a 404" is
-     * written once.
+     * <p>Every method here that names a pet by id goes through it, so "unknown id is a 404" is
+     * written once. T-16 also calls it, to attach a {@link com.petlee.model.PetImage} to the pet
+     * it has just authorised — an image needs the entity, not a DTO, and routing T-16 through this
+     * method keeps it out of {@link PetRepository} and out of a second copy of the 404 rule.
+     *
+     * <p>Like {@code CategoryService.requireById}, it is <strong>package-private</strong>, and the
+     * visibility is the enforcement: REST resources are not in {@code com.petlee.service}, so no
+     * entity can escape to the wire through this door.
+     *
+     * @param petId the pet's id, may be {@code null}
+     * @return the managed pet
+     * @throws NotFoundException <strong>404</strong>, code {@code PET_NOT_FOUND}
      */
-    private Pet requirePet(Long petId) {
+    @Transactional(Transactional.TxType.SUPPORTS)
+    Pet requireById(Long petId) {
         return pets.findDetailById(petId)
                 .orElseThrow(() -> new NotFoundException("PET_NOT_FOUND", "No such pet: " + petId));
     }

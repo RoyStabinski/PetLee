@@ -73,8 +73,8 @@
                         A POST, not a link. Logging out changes server state, and a GET that does
                         so can be triggered by any image tag on any page the user visits.
                     -->
-                    <h:form>
-                        <h:commandButton value="#{msg['nav.logout']}"
+                    <h:form id="logoutForm">
+                        <h:commandButton id="logout" value="#{msg['nav.logout']}"
                                          action="#{userBean.logout}"
                                          styleClass="button-secondary"/>
                     </h:form>

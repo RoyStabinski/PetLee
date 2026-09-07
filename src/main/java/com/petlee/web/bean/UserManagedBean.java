@@ -146,7 +146,7 @@ public class UserManagedBean implements Serializable {
             LOGGER.log(Level.FINE, () -> "registered " + created.getUsername());
 
             info(message("auth.register.success"));
-            return LOGIN;
+            return keepingMessages(LOGIN);
 
         } catch (ApiException failure) {
             // 409 USERNAME_TAKEN or EMAIL_TAKEN, 400 for a field the server rejected. Its message
@@ -187,6 +187,20 @@ public class UserManagedBean implements Serializable {
         } finally {
             currentUser = null;
         }
+        return HOME;
+    }
+
+    /**
+     * Sends a signed-in user away from the login and registration pages.
+     *
+     * <p>Bound by both as an {@code <f:viewAction if="#{userBean.loggedIn}">}. Landing on a login
+     * form while already authenticated is a dead end: the form appears to work, the server answers,
+     * and nothing visible changes. T-33 generalises this into a filter over every page; until then
+     * these are the only two views where it matters.
+     *
+     * @return home
+     */
+    public String redirectHome() {
         return HOME;
     }
 
@@ -280,6 +294,23 @@ public class UserManagedBean implements Serializable {
 
     private static String trimmed(String value) {
         return value == null ? null : value.trim();
+    }
+
+    /**
+     * Carries the messages added during this request across a redirect.
+     *
+     * <p>A {@link FacesMessage} belongs to one {@code FacesContext}, and a redirect starts a new
+     * one — so "your account has been created" was added, the browser was sent to the login page,
+     * and the message was discarded on the way. The Flash is the scope that spans exactly that gap.
+     * Without this call the user is redirected to a login form with no explanation of why they are
+     * looking at it.
+     *
+     * @param outcome the redirect outcome to return
+     * @return {@code outcome}, unchanged
+     */
+    private static String keepingMessages(String outcome) {
+        FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
+        return outcome;
     }
 
     /** @return the bundle string for {@code key}, so no wording is written in Java either */

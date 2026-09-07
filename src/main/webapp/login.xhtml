@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <f:metadata>
+        <f:viewAction action="#{userBean.redirectHome}" if="#{userBean.loggedIn}"/>
+    </f:metadata>
+
+    <ui:define name="title">#{msg['auth.login.title']} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+
+        <div class="panel panel-narrow">
+            <h1>#{msg['auth.login.title']}</h1>
+
+            <h:form id="loginForm">
+
+                <div class="field">
+                    <h:outputLabel for="username" value="#{msg['auth.username']}"/>
+                    <h:inputText id="username"
+                                 value="#{userBean.username}"
+                                 required="true"
+                                 requiredMessage="#{msg['form.required']}"
+                                 autocomplete="username"/>
+                    <h:message for="username" styleClass="field-error"/>
+                </div>
+
+                <div class="field">
+                    <h:outputLabel for="password" value="#{msg['auth.password']}"/>
+                    <h:inputSecret id="password"
+                                   value="#{userBean.password}"
+                                   required="true"
+                                   requiredMessage="#{msg['form.required']}"
+                                   redisplay="false"
+                                   autocomplete="current-password"/>
+                    <h:message for="password" styleClass="field-error"/>
+                </div>
+
+                <div class="actions">
+                    <h:commandButton id="submit" value="#{msg['auth.login.submit']}" action="#{userBean.login}"/>
+                </div>
+
+            </h:form>
+
+            <p>
+                #{msg['auth.login.noAccount']}
+                <h:outputLink value="#{request.contextPath}/register.xhtml">#{msg['nav.register']}</h:outputLink>
+            </p>
+        </div>
+
+    </ui:define>
+
+</ui:composition>

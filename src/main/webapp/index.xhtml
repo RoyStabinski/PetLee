@@ -1,24 +1,120 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-    Placeholder landing page, now written inside T-25's template. T-29 replaces the content region
-    with the gallery and its filter panel.
-
-    It is deliberately nothing but a <ui:composition> filling two regions - which is what T-25
-    criterion 1 asks to see: a page with no header, no footer and no stylesheet link of its own
-    that nevertheless renders the whole frame.
--->
 <ui:composition template="/WEB-INF/templates/main.xhtml"
                 xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
     <ui:define name="title">#{msg['gallery.title']} - #{msg['app.name']}</ui:define>
 
     <ui:define name="content">
+
         <h1>#{msg['gallery.title']}</h1>
 
-        <div class="empty-state">
-            <p>#{msg['gallery.empty']}</p>
+        <div class="gallery-layout">
+
+            <h:form id="filterForm" styleClass="panel filter-panel">
+                <fieldset>
+                    <legend>#{msg['gallery.filter.legend']}</legend>
+
+                    <div class="field">
+                        <h:outputLabel for="category" value="#{msg['gallery.filter.category']}"/>
+                        <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
+                            <f:selectItem itemValue="#{null}" itemLabel="#{msg['gallery.filter.any']}"/>
+                            <f:selectItems value="#{petBean.categories}" var="c"
+                                           itemValue="#{c.id}" itemLabel="#{c.name}"/>
+                        </h:selectOneMenu>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="size" value="#{msg['gallery.filter.size']}"/>
+                        <h:selectOneMenu id="size" value="#{petBean.selectedSize}">
+                            <f:selectItems value="#{petBean.sizeOptions}"/>
+                        </h:selectOneMenu>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="gender" value="#{msg['gallery.filter.gender']}"/>
+                        <h:selectOneMenu id="gender" value="#{petBean.selectedGender}">
+                            <f:selectItems value="#{petBean.genderOptions}"/>
+                        </h:selectOneMenu>
+                    </div>
+
+                    <div class="actions">
+                        <h:commandButton id="apply" value="#{msg['gallery.filter.apply']}"
+                                         action="#{petBean.applyFilter}">
+                            <f:ajax execute="@form" render=":globalMessages :galleryGrid"/>
+                        </h:commandButton>
+                        <h:commandButton id="clear" value="#{msg['gallery.filter.clear']}"
+                                         action="#{petBean.clearFilters}"
+                                         styleClass="button-secondary">
+                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
+                        </h:commandButton>
+                    </div>
+                </fieldset>
+            </h:form>
+
+            <h:panelGroup id="galleryGrid" layout="block" styleClass="gallery-results">
+
+                <!--
+                    Bracket notation, not #{petBean.empty}: 'empty' is a reserved EL operator, and
+                    the dotted form fails to parse the view outright. The bean keeps the isEmpty()
+                    name T-28 asks for; only the expression has to spell it this way.
+                -->
+                <ui:fragment rendered="#{petBean['empty']}">
+                    <div class="empty-state">
+                        <p>#{msg['gallery.empty']}</p>
+                        <h:form>
+                            <h:commandButton id="clearEmpty" value="#{msg['gallery.filter.clear']}"
+                                             action="#{petBean.clearFilters}"
+                                             styleClass="button-secondary"/>
+                        </h:form>
+                    </div>
+                </ui:fragment>
+
+                <ui:fragment rendered="#{not petBean['empty']}">
+                    <ul class="gallery">
+                        <ui:repeat value="#{petBean.pets}" var="pet">
+                            <li class="card">
+
+                                <div class="card-media">
+                                    <!--
+                                        No #{request.contextPath} here: h:graphicImage prepends it
+                                        itself for a value starting with "/", and adding one too
+                                        gives /pet-lee/pet-lee/... and a broken image on every card.
+                                    -->
+                                    <h:graphicImage value="#{petBean.getMainImageUrl(pet)}"
+                                                    alt="#{pet.name}"/>
+                                </div>
+
+                                <div class="card-body">
+                                    <h3 class="card-title">#{pet.name}</h3>
+                                    <p class="card-desc">#{pet.shortDesc}</p>
+
+                                    <ul class="tags">
+                                        <li class="tag">#{msg['size.'.concat(pet.size)]}</li>
+                                        <li class="tag">#{msg['gender.'.concat(pet.gender)]}</li>
+                                        <li class="tag">#{pet.categoryName}</li>
+                                    </ul>
+
+                                    <div class="card-actions">
+                                        <h:form>
+                                            <h:commandLink action="#{petBean.viewDetails(pet.id)}"
+                                                           styleClass="button"
+                                                           value="#{msg['gallery.card.details']}"/>
+                                        </h:form>
+                                    </div>
+                                </div>
+
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                </ui:fragment>
+
+            </h:panelGroup>
+
         </div>
+
     </ui:define>
 
 </ui:composition>

@@ -204,6 +204,28 @@ img {
     padding-block: 1.25rem;
 }
 
+/* --- gallery page layout ------------------------------------------------------------------------
+ * Filter panel beside the grid on a wide screen, stacked above it on a narrow one. auto-fit with a
+ * 15rem minimum does both without a media query: below about 46rem there is only room for one
+ * track, so the panel drops above the results on its own.
+ */
+.gallery-layout {
+    display: grid;
+    grid-template-columns: minmax(15rem, 18rem) 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.filter-panel .field + .field {
+    margin-top: 0.75rem;
+}
+
+@media (max-width: 46rem) {
+    .gallery-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* --- gallery grid -------------------------------------------------------------------------------
  * The one rule T-25 criterion 4 is about: auto-fill with a 240 px minimum gives one column on a
  * 360 px phone and as many as fit on a desktop, with no breakpoint to maintain.

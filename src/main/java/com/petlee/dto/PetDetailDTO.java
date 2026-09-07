@@ -1,5 +1,7 @@
 package com.petlee.dto;
 
+import jakarta.json.bind.annotation.JsonbNillable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,7 +10,16 @@ import java.util.List;
  *
  * <p>The three owner fields are {@code null} for a caller who is not logged in — see
  * {@code PetMapper.toDetailDto}, which is the only place that decision is made.
+ *
+ * <h2>Why {@code @JsonbNillable}</h2>
+ * JSON-B omits a null property by default, so a pet with no photograph would answer without a
+ * {@code mainImageUrl} key at all, and a guest's pet detail would arrive with the three owner
+ * fields simply missing. Every client reads an absent key as null, so nothing breaks — but the
+ * frozen contract shows those keys, T-22 criterion 4 asks to see them as null rather than gone,
+ * and a fixed key set is one less thing for a reviewer diffing a response against
+ * {@code api-contract.md} to have to reason about.
  */
+@JsonbNillable
 public class PetDetailDTO {
 
     private Long id;

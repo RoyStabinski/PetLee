@@ -15,7 +15,7 @@ import jakarta.ws.rs.core.Application;
  *
  * <h2>Why nothing is registered here</h2>
  * ADR-003 keeps the dependency list closed and the application portable across Jakarta EE 10
- * servers. Registering a {@code Feature} — a Jersey {@code MultiPartFeature}, a Jackson provider —
+ * servers. Registering a {@code Feature} — Jersey's multipart one, a Jackson provider —
  * would bind the WAR to one server's implementation. JSON is handled by the platform's JSON-B,
  * multipart uploads by the Servlet API's {@code Part} (T-23), and both are available without
  * registering anything.

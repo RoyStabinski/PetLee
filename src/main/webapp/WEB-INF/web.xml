@@ -13,8 +13,9 @@
     servlet here - even with no class and no mapping, purely to add <multipart-config> - makes
     RESTEasy conclude the application is configured by hand and skip registering it. On WildFly
     that produced a deployment that started cleanly and answered 404 to every /api path.
-  * No <error-page>. T-33 owns the error pages, so that JSF error handling stays in one place and
-    REST error handling stays in T-19's exception mappers.
+  * The <error-page> entries below are T-33's, and cover the JSF tier only. REST error handling
+    stays in T-19's exception mappers: a request to /api never reaches these pages, because a
+    mapper answers it with an ErrorDTO before the container's error machinery is involved.
   * metadata-complete is left at its default of false: the annotations above are only found if the
     server scans the classes.
 -->
@@ -94,6 +95,37 @@
       The landing page. index.xhtml is replaced by the real gallery in T-29; until then it proves
       Faces, EL and CDI are wired (T-17 criteria 4 and 5).
     -->
+    <!--
+      T-33's error pages. Four entries, and each exists because the alternative is a container
+      page: a Payara or WildFly stack trace, which tells a user nothing and an attacker rather a
+      lot.
+
+      The status code is preserved by the container on this path - it sets the status before
+      forwarding - so an error page answers 403, 404 or 500 rather than a cheerful 200. That
+      matters to crawlers, to monitoring and to T-39's tests, all of which read the status and not
+      the prose.
+
+      ViewExpiredException gets its own page. After the 30-minute timeout above, a user who
+      submits a form they left open otherwise meets a raw exception name; expired.xhtml explains
+      what happened in a sentence and offers the login page.
+    -->
+    <error-page>
+        <error-code>403</error-code>
+        <location>/error/403.xhtml</location>
+    </error-page>
+    <error-page>
+        <error-code>404</error-code>
+        <location>/error/404.xhtml</location>
+    </error-page>
+    <error-page>
+        <error-code>500</error-code>
+        <location>/error/500.xhtml</location>
+    </error-page>
+    <error-page>
+        <exception-type>jakarta.faces.application.ViewExpiredException</exception-type>
+        <location>/error/expired.xhtml</location>
+    </error-page>
+
     <welcome-file-list>
         <welcome-file>index.xhtml</welcome-file>
     </welcome-file-list>

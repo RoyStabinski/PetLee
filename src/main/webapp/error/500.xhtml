@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">#{msg['error.500.title']} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+        <div class="panel panel-narrow">
+            <h1>#{msg['error.500.title']}</h1>
+            <p>#{msg['error.500.body']}</p>
+
+            <!--
+                What is deliberately not here: the exception, its class, its message, its stack
+                trace, and the SQL underneath it. Not even in Development stage - the project stage
+                is a configuration value, and the one time it is wrong is the one time it matters.
+
+                A correlation id is shown when the request carries one, so a user can quote it and
+                somebody can find the matching line in the server log. T-19 sets it on the REST
+                tier's error responses; a failure that never reached the API has none, and the
+                block simply does not render.
+            -->
+            <ui:fragment rendered="#{not empty requestScope['petlee.correlationId']}">
+                <p class="field-hint">
+                    #{msg['error.reference']}: #{requestScope['petlee.correlationId']}
+                </p>
+            </ui:fragment>
+
+            <div class="actions">
+                <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button">
+                    #{msg['error.backHome']}
+                </h:outputLink>
+            </div>
+        </div>
+    </ui:define>
+
+</ui:composition>

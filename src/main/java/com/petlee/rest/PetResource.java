@@ -31,7 +31,9 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * {@code /api/pets} — the five endpoints at the centre of {@code api-contract.md}.
+ * {@code /api/pets} — the five endpoints at the centre of {@code api-contract.md}, plus
+ * {@code GET /api/pets/mine} (ADR-002 deviation #11), which T-32's dashboard needs and the frozen
+ * contract has no equivalent of.
  *
  * <h2>No rule is decided here</h2>
  * Ownership, the privacy of contact details, the category check, the optimistic-lock conflict:
@@ -115,10 +117,37 @@ public class PetResource {
      * @return the pet in full, with owner contact details only for a logged-in caller
      */
     @GET
-    @Path("{id}")
+    @Path("{id: \\d+}")
     @Produces(MediaType.APPLICATION_JSON)
     public PetDetailDTO findDetail(@PathParam("id") Long id) {
         return pets.findDetail(id, CurrentUser.userIdOrNull(request));
+    }
+
+    /**
+     * {@code GET /api/pets/mine} — auth. The caller's own listings, every status included.
+     *
+     * <p><strong>This endpoint is not in {@code api-contract.md}.</strong> It extends the frozen
+     * contract and is recorded as deviation #11 in ADR-002; T-41 adds it to the contract document.
+     * T-32's dashboard needs it and nothing else can supply it: {@code GET /api/pets} is the public
+     * gallery, which hides {@code ADOPTED} and {@code REMOVED} listings and returns a
+     * {@link PetDTO} with no owner field, so a client could neither see its own hidden listings nor
+     * pick its own out of the result.
+     *
+     * <p>The owner is the session user, never a parameter. An {@code ?ownerId=} would turn the one
+     * endpoint that shows a user their withdrawn listings into a way to read anybody's.
+     *
+     * <p>The path is a literal, so it is matched ahead of {@code {id}} whatever the order of the
+     * methods in this file — and {@code {id}} is additionally constrained to digits, so the two can
+     * never compete.
+     *
+     * @return this user's listings, newest first, of every status
+     */
+    @GET
+    @Path("mine")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<PetDTO> findMine() {
+        return pets.findByOwner(caller().getUserId());
     }
 
     /**
@@ -149,7 +178,7 @@ public class PetResource {
      * @return the updated listing
      */
     @PUT
-    @Path("{id}")
+    @Path("{id: \\d+}")
     @Secured
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
@@ -171,7 +200,7 @@ public class PetResource {
      * @return {@code 204 No Content}
      */
     @DELETE
-    @Path("{id}")
+    @Path("{id: \\d+}")
     @Secured
     @Produces(MediaType.APPLICATION_JSON)
     public Response delete(@PathParam("id") Long id) {

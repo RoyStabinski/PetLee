@@ -5,8 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Proxy;
 
 /**
- * An {@link HttpServletRequest} that implements exactly one thing — {@code getSession} — and
- * records what was asked of it.
+ * An {@link HttpServletRequest} that implements exactly two things — {@code getSession} and
+ * {@code changeSessionId} — and records what was asked of it.
  *
  * <p>{@code HttpServletRequest} declares some seventy methods, and a hand-written stub would be
  * seventy lines of noise around the three that matter. A {@link Proxy} answers the rest with a
@@ -28,6 +28,9 @@ final class TestRequest {
                 HttpServletRequest.class.getClassLoader(),
                 new Class<?>[]{HttpServletRequest.class},
                 (target, method, args) -> {
+                    if ("changeSessionId".equals(method.getName())) {
+                        return changeSessionId();
+                    }
                     if (!"getSession".equals(method.getName())) {
                         return defaultValue(method.getReturnType());
                     }
@@ -63,6 +66,18 @@ final class TestRequest {
 
     int sessionsCreated() {
         return sessionsCreated;
+    }
+
+    /**
+     * The Servlet contract for {@code changeSessionId()}: a new identifier for the session already
+     * associated with this request, and an {@link IllegalStateException} when there is none.
+     */
+    private String changeSessionId() {
+        FakeHttpSession current = getSession(false);
+        if (current == null) {
+            throw new IllegalStateException("no session is associated with this request");
+        }
+        return current.rotateId();
     }
 
     private FakeHttpSession getSession(boolean create) {

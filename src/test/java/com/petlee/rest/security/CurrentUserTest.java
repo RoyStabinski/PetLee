@@ -108,12 +108,34 @@ class CurrentUserTest {
 
             CurrentUser.establish(request.asServletRequest(), user(7L, User.Role.USER));
 
-            FakeHttpSession afterLogin = request.session();
-            assertFalse(beforeLogin.isValid(), "the pre-login session must be invalidated");
-            assertNotEquals(idBeforeLogin, afterLogin.getId(),
+            assertNotEquals(idBeforeLogin, request.session().getId(),
                     "a fixed session id must not survive login");
-            assertEquals(1, request.sessionsCreated());
+            assertEquals(0, request.sessionsCreated(),
+                    "the identifier changes; a second session is not created");
             assertEquals(7L, CurrentUser.userIdOrNull(request.asServletRequest()));
+        }
+
+        /**
+         * The regression behind the ADR-001 amendment. Under ADR-001 the Faces tier reaches login
+         * over loopback HTTP and the two requests share one {@code HttpSession}, so destroying it
+         * here left the browser's request holding a torn-down object: the next line of Faces code
+         * to touch a {@code @SessionScoped} bean died with
+         * "getAttribute: Session already invalidated". Changing the identifier achieves the same
+         * defence without destroying anything.
+         */
+        @Test
+        @DisplayName("login leaves the session object alive, because the Faces tier is standing on it")
+        void loginDoesNotDestroyTheSharedSession() {
+            TestRequest request = TestRequest.withSession();
+            FakeHttpSession shared = request.session();
+            shared.setAttribute("faces.viewState", "whatever Faces put there");
+
+            CurrentUser.establish(request.asServletRequest(), user(7L, User.Role.USER));
+
+            assertTrue(shared.isValid(), "the session the other tier holds must survive login");
+            assertSame(shared, request.session(), "and it must still be the same session");
+            assertEquals("whatever Faces put there", shared.getAttribute("faces.viewState"),
+                    "its attributes belong to the user and survive with it");
         }
 
         @Test

@@ -9,6 +9,7 @@ import com.petlee.dto.PetForm;
 import com.petlee.dto.PetImageDTO;
 import com.petlee.dto.RegisterForm;
 import com.petlee.dto.UserDTO;
+import com.petlee.session.SessionLifecycle;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -179,13 +180,31 @@ public class ApiClient {
     }
 
     /**
-     * {@code POST /api/auth/logout} — auth. Destroys the shared session, so every later call is a
+     * {@code POST /api/auth/logout} — auth. Ends the browser's session, so every later call is a
      * guest call again.
+     *
+     * <h2>Why the session is destroyed here and not by the API</h2>
+     * Both requests hold the same {@code HttpSession} (ADR-001). If the loopback request destroys
+     * it, this one is left standing on a torn-down object and the next {@code @SessionScoped} bean
+     * the caller touches — T-26's {@code UserManagedBean} clears its user one statement later —
+     * fails with {@code IllegalStateException: getAttribute: Session already invalidated}. So this
+     * method declares the destruction its own through {@link SessionLifecycle}, and performs it on
+     * the request the browser is waiting on, where the container's listeners fire on this thread.
+     *
+     * <p>The {@code finally} is deliberate: whatever the server said, and even if it said nothing
+     * at all, this browser is finished with its session. Failing closed is the only safe direction
+     * for a logout.
      *
      * @throws ApiException 401 when nobody was logged in
      */
     public void logout() {
-        send("POST", target("auth").path("logout"), null, (Class<Void>) null);
+        HttpServletRequest browser = currentRequest();
+        SessionLifecycle.deferDiscardToCaller(browser);
+        try {
+            send("POST", target("auth").path("logout"), null, (Class<Void>) null);
+        } finally {
+            SessionLifecycle.discard(browser);
+        }
     }
 
     // ------------------------------------------------------------------------------ categories

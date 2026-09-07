@@ -1,5 +1,7 @@
 package com.petlee.rest.security;
 
+import com.petlee.session.SessionLifecycle;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
@@ -93,19 +95,39 @@ public final class CurrentUser {
     }
 
     /**
-     * Logs a user in: invalidates whatever session the caller arrived with, creates a new one, and
-     * stores the user in it.
+     * Logs a user in: gives the caller a session identifier it has never seen before, and stores
+     * the user in it.
      *
-     * <h2>Why the invalidate comes first</h2>
+     * <h2>Why the identifier changes</h2>
      * Session fixation. An attacker who can set a victim's {@code JSESSIONID} — through a link, a
      * subdomain cookie, an XSS foothold — waits for them to log in and then uses the same
-     * identifier, now authenticated. Recreating the session at login makes the pre-login
-     * identifier worthless, because the value the browser holds afterwards is one the attacker
-     * never saw. This is why T-20 must not simply call {@code setAttribute} on the session it
-     * already has, and why that decision is made here rather than left to the caller.
+     * identifier, now authenticated. Changing it at login makes the pre-login identifier
+     * worthless, because the value the browser holds afterwards is one the attacker never saw.
+     * This is why T-20 must not simply call {@code setAttribute} on the session it already has,
+     * and why that decision is made here rather than left to the caller.
+     *
+     * <h2>Why {@code changeSessionId} and not invalidate-then-recreate</h2>
+     * Both make the old identifier worthless, and the first version of this method did the
+     * second. It cannot be used here, because of ADR-001: the Faces tier reaches this endpoint
+     * over loopback HTTP, and the two requests share one {@code HttpSession}. Destroying it from
+     * the loopback request leaves the <em>browser's</em> request standing on an object the
+     * container has already torn down, and the next line of Faces code to touch a
+     * {@code @SessionScoped} bean fails with
+     * {@code IllegalStateException: getAttribute: Session already invalidated}. That is not a
+     * theoretical risk — it is what T-26's {@code UserManagedBean} does one statement after
+     * {@code ApiClient.login} returns, and it was reproduced before this method was changed.
+     *
+     * <p>{@link HttpServletRequest#changeSessionId()} is the Servlet API written for exactly this:
+     * the identifier is replaced and the container sends the new one to the client, while the
+     * session object itself stays alive, so nothing holding a reference to it is harmed. The
+     * attributes carry over, which is the accepted trade — an attacker who fixates an identifier
+     * knows that string and nothing else; they never had a way to read or write the session's
+     * server-side attributes. OWASP recommends this call for Servlet containers for the same
+     * reason.
      *
      * <p>This is the only {@code getSession(true)} in the project. A grep for it should find one
-     * hit, in this method.
+     * hit, in this method, on the path where the caller arrived with no session at all — there
+     * being no identifier to change, and the one about to be created never having been exposed.
      *
      * @param request the current request; must not be {@code null}
      * @param user    the authenticated user; must not be {@code null}
@@ -114,17 +136,14 @@ public final class CurrentUser {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(user, "user");
 
-        HttpSession existing = request.getSession(false);
-        if (existing != null) {
-            try {
-                existing.invalidate();
-            } catch (IllegalStateException alreadyGone) {
-                // Already invalid, which is the state this call was trying to reach.
-            }
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            session = request.getSession(true);
+        } else {
+            request.changeSessionId();
         }
 
-        HttpSession fresh = request.getSession(true);
-        fresh.setAttribute(SESSION_ATTRIBUTE, user);
+        session.setAttribute(SESSION_ATTRIBUTE, user);
 
         LOGGER.log(Level.FINE, () -> "Session established for " + user.getUsername());
     }
@@ -136,6 +155,19 @@ public final class CurrentUser {
      * <p>Removing the attribute would not be enough: the session, its identifier and anything the
      * Faces tier put in it would survive, and the browser would keep sending a cookie that is
      * still valid for whatever else reads that session.
+     *
+     * <h2>Unless the caller is destroying it itself</h2>
+     * Under ADR-001 the Faces tier reaches this endpoint over loopback HTTP and the two requests
+     * share one session. Invalidating it here leaves the browser's request holding a torn-down
+     * object, and the next {@code @SessionScoped} bean it touches fails with
+     * {@code IllegalStateException: getAttribute: Session already invalidated} — which is exactly
+     * what T-26's {@code UserManagedBean.logout()} does one statement later.
+     *
+     * <p>So a caller in the same JVM may take responsibility for the destruction, declaring it
+     * through {@link SessionLifecycle#deferDiscardToCaller}; this method then clears its own state
+     * and leaves the session for the caller to end on the browser's own thread. The session dies
+     * either way. The flag is a server-side attribute, so no external client can set it and no
+     * external client takes this path.
      *
      * @param request the current request, possibly {@code null}
      */
@@ -152,7 +184,11 @@ public final class CurrentUser {
         }
 
         try {
-            session.invalidate();
+            if (SessionLifecycle.discardIsDeferred(session)) {
+                session.removeAttribute(SESSION_ATTRIBUTE);
+            } else {
+                session.invalidate();
+            }
         } catch (IllegalStateException alreadyGone) {
             // Two logouts racing. Both callers get what they asked for.
         }

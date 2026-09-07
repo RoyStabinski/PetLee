@@ -33,6 +33,39 @@ same web application, they share one session manager, so the REST tier resolves 
 - **Hard rule for reviewers:** any `import com.petlee.service.*` or `import
   com.petlee.repository.*` inside `com.petlee.web` is a review blocker.
 
+## Amendment — 2026-09-07 (T-24): two requests, one session
+
+Sharing a session manager is what makes the loopback call an authenticated call, and it has a
+consequence this ADR did not anticipate: during a login or a logout, **two live requests hold the
+same `HttpSession` object** — the browser's Faces request and the loopback REST request. Whichever
+one destroys it leaves the other standing on an object the container has already torn down, and the
+next `@SessionScoped` bean that request touches fails with
+`IllegalStateException: getAttribute: Session already invalidated`.
+
+Reproduced during T-24, one statement after `ApiClient.login` returned — which is exactly where
+T-26's `UserManagedBean` stores the signed-in user.
+
+Two rules follow, and both are enforced in code rather than left to memory:
+
+1. **Login changes the identifier; it does not replace the session.**
+   `CurrentUser.establish` calls `HttpServletRequest.changeSessionId()`. The fixation defence is
+   unchanged — the pre-login identifier is worthless afterwards — but the session object survives,
+   so nothing holding a reference to it is harmed. Attributes carry over, which is the accepted
+   trade: an attacker who fixates an identifier knows that string and nothing else, and never had
+   a way to read or write the session's server-side attributes.
+
+2. **Logout is performed by the request the browser is waiting on.**
+   `ApiClient.logout` declares this through `com.petlee.session.SessionLifecycle` before it calls,
+   and destroys the session itself afterwards, so the container's session listeners fire on that
+   thread. `CurrentUser.terminate` honours the declaration by clearing only its own attribute. The
+   session dies either way; what changes is which thread ends it. The flag is a **server-side
+   session attribute**, so no external client can set it and every external client still takes the
+   ordinary path where the REST tier invalidates the session itself.
+
+`com.petlee.session` exists so that neither tier has to import the other: `com.petlee.web`
+depending on `com.petlee.rest` would invert the layering as surely as the service import this ADR
+bans.
+
 ## Rejected alternatives
 - **Two WARs** — strictest separation, but the web tier would have to store and replay a second,
   independent `JSESSIONID` for the API, and every environment needs two deploys. Complexity

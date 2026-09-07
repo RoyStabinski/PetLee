@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Empty on purpose, and required.
+
+  This file is what makes the server register the Faces servlet and map it to *.xhtml. Jakarta
+  Faces 4.0 section 11.1.3 lists the triggers for that automatic registration - a WEB-INF
+  faces-config.xml is the first of them - and without any of them the container leaves Faces
+  switched off. The symptom is not an error: index.xhtml is served as a static file, EL is never
+  evaluated, and the browser shows the raw #{...} markup.
+
+  The alternative trigger is a hand-written <servlet> for FacesServlet in web.xml, which T-17
+  criterion 6 forbids: a manual mapping can collide with the server's own.
+
+  Navigation rules, converters and validators are declared with annotations, so nothing is
+  expected to be added here. T-25 may add a resource library contract; nothing else should.
+-->
+<faces-config xmlns="https://jakarta.ee/xml/ns/jakartaee"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                                  https://jakarta.ee/xml/ns/jakartaee/web-facesconfig_4_0.xsd"
+              version="4.0">
+</faces-config>

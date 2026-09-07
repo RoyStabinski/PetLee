@@ -51,6 +51,23 @@
     </context-param>
 
     <!--
+      Strip XML comments from the rendered page.
+
+      Two reasons, and the first one bites immediately. Facelets does not treat a comment as inert:
+      by default it copies it into the response and evaluates any EL inside it, so a comment
+      explaining that "all text comes from #{msg.*}" is not documentation, it is an expression -
+      and that one fails to parse, replacing the whole page with a Facelets error. Every comment in
+      every view is a live expression until this is set.
+
+      The second reason is that implementation notes written for the next engineer are not written
+      for the user, and there is no reason to ship them to a browser.
+    -->
+    <context-param>
+        <param-name>jakarta.faces.FACELETS_SKIP_COMMENTS</param-name>
+        <param-value>true</param-value>
+    </context-param>
+
+    <!--
       Sessions are the whole authentication model: T-20 stores the logged-in user in one, T-18's
       filter reads it on every modifying request, and T-24 forwards the browser's JSESSIONID from
       the JSF tier to the REST tier over loopback (ADR-001).

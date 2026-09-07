@@ -11,12 +11,32 @@
   The alternative trigger is a hand-written <servlet> for FacesServlet in web.xml, which T-17
   criterion 6 forbids: a manual mapping can collide with the server's own.
 
-  Navigation rules, converters and validators are declared with annotations, so nothing is
-  expected to be added here. T-25 may add a resource library contract; nothing else should.
+  T-25 adds the one thing that does belong here: the resource bundle. Everything else -
+  navigation, converters, validators - is declared with annotations or resolved implicitly, and
+  nothing further is expected to be added.
 -->
 <faces-config xmlns="https://jakarta.ee/xml/ns/jakartaee"
               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
               xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
                                   https://jakarta.ee/xml/ns/jakartaee/web-facesconfig_4_0.xsd"
               version="4.0">
+
+    <!--
+      Every user-facing string, reachable from any page as #{msg.key} (T-25 requirement 6).
+
+      Declared as <resource-bundle> under <application> rather than with <f:loadBundle> on each
+      page: <f:loadBundle> has to be repeated in every view and is easy to forget, and a page that
+      forgets it renders every label as an empty string rather than failing - the worst kind of
+      bug, because it looks like a styling problem.
+
+      var is 'msg'. base-name has no extension and no locale: Faces resolves
+      messages_<locale>.properties itself, so a Hebrew translation is one new file and no code.
+    -->
+    <application>
+        <resource-bundle>
+            <base-name>messages</base-name>
+            <var>msg</var>
+        </resource-bundle>
+    </application>
+
 </faces-config>

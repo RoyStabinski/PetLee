@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The administrator's two management tables. Hide is reversible and one click; Delete is styled
+    as destructive and confirms by name, because it takes the photograph with it.
+-->
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">Admin panel - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+
+        <h1>Admin panel</h1>
+
+        <h2>Listing management</h2>
+
+        <h:form id="adminFilterForm" styleClass="panel filter-panel">
+            <fieldset>
+                <legend>Narrow the list</legend>
+
+                <div class="field">
+                    <h:outputLabel for="category" value="Category"/>
+                    <h:selectOneMenu id="category" value="#{adminBean.selectedCategoryId}">
+                        <f:selectItems value="#{adminBean.categoryOptions}"/>
+                    </h:selectOneMenu>
+                </div>
+
+                <div class="field">
+                    <h:outputLabel for="size" value="Size"/>
+                    <h:selectOneMenu id="size" value="#{adminBean.selectedSize}">
+                        <f:selectItems value="#{adminBean.sizeOptions}"/>
+                    </h:selectOneMenu>
+                </div>
+
+                <div class="field">
+                    <h:outputLabel for="gender" value="Gender"/>
+                    <h:selectOneMenu id="gender" value="#{adminBean.selectedGender}">
+                        <f:selectItems value="#{adminBean.genderOptions}"/>
+                    </h:selectOneMenu>
+                </div>
+
+                <!-- This table's alone: the public gallery has no way to ask for hidden listings. -->
+                <div class="field">
+                    <h:outputLabel for="status" value="Status"/>
+                    <h:selectOneMenu id="status" value="#{adminBean.selectedStatus}">
+                        <f:selectItems value="#{adminBean.statusOptions}"/>
+                    </h:selectOneMenu>
+                </div>
+
+                <div class="actions">
+                    <h:commandButton id="apply" value="Apply" action="#{adminBean.applyFilter}"/>
+                    <h:commandButton id="clear" value="Clear" action="#{adminBean.clearFilters}"
+                                     styleClass="button-secondary"/>
+                </div>
+            </fieldset>
+        </h:form>
+
+        <ui:fragment rendered="#{adminBean.noListings}">
+            <div class="empty-state"><p>No listing matches these filters.</p></div>
+        </ui:fragment>
+
+        <ui:fragment rendered="#{not adminBean.noListings}">
+            <h:form id="listingsForm">
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Photograph</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Posted by</th>
+                                <th scope="col">Category</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Created</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <ui:repeat id="rows" value="#{adminBean.listings}" var="pet">
+                                <tr>
+                                    <td class="cell-thumb">
+                                        <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.petName}"/>
+                                    </td>
+                                    <td>#{pet.petName}</td>
+                                    <td>#{pet.owner.fullName}</td>
+                                    <td>#{pet.category.categoryName}</td>
+                                    <td>
+                                        <span class="#{adminBean.statusStyle(pet)}">
+                                            #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
+                                        </span>
+                                    </td>
+                                    <td>#{adminBean.createdOn(pet)}</td>
+                                    <td>
+                                        <div class="actions">
+                                            <h:commandLink id="hide" value="Hide" styleClass="button-secondary"
+                                                           rendered="#{not adminBean.isHidden(pet)}"
+                                                           action="#{adminBean.hide(pet.petId)}"/>
+                                            <h:commandLink id="restore" value="Restore" styleClass="button-secondary"
+                                                           rendered="#{adminBean.isHidden(pet)}"
+                                                           action="#{adminBean.restore(pet.petId)}"/>
+                                            <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
+                                                           action="#{adminBean.deletePet(pet.petId)}"
+                                                           onclick="return confirm('#{adminBean.confirmDelete(pet)}');"/>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ui:repeat>
+                        </tbody>
+                    </table>
+                </div>
+            </h:form>
+        </ui:fragment>
+
+        <h2>Category management</h2>
+
+        <h:form id="categoryForm">
+            <div class="panel">
+                <div class="field">
+                    <h:outputLabel for="newCategory" value="New category"/>
+                    <h:inputText id="newCategory" value="#{adminBean.newCategoryName}" maxlength="50"/>
+                </div>
+                <div class="actions">
+                    <h:commandButton id="addCategory" value="Add category" action="#{adminBean.addCategory}"/>
+                </div>
+            </div>
+
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Listings</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <ui:repeat id="categoryRows" value="#{adminBean.categories}" var="category">
+                            <tr>
+                                <td>#{category.categoryName}</td>
+                                <td>#{adminBean.listingCount(category)}</td>
+                                <td>
+                                    <!-- Disabled rather than absent, so the count beside it explains itself.
+                                         The 409 still stands: the count can change between render and click. -->
+                                    <h:commandLink id="deleteCategory" value="Delete" styleClass="button button-danger"
+                                                   action="#{adminBean.deleteCategory(category.categoryId)}"
+                                                   disabled="#{adminBean.isInUse(category)}"
+                                                   title="#{adminBean.isInUse(category) ? 'A category that still holds listings cannot be deleted.' : ''}"/>
+                                </td>
+                            </tr>
+                        </ui:repeat>
+                    </tbody>
+                </table>
+            </div>
+        </h:form>
+
+    </ui:define>
+
+</ui:composition>

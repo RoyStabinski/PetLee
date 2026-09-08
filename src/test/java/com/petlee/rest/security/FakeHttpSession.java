@@ -9,9 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A session that behaves like a container's in the two ways these tests depend on: it has an
- * identifier that changes when a new one is created, and it refuses every operation once
- * invalidated.
+ * A session that behaves like a container's in the three ways these tests depend on: it has an
+ * identifier, that identifier can be replaced without disturbing anything else, and it refuses
+ * every operation once invalidated.
  *
  * <p>Written by hand rather than mocked because ADR-003 keeps the dependency list closed — JUnit
  * is the only test library — and because the invalidation behaviour is the thing under test, not
@@ -21,13 +21,25 @@ final class FakeHttpSession implements HttpSession {
 
     private static int counter;
 
-    private final String id = "SESSION-" + (++counter);
+    private String id = "SESSION-" + (++counter);
     private final Map<String, Object> attributes = new LinkedHashMap<>();
     private boolean valid = true;
     private int maxInactiveInterval = 1800;
 
     boolean isValid() {
         return valid;
+    }
+
+    /**
+     * What a container does for {@code HttpServletRequest.changeSessionId()}: a new identifier,
+     * the same live session, the same attributes.
+     *
+     * @return the new identifier
+     */
+    String rotateId() {
+        requireValid();
+        id = "SESSION-" + (++counter);
+        return id;
     }
 
     @Override

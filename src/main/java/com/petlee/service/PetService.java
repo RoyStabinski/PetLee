@@ -1,5 +1,6 @@
 package com.petlee.service;
 
+import com.petlee.config.StorageConfig;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
@@ -11,6 +12,7 @@ import com.petlee.exception.ValidationException;
 import com.petlee.mapper.PetMapper;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
+import com.petlee.model.PetImage;
 import com.petlee.model.User;
 import com.petlee.repository.PetFilter;
 import com.petlee.repository.PetRepository;
@@ -23,6 +25,7 @@ import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -62,15 +65,23 @@ public class PetService {
     private UserRepository users;
     private CategoryService categories;
 
+    /**
+     * Only for the files behind a deleted listing. The rows cascade in the database; the
+     * photographs on disk do not, and nothing else in this class touches storage.
+     */
+    private StorageConfig storage;
+
     /** For CDI only — an {@code @ApplicationScoped} proxy needs a no-argument constructor. */
     protected PetService() {
     }
 
     @Inject
-    public PetService(PetRepository pets, UserRepository users, CategoryService categories) {
+    public PetService(PetRepository pets, UserRepository users, CategoryService categories,
+                      StorageConfig storage) {
         this.pets = pets;
         this.users = users;
         this.categories = categories;
+        this.storage = storage;
     }
 
     /**
@@ -225,9 +236,23 @@ public class PetService {
                     "Only the owner of a listing, or an administrator, can remove it");
         }
 
+        // Collected before the row goes, because after it the collection is gone with it.
+        List<String> photographs = pet.getImages() == null ? List.of()
+                : pet.getImages().stream().map(PetImage::getImageUrl).filter(Objects::nonNull).toList();
+
         pets.delete(pet);
+
+        // The database cascade takes the rows (T-03, T-09); nothing took the files. Until T-32
+        // criterion 6 went looking, every deleted listing left its photographs on disk - and
+        // ImageServlet went on serving them by public URL to anyone who had seen one. Deleting a
+        // withdrawn listing has to mean the photographs are gone, not merely unlisted.
+        //
+        // Last, and quietly: a file that will not delete is a smaller problem than a listing that
+        // will not delete, and storage.deleteStored logs loudly enough to be found.
+        photographs.forEach(storage::deleteStored);
+
         LOGGER.log(Level.INFO, () -> "User " + callerUserId + (callerIsAdmin ? " (admin)" : "")
-                + " deleted pet " + petId);
+                + " deleted pet " + petId + " and its " + photographs.size() + " photograph(s)");
     }
 
     /**

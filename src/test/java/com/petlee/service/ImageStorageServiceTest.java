@@ -58,7 +58,8 @@ class ImageStorageServiceTest {
         images = new FakePetImageRepository();
         pets = new FakePetRepository();
         users = new FakeUserRepository();
-        PetService petService = new PetService(pets, users, new CategoryService(new FakeCategoryRepository()));
+        PetService petService = new PetService(pets, users,
+                new CategoryService(new FakeCategoryRepository()), new FixedRoot(uploadRoot));
 
         user(OWNER_ID, "roy");
         user(STRANGER_ID, "stranger");
@@ -75,10 +76,10 @@ class ImageStorageServiceTest {
     }
 
     /** A {@link StorageConfig} pinned to the test's temporary directory. */
-    private static final class FixedRoot extends StorageConfig {
+    static final class FixedRoot extends StorageConfig {
         private final Path root;
 
-        private FixedRoot(Path root) {
+        FixedRoot(Path root) {
             this.root = root;
         }
 

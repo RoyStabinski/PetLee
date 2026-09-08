@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">#{msg['pet.add.title']} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+        <div class="panel">
+            <h1>#{msg['pet.add.title']}</h1>
+
+            <!--
+                enctype is not optional. Without it the browser posts the form as
+                application/x-www-form-urlencoded, the file is never sent, and h:inputFile hands the
+                bean a null Part - a failure with no error anywhere to explain it.
+            -->
+            <h:form id="petForm" enctype="multipart/form-data">
+                <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
+
+                <div class="field field-wide">
+                    <h:outputLabel for="photo" value="#{msg['pet.photo']}"/>
+                    <h:inputFile id="photo" value="#{petFormBean.uploadedFile}" accept="image/*"/>
+                    <h:message for="photo" styleClass="field-error"/>
+                    <span class="field-hint">#{petFormBean.uploadLimits}</span>
+                </div>
+
+                <div class="actions">
+                    <h:commandButton id="save" value="#{msg['form.save']}" action="#{petFormBean.save}"/>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml"
+                                  styleClass="button-secondary">#{msg['form.cancel']}</h:outputLink>
+                </div>
+            </h:form>
+        </div>
+    </ui:define>
+
+</ui:composition>

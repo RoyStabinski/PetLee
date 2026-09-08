@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <f:metadata>
+        <f:viewParam name="id" value="#{petDetailBean.petId}"/>
+        <f:viewAction action="#{petDetailBean.load}"/>
+    </f:metadata>
+
+    <ui:define name="title">#{petDetailBean.pet.name} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+
+        <ui:fragment rendered="#{not empty petDetailBean.pet}">
+
+            <h1>#{petDetailBean.pet.name}</h1>
+
+            <ui:fragment rendered="#{petDetailBean.withdrawn}">
+                <p class="tag tag-removed">#{msg['pet.withdrawn']}</p>
+            </ui:fragment>
+
+            <div class="detail">
+
+                <div>
+                    <h:panelGroup id="mainImageBox" layout="block" styleClass="detail-media">
+                        <ui:fragment rendered="#{not empty petDetailBean.selectedImage}">
+                            <h:graphicImage value="#{petDetailBean.selectedImage.imageUrl}"
+                                            alt="#{petDetailBean.pet.name}"/>
+                        </ui:fragment>
+                        <ui:fragment rendered="#{empty petDetailBean.selectedImage}">
+                            <h:graphicImage value="/resources/images/placeholder-pet.png"
+                                            alt="#{msg['pet.image.none']}"/>
+                        </ui:fragment>
+                    </h:panelGroup>
+
+                    <!--
+                        A thumbnail strip only when there is more than one photograph: a strip of
+                        one is a row of nothing useful. Each thumbnail is an AJAX action that
+                        re-renders the frame above - plain JSF, no image-gallery library, and it
+                        degrades to a full postback with JavaScript switched off.
+                    -->
+                    <ui:fragment rendered="#{petDetailBean.hasThumbnails}">
+                        <h3>#{msg['pet.photographs']}</h3>
+                        <h:form id="thumbForm">
+                            <ul class="thumbs">
+                                <ui:repeat id="thumbs" value="#{petDetailBean.images}" var="image" varStatus="row">
+                                    <li>
+                                        <h:commandLink id="thumb" action="#{petDetailBean.select(row.index)}">
+                                            <f:ajax render=":mainImageBox"/>
+                                            <h:graphicImage value="#{image.imageUrl}"
+                                                            alt="#{petDetailBean.pet.name}"/>
+                                        </h:commandLink>
+                                    </li>
+                                </ui:repeat>
+                            </ul>
+                        </h:form>
+                    </ui:fragment>
+                </div>
+
+                <div>
+                    <dl class="detail-facts">
+                        <dt>#{msg['pet.breed']}</dt>
+                        <dd>#{petDetailBean.pet.breed}</dd>
+                        <dt>#{msg['pet.age']}</dt>
+                        <dd><h:outputFormat value="#{msg['pet.age.years']}">
+                            <f:param value="#{petDetailBean.pet.age}"/>
+                        </h:outputFormat></dd>
+                        <dt>#{msg['pet.size']}</dt>
+                        <dd>#{msg['size.'.concat(petDetailBean.pet.size)]}</dd>
+                        <dt>#{msg['pet.gender']}</dt>
+                        <dd>#{msg['gender.'.concat(petDetailBean.pet.gender)]}</dd>
+                        <dt>#{msg['pet.category']}</dt>
+                        <dd>#{petDetailBean.pet.categoryName}</dd>
+                        <dt>#{msg['pet.status']}</dt>
+                        <dd>#{msg['status.'.concat(petDetailBean.pet.status)]}</dd>
+                    </dl>
+
+                    <h2>#{msg['pet.description']}</h2>
+                    <p>#{petDetailBean.pet.longDesc}</p>
+
+                    <!--
+                        The contact block. The rendered check is the SECOND layer, not the only
+                        one: the server has already returned these three fields as null for a
+                        caller with no session (T-15, T-22), so a guest's response never carries
+                        them at all. Both must stay. Removing this check would render an empty
+                        block; removing the server's would put a stranger's email in the HTML.
+                    -->
+                    <h:panelGroup layout="block" styleClass="panel"
+                                  rendered="#{petDetailBean.contactAvailable}">
+                        <h2>#{msg['pet.contact.title']}</h2>
+                        <dl class="detail-facts">
+                            <dt>#{msg['pet.owner']}</dt>
+                            <dd>#{petDetailBean.pet.ownerFullName}</dd>
+                            <dt>#{msg['pet.owner.email']}</dt>
+                            <dd><a href="mailto:#{petDetailBean.pet.ownerEmail}">#{petDetailBean.pet.ownerEmail}</a></dd>
+                            <dt>#{msg['pet.owner.phone']}</dt>
+                            <dd><a href="tel:#{petDetailBean.pet.ownerPhone}">#{petDetailBean.pet.ownerPhone}</a></dd>
+                        </dl>
+                    </h:panelGroup>
+
+                    <h:panelGroup layout="block" styleClass="panel"
+                                  rendered="#{not petDetailBean.contactAvailable}">
+                        <p>#{msg['pet.login.toContact']}</p>
+                        <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="button">
+                            #{msg['nav.login']}
+                        </h:outputLink>
+                    </h:panelGroup>
+
+                    <div class="actions">
+                        <h:outputLink value="#{request.contextPath}/index.xhtml"
+                                      styleClass="button-secondary">
+                            #{msg['pet.backToGallery']}
+                        </h:outputLink>
+                    </div>
+                </div>
+
+            </div>
+        </ui:fragment>
+
+    </ui:define>
+
+</ui:composition>

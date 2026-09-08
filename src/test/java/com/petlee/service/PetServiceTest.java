@@ -16,8 +16,12 @@ import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
@@ -40,6 +44,10 @@ class PetServiceTest {
     private FakeCategoryRepository categories;
     private PetService service;
 
+    /** Where a listing's photographs live, so the delete path has real files to remove. */
+    @TempDir
+    Path uploadRoot;
+
     private User owner;
 
     @BeforeEach
@@ -47,11 +55,92 @@ class PetServiceTest {
         pets = new FakePetRepository();
         users = new FakeUserRepository();
         categories = new FakeCategoryRepository();
-        service = new PetService(pets, users, new CategoryService(categories));
+        service = new PetService(pets, users, new CategoryService(categories),
+                new ImageStorageServiceTest.FixedRoot(uploadRoot));
 
         owner = user(OWNER_ID, "roy", "Roy Stein", "roy@example.com", "050-1234567");
         user(STRANGER_ID, "stranger", "A Stranger", "stranger@example.com", "050-7654321");
         user(ADMIN_ID, "admin", "The Admin", "admin@example.com", null);
+    }
+
+    /**
+     * The defect T-32 criterion 6 went looking for. The database cascade takes the {@code
+     * pet_image} rows; nothing took the files, so every deleted listing left its photographs on
+     * disk — and {@code ImageServlet} went on serving them by public URL to anyone who had seen
+     * one. A withdrawn listing whose photographs are still retrievable is not withdrawn.
+     */
+    @Test
+    @DisplayName("deleting a listing deletes its photographs from disk, not just its rows")
+    void deleteRemovesTheFilesToo() throws IOException {
+        Pet pet = persistedPetWithImages("185_11111111-1111-1111-1111-111111111111.jpg",
+                "185_22222222-2222-2222-2222-222222222222.png");
+        Path first = uploadRoot.resolve("185_11111111-1111-1111-1111-111111111111.jpg");
+        Path second = uploadRoot.resolve("185_22222222-2222-2222-2222-222222222222.png");
+        assertTrue(Files.exists(first) && Files.exists(second), "the fixture should have written both");
+
+        service.delete(pet.getPetId(), OWNER_ID, false);
+
+        assertFalse(Files.exists(first), "the main photograph should be gone");
+        assertFalse(Files.exists(second), "and so should the other one");
+    }
+
+    @Test
+    @DisplayName("a listing with no photographs deletes without complaint")
+    void deleteWithNoImages() throws IOException {
+        Pet pet = persistedPetWithImages();
+
+        service.delete(pet.getPetId(), OWNER_ID, false);
+
+        assertTrue(pets.rows.stream().noneMatch(p -> p.getPetId().equals(pet.getPetId())));
+    }
+
+    /**
+     * A row whose {@code image_url} is not a shape this application writes must not send the
+     * delete anywhere near the filesystem. The column is data, and data that becomes a path
+     * deserves the same suspicion as a request parameter.
+     */
+    @Test
+    @DisplayName("a hostile image_url is refused rather than resolved")
+    void deleteIgnoresAnUnexpectedImageUrl() throws IOException {
+        Path outside = uploadRoot.resolve("keep-me.txt");
+        Files.writeString(outside, "not a photograph");
+        Pet pet = persistedPetWithImages("/../keep-me.txt", "../keep-me.txt", "keep-me.txt");
+
+        service.delete(pet.getPetId(), OWNER_ID, false);
+
+        assertTrue(Files.exists(outside), "nothing outside the naming convention may be deleted");
+    }
+
+    /**
+     * Builds a persisted pet whose photographs exist both as rows and as files.
+     *
+     * @param fileNames the stored names, as T-16 generates them
+     * @return the pet
+     */
+    private Pet persistedPetWithImages(String... fileNames) throws IOException {
+        PetForm form = new PetForm();
+        form.setName("Rex");
+        form.setSize("MEDIUM");
+        form.setGender("MALE");
+        form.setShortDesc("Friendly");
+        form.setCategoryId(1);
+        PetDTO created = service.create(form, OWNER_ID);
+
+        Pet pet = pets.rows.stream()
+                .filter(p -> p.getPetId().equals(created.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        for (String fileName : fileNames) {
+            if (!fileName.contains("/")) {
+                Files.write(uploadRoot.resolve(fileName), new byte[]{1, 2, 3});
+            }
+            PetImage image = new PetImage();
+            image.setImageUrl("/images/" + fileName);
+            image.setPet(pet);
+            pet.getImages().add(image);
+        }
+        return pet;
     }
 
     private User user(Long id, String username, String fullName, String email, String phone) {

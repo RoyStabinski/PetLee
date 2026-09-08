@@ -90,12 +90,18 @@
             <!--
                 globalOnly: field-level messages belong beside their field, where the user is
                 looking. Anything a bean reports about the request as a whole surfaces here.
+
+                The id is load-bearing. An AJAX action that re-renders only its own region leaves
+                this block untouched, so a failure reported here would never reach the screen - the
+                user would see stale content and no explanation. Every ajax render in the
+                application names :globalMessages alongside its own target.
             -->
-            <h:messages globalOnly="true"
+            <h:messages id="globalMessages"
+                        globalOnly="true"
                         layout="list"
                         styleClass="messages"
                         infoClass="message-info"
-                        warnClass="message-error"
+                        warnClass="message-warn"
                         errorClass="message-error"
                         fatalClass="message-error"/>
 

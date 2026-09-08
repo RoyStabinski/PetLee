@@ -26,7 +26,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 
 /**
  * Stores an uploaded photograph and records it against a pet, keeping specification §11's "exactly
@@ -76,8 +75,6 @@ public class ImageStorageService {
      * root. Anything else in {@code image_url} — a separator, a {@code ..}, an absolute path — is
      * refused rather than followed, even though every value in that column was generated here.
      */
-    private static final Pattern STORED_FILENAME = Pattern.compile("^[0-9]+_[0-9a-f-]{36}\\.[a-z]{3,4}$");
-
     private PetImageRepository images;
     private PetService pets;
     private StorageConfig storage;
@@ -179,7 +176,7 @@ public class ImageStorageService {
         } catch (RuntimeException e) {
             // The row did not go in, so the file must not stay. Otherwise every failed upload
             // leaves a byte-for-byte copy of a user's photograph that nothing references.
-            deleteQuietly(target);
+            storage.deleteStored(StorageConfig.PUBLIC_URL_PREFIX + target.getFileName());
             throw e;
         }
     }
@@ -227,7 +224,7 @@ public class ImageStorageService {
 
         // The file goes last: a failed delete must not be the reason a row survives, and an
         // unreferenced file is a smaller problem than a row pointing at nothing.
-        fileFor(url).ifPresent(this::deleteQuietly);
+        storage.deleteStored(url);
         LOGGER.log(Level.INFO, () -> "Deleted image " + imageId + " (" + url + ")");
     }
 
@@ -326,38 +323,6 @@ public class ImageStorageService {
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Could not store the uploaded photograph", e);
-        }
-    }
-
-    /**
-     * The file behind a stored {@code image_url}, if the value is one this service wrote.
-     *
-     * <p>The column holds public URL paths, never filesystem paths, so the filename is what
-     * follows the prefix. It is matched against {@link #STORED_FILENAME} before being resolved:
-     * the value came from this class, but a row is data, and data that reaches a path deserves the
-     * same suspicion as a request parameter.
-     */
-    private Optional<Path> fileFor(String imageUrl) {
-        if (imageUrl == null || !imageUrl.startsWith(StorageConfig.PUBLIC_URL_PREFIX)) {
-            return Optional.empty();
-        }
-        String fileName = imageUrl.substring(StorageConfig.PUBLIC_URL_PREFIX.length());
-        if (!STORED_FILENAME.matcher(fileName).matches()) {
-            LOGGER.log(Level.WARNING, () -> "Refusing to resolve an unexpected image_url: " + imageUrl);
-            return Optional.empty();
-        }
-        return Optional.of(resolveInsideRoot(fileName));
-    }
-
-    /**
-     * Deletes a file without letting the failure mask the reason we are deleting it. The caller is
-     * either cleaning up after an exception it is about to rethrow, or has already removed the row.
-     */
-    private void deleteQuietly(Path path) {
-        try {
-            Files.deleteIfExists(path);
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, e, () -> "Could not delete " + path + "; it is now orphaned");
         }
     }
 

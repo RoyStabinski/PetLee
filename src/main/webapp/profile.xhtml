@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">#{msg['profile.title']} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+
+        <h1>#{msg['profile.title']}</h1>
+
+        <!--
+            The user's own details, so no privacy gate applies here - specification section 6 is
+            about one user seeing another's contact details, and this is the one page where the
+            person reading is the person described.
+        -->
+        <div class="panel">
+            <dl class="detail-facts">
+                <dt>#{msg['auth.fullName']}</dt>
+                <dd>#{userBean.currentUser.fullName}</dd>
+                <dt>#{msg['auth.username']}</dt>
+                <dd>#{userBean.currentUser.username}</dd>
+                <dt>#{msg['auth.email']}</dt>
+                <dd>#{userBean.currentUser.email}</dd>
+                <dt>#{msg['auth.phone']}</dt>
+                <dd>#{userBean.currentUser.phone}</dd>
+                <dt>#{msg['pet.status']}</dt>
+                <dd>#{msg['role.'.concat(userBean.currentUser.role)]}</dd>
+            </dl>
+        </div>
+
+        <h2>#{msg['profile.listings']}</h2>
+
+        <ui:fragment rendered="#{myListingsBean.noListings}">
+            <div class="empty-state">
+                <p>#{msg['profile.empty']}</p>
+                <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
+                    #{msg['profile.addFirst']}
+                </h:outputLink>
+            </div>
+        </ui:fragment>
+
+        <ui:fragment rendered="#{not myListingsBean.noListings}">
+            <h:form id="listingsForm">
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">#{msg['profile.column.photo']}</th>
+                                <th scope="col">#{msg['profile.column.name']}</th>
+                                <th scope="col">#{msg['profile.column.category']}</th>
+                                <th scope="col">#{msg['profile.column.status']}</th>
+                                <th scope="col">#{msg['profile.column.actions']}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <ui:repeat id="rows" value="#{myListingsBean.listings}" var="pet">
+                                <tr>
+                                    <td class="cell-thumb">
+                                        <h:graphicImage value="#{myListingsBean.thumbnailOf(pet)}"
+                                                        alt="#{pet.name}"/>
+                                    </td>
+                                    <td>#{pet.name}</td>
+                                    <td>#{pet.categoryName}</td>
+                                    <td>
+                                        <span class="#{myListingsBean.statusStyle(pet)}">
+                                            #{msg['status.'.concat(pet.status)]}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="actions">
+                                            <h:commandLink id="edit"
+                                                           action="#{myListingsBean.edit(pet.id)}"
+                                                           styleClass="button-secondary"
+                                                           value="#{msg['form.edit']}"/>
+                                            <!--
+                                                A confirmation before the call, because deletion is
+                                                permanent and takes the photographs with it. A
+                                                mis-click must not be able to reach the server.
+                                            -->
+                                            <h:commandLink id="delete"
+                                                           action="#{myListingsBean.delete(pet.id)}"
+                                                           styleClass="button button-danger"
+                                                           value="#{msg['form.delete']}"
+                                                           onclick="return confirm('#{msg['form.confirmDelete']}');"/>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ui:repeat>
+                        </tbody>
+                    </table>
+                </div>
+            </h:form>
+        </ui:fragment>
+
+    </ui:define>
+
+</ui:composition>

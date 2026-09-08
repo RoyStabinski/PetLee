@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">Pets looking for a home - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+
+        <h1>Pets looking for a home</h1>
+
+        <div class="gallery-layout">
+
+            <h:form id="filterForm" styleClass="panel filter-panel">
+                <fieldset>
+                    <legend>Narrow the list</legend>
+
+                    <div class="field">
+                        <h:outputLabel for="category" value="Category"/>
+                        <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
+                            <f:selectItem itemValue="#{null}" itemLabel="Any"/>
+                            <f:selectItems value="#{petBean.categories}" var="c"
+                                           itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
+                        </h:selectOneMenu>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="size" value="Size"/>
+                        <h:selectOneMenu id="size" value="#{petBean.selectedSize}">
+                            <f:selectItems value="#{petBean.sizeOptions}"/>
+                        </h:selectOneMenu>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="gender" value="Gender"/>
+                        <h:selectOneMenu id="gender" value="#{petBean.selectedGender}">
+                            <f:selectItems value="#{petBean.genderOptions}"/>
+                        </h:selectOneMenu>
+                    </div>
+
+                    <div class="actions">
+                        <h:commandButton id="apply" value="Apply" action="#{petBean.applyFilter}">
+                            <f:ajax execute="@form" render=":globalMessages :galleryGrid"/>
+                        </h:commandButton>
+                        <h:commandButton id="clear" value="Clear" action="#{petBean.clearFilters}"
+                                         styleClass="button-secondary">
+                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
+                        </h:commandButton>
+                    </div>
+                </fieldset>
+            </h:form>
+
+            <h:panelGroup id="galleryGrid" layout="block" styleClass="gallery-results">
+
+                <!-- Bracket notation: 'empty' is a reserved EL operator, so #{petBean.empty}
+                     fails to parse the view outright. -->
+                <ui:fragment rendered="#{petBean['empty']}">
+                    <div class="empty-state">
+                        <p>No pets match your search just yet.</p>
+                        <h:form>
+                            <h:commandButton id="clearEmpty" value="Clear" styleClass="button-secondary"
+                                             action="#{petBean.clearFilters}"/>
+                        </h:form>
+                    </div>
+                </ui:fragment>
+
+                <ui:fragment rendered="#{not petBean['empty']}">
+                    <ul class="gallery">
+                        <ui:repeat value="#{petBean.pets}" var="pet">
+                            <li class="card">
+
+                                <!-- No contextPath: h:graphicImage prepends it itself for a "/" value. -->
+                                <div class="card-media">
+                                    <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.petName}"/>
+                                </div>
+
+                                <div class="card-body">
+                                    <h3 class="card-title">#{pet.petName}</h3>
+                                    <p class="card-desc">#{pet.shortDesc}</p>
+
+                                    <ul class="tags">
+                                        <li class="tag">#{pet.size == 'SMALL' ? 'Small' : (pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</li>
+                                        <li class="tag">#{pet.gender == 'MALE' ? 'Male' : 'Female'}</li>
+                                        <li class="tag">#{pet.category.categoryName}</li>
+                                    </ul>
+
+                                    <div class="card-actions">
+                                        <h:form>
+                                            <h:commandLink value="See details" styleClass="button"
+                                                           action="#{petBean.viewDetails(pet.petId)}"/>
+                                        </h:form>
+                                    </div>
+                                </div>
+
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                </ui:fragment>
+
+            </h:panelGroup>
+
+        </div>
+
+    </ui:define>
+
+</ui:composition>

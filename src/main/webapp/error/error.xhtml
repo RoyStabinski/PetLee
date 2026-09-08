@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- One generic page for 403, 500 and an expired view: none of them benefit from naming the
+     status, and one page is one less place for the same sentence to drift. -->
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">Something went wrong - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+        <div class="panel panel-narrow">
+            <h1>Something went wrong</h1>
+            <p>We could not complete that request. Please try again.</p>
+
+            <!-- Shows no exception, stack trace or SQL, in any project stage. -->
+
+            <div class="actions">
+                <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button">
+                    Back to the gallery
+                </h:outputLink>
+            </div>
+        </div>
+    </ui:define>
+
+</ui:composition>

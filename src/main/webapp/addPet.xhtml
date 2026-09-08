@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">Add a pet - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+        <div class="panel">
+            <h1>Add a pet</h1>
+
+            <!-- enctype is not optional: without it the file is never sent and h:inputFile
+                 hands the bean a null Part, with no error to explain it. -->
+            <h:form id="petForm" enctype="multipart/form-data">
+                <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
+
+                <div class="field field-wide">
+                    <h:outputLabel for="photo" value="Photograph"/>
+                    <h:inputFile id="photo" value="#{petFormBean.uploadedFile}" accept="image/*"/>
+                    <h:message for="photo" styleClass="field-error"/>
+                    <span class="field-hint">#{petFormBean.uploadLimits}</span>
+                </div>
+
+                <div class="actions">
+                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml"
+                                  styleClass="button-secondary">Cancel</h:outputLink>
+                </div>
+            </h:form>
+        </div>
+    </ui:define>
+
+</ui:composition>

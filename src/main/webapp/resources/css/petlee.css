@@ -1,0 +1,291 @@
+/*
+ * Pet-Lee's whole stylesheet. Hand-written and served from the application, so nothing is
+ * fetched from a CDN and the layout survives without internet access.
+ *
+ * Two rules: no inline style= in the XHTML, and everything is sized in rem and laid out with
+ * grid/flex so the pages reflow without a breakpoint per screen size.
+ */
+
+/* --- design tokens, named by role so a theme change is six lines --- */
+:root {
+    --ink: #1d2321;
+    --ink-soft: #5a6663;
+    --page: #f6f4ef;
+    --surface: #ffffff;
+    --line: #ddd8cf;
+    --brand: #2f6f5e;
+    --brand-dark: #245647;
+    --brand-tint: #e6f0ec;
+    --danger: #a3342a;
+    --danger-tint: #f8e9e7;
+    --ok: #2c6e49;
+    --ok-tint: #e5f2ea;
+    --radius: 10px;
+    --gap: 1rem;
+}
+
+/* --- base --- */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    line-height: 1.55;
+    color: var(--ink);
+    background: var(--page);
+}
+
+h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5em; }
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0 0 1em; max-width: 68ch; }
+a { color: var(--brand-dark); }
+img { max-width: 100%; display: block; }
+
+/* One visible focus ring everywhere: removing it without a replacement breaks keyboard use. */
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* --- layout --- */
+.page { min-height: 100vh; display: flex; flex-direction: column; }
+.container { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: var(--gap); }
+.main { flex: 1; padding-block: 1.5rem 3rem; }
+
+/* Off-screen until focused: the first thing a keyboard user meets. */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    background: var(--brand-dark);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    z-index: 10;
+}
+
+.skip-link:focus { left: 0; }
+
+/* --- header, navigation and footer --- */
+.site-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+
+.site-header .container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gap);
+    padding-block: 0.75rem;
+}
+
+.brand { display: flex; flex-direction: column; text-decoration: none; color: var(--ink); margin-right: auto; }
+.brand-name { font-size: 1.3rem; font-weight: 700; color: var(--brand-dark); }
+.brand-tagline { font-size: 0.8rem; color: var(--ink-soft); }
+
+.nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
+.nav a { padding: 0.4rem 0.65rem; text-decoration: none; color: var(--ink); font-weight: 500; }
+.nav-user { font-size: 0.9rem; color: var(--ink-soft); padding-inline: 0.35rem; }
+.nav form { margin: 0; }
+
+.site-footer {
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    padding-block: 1.25rem;
+}
+
+/* --- gallery: filter panel beside the grid, stacked below 46rem --- */
+.gallery-layout {
+    display: grid;
+    grid-template-columns: minmax(15rem, 18rem) 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.filter-panel .field + .field { margin-top: 0.75rem; }
+
+/* auto-fill with a 240px minimum: one column on a phone, as many as fit on a desktop. */
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-media { aspect-ratio: 4 / 3; background: var(--brand-tint); overflow: hidden; }
+.card-media img, .detail-media img { width: 100%; height: 100%; object-fit: cover; }
+.card-body { padding: 0.9rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
+.card-title { margin: 0; font-size: 1.1rem; }
+.card-desc { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+.card-actions { margin-top: auto; padding-top: 0.6rem; }
+
+/* --- size, gender and status badges --- */
+.tags { display: flex; flex-wrap: wrap; gap: 0.35rem; list-style: none; margin: 0; padding: 0; }
+
+.tag {
+    font-size: 0.78rem;
+    background: var(--brand-tint);
+    color: var(--brand-dark);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+}
+
+.tag-removed { background: var(--danger-tint); color: var(--danger); }
+.tag-adopted { background: var(--brand-dark); color: var(--surface); }
+
+/* --- panels and forms --- */
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.panel-narrow { max-width: 30rem; margin-inline: auto; }
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.9rem 1.25rem;
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.form-grid legend { font-weight: 600; padding: 0; margin-bottom: 0.5rem; }
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field-wide { grid-column: 1 / -1; }
+.field label { font-size: 0.9rem; font-weight: 600; }
+
+.field input, .field select, .field textarea {
+    font: inherit;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.65rem;
+    width: 100%;
+}
+
+.field textarea { min-height: 7rem; resize: vertical; }
+.field-hint { font-size: 0.82rem; color: var(--ink-soft); }
+.field-error { color: var(--danger); font-size: 0.85rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+
+/* --- buttons: one set of rules, so a link and a Faces submit look identical --- */
+.button, button, input[type="submit"] {
+    font: inherit;
+    font-weight: 600;
+    display: inline-block;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid var(--brand-dark);
+    border-radius: var(--radius);
+    background: var(--brand);
+    color: #fff;
+    padding: 0.5rem 1rem;
+}
+
+.button-secondary { background: var(--surface); color: var(--brand-dark); border-color: var(--line); }
+.button-danger { background: var(--danger); border-color: var(--danger); }
+
+/* A disabled h:commandLink renders as a <span> that keeps its classes but loses its href. */
+span.button, span.button-danger { opacity: 0.5; cursor: not-allowed; }
+
+/* --- messages: Faces renders h:messages as a <ul> with these classes --- */
+.messages { list-style: none; margin: 0 0 1.25rem; padding: 0; }
+
+.messages li {
+    border-radius: var(--radius);
+    padding: 0.65rem 0.9rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--line);
+}
+
+/* A marker glyph as well as colour, so the two are not told apart by colour alone. */
+.message-info::before, .message-warn::before, .message-error::before {
+    font-weight: 700;
+    margin-right: 0.5rem;
+}
+
+.message-info { background: var(--ok-tint); border-color: var(--ok); color: var(--ok); }
+.message-info::before { content: "\2713"; }
+
+/* A partial success must not look like a failure, or the user re-submits the whole form. */
+.message-warn { background: #fdf3e3; border-color: #b07d1a; color: #8a6212; }
+.message-warn::before { content: "\26A0"; }
+
+.message-error { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
+.message-error::before { content: "\26A0"; }
+
+.empty-state {
+    background: var(--surface);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 2rem 1.25rem;
+    text-align: center;
+    color: var(--ink-soft);
+}
+
+/* --- pet detail --- */
+.detail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.detail-media {
+    background: var(--brand-tint);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    aspect-ratio: 4 / 3;
+}
+
+.detail-facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
+.detail-facts dt { font-weight: 600; color: var(--ink-soft); }
+.detail-facts dd { margin: 0; }
+
+/* --- tables: .table-scroll keeps a wide table from scrolling the whole page sideways --- */
+.table-scroll { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; background: var(--surface); }
+
+.table th, .table td {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+}
+
+.table th { font-size: 0.85rem; text-transform: uppercase; color: var(--ink-soft); }
+.table .actions { margin-top: 0; flex-wrap: nowrap; }
+
+.cell-thumb img {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+}
+
+/* --- narrow screens: the grids already reflow, this only unstacks the header --- */
+@media (max-width: 46rem) {
+    .gallery-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 30rem) {
+    .site-header .container { align-items: flex-start; }
+    .brand { margin-right: 0; }
+    .nav { width: 100%; }
+    h1 { font-size: 1.45rem; }
+}

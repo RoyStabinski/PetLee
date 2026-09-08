@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
+
+    <f:metadata>
+        <f:viewAction action="#{userBean.redirectHome}" if="#{userBean.loggedIn}"/>
+    </f:metadata>
+
+    <ui:define name="title">Create an account - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+
+        <div class="panel panel-narrow">
+            <h1>Create an account</h1>
+
+            <h:form id="registerForm">
+                <fieldset class="form-grid">
+
+                    <div class="field field-wide">
+                        <h:outputLabel for="username" value="Username"/>
+                        <h:inputText id="username" value="#{userBean.username}" required="true"
+                                     requiredMessage="Required" autocomplete="username"
+                                     validatorMessage="A username is 3 to 20 characters.">
+                            <f:validateLength minimum="3" maximum="20"/>
+                        </h:inputText>
+                        <h:message for="username" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="password" value="Password"/>
+                        <h:inputSecret id="password" value="#{userBean.password}" required="true"
+                                       requiredMessage="Required" redisplay="false"
+                                       autocomplete="new-password"
+                                       validatorMessage="A password is at least 8 characters.">
+                            <f:validateLength minimum="8"/>
+                        </h:inputSecret>
+                        <h:message for="password" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="confirmPassword" value="Confirm password"/>
+                        <h:inputSecret id="confirmPassword" value="#{userBean.confirmPassword}"
+                                       required="true" requiredMessage="Required"
+                                       redisplay="false" autocomplete="new-password"/>
+                        <h:message for="confirmPassword" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field field-wide">
+                        <h:outputLabel for="fullName" value="Full name"/>
+                        <h:inputText id="fullName" value="#{userBean.fullName}" required="true"
+                                     requiredMessage="Required" autocomplete="name"
+                                     validatorMessage="A full name is at most 50 characters.">
+                            <f:validateLength maximum="50"/>
+                        </h:inputText>
+                        <h:message for="fullName" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="email" value="Email"/>
+                        <h:inputText id="email" value="#{userBean.email}" type="email" required="true"
+                                     requiredMessage="Required" autocomplete="email"
+                                     validatorMessage="An email address is at most 100 characters.">
+                            <f:validateLength maximum="100"/>
+                        </h:inputText>
+                        <h:message for="email" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="phone" value="Telephone"/>
+                        <!-- 20, not 10: the contract's own example "050-1234567" is 11 characters. -->
+                        <h:inputText id="phone" value="#{userBean.phone}" maxlength="20"
+                                     p:placeholder="050-1234567" autocomplete="tel"
+                                     validatorMessage="A telephone number is at most 20 characters.">
+                            <f:validateLength maximum="20"/>
+                        </h:inputText>
+                        <h:message for="phone" styleClass="field-error"/>
+                        <span class="field-hint">Up to 20 characters, for example 050-1234567</span>
+                    </div>
+
+                    <div class="field field-wide">
+                        <h:outputLabel for="region" value="Region"/>
+                        <h:inputText id="region" value="#{userBean.region}"
+                                     autocomplete="address-level1"
+                                     validatorMessage="A region is at most 100 characters.">
+                            <f:validateLength maximum="100"/>
+                        </h:inputText>
+                        <h:message for="region" styleClass="field-error"/>
+                    </div>
+
+                </fieldset>
+
+                <div class="actions">
+                    <h:commandButton id="submit" value="Create account" action="#{userBean.register}"/>
+                </div>
+            </h:form>
+
+            <p>
+                Already registered?
+                <h:outputLink value="#{request.contextPath}/login.xhtml">Log in</h:outputLink>
+            </p>
+        </div>
+
+    </ui:define>
+
+</ui:composition>

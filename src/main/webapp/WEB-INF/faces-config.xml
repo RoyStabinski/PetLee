@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Empty on purpose, and required: its presence is what makes the server register the Faces
+  servlet. Without it the pages are served as static files and the browser shows raw #{...}.
+-->
+<faces-config xmlns="https://jakarta.ee/xml/ns/jakartaee"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                                  https://jakarta.ee/xml/ns/jakartaee/web-facesconfig_4_0.xsd"
+              version="4.0">
+
+</faces-config>

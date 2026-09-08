@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <f:metadata>
+        <f:viewParam name="id" value="#{petDetailBean.petId}"/>
+        <f:viewAction action="#{petDetailBean.load}"/>
+    </f:metadata>
+
+    <ui:define name="title">#{petDetailBean.pet.petName} - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+
+        <ui:fragment rendered="#{not empty petDetailBean.pet}">
+
+            <h1>#{petDetailBean.pet.petName}</h1>
+
+            <ui:fragment rendered="#{petDetailBean.withdrawn}">
+                <p class="tag tag-removed">This listing is no longer available</p>
+            </ui:fragment>
+
+            <div class="detail">
+
+                <div>
+                    <h:panelGroup layout="block" styleClass="detail-media">
+                        <h:graphicImage value="#{petDetailBean.imageUrl}" alt="#{petDetailBean.pet.petName}"/>
+                    </h:panelGroup>
+                </div>
+
+                <div>
+                    <dl class="detail-facts">
+                        <dt>Breed</dt>
+                        <dd>#{petDetailBean.pet.breed}</dd>
+                        <dt>Age</dt>
+                        <dd><h:outputFormat value="{0} years old">
+                            <f:param value="#{petDetailBean.pet.age}"/>
+                        </h:outputFormat></dd>
+                        <dt>Size</dt>
+                        <dd>#{petDetailBean.pet.size == 'SMALL' ? 'Small' : (petDetailBean.pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</dd>
+                        <dt>Gender</dt>
+                        <dd>#{petDetailBean.pet.gender == 'MALE' ? 'Male' : 'Female'}</dd>
+                        <dt>Category</dt>
+                        <dd>#{petDetailBean.pet.category.categoryName}</dd>
+                        <dt>Status</dt>
+                        <dd>#{petDetailBean.pet.status == 'AVAILABLE' ? 'Available' : (petDetailBean.pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}</dd>
+                    </dl>
+
+                    <h2>About</h2>
+                    <p>#{petDetailBean.pet.longDesc}</p>
+
+                    <!-- This rendered check is the privacy gate on this tier: the entity always
+                         carries its owner, so removing it exposes a stranger's contact details. -->
+                    <h:panelGroup layout="block" styleClass="panel"
+                                  rendered="#{petDetailBean.contactVisible}">
+                        <h2>Contact the owner</h2>
+                        <dl class="detail-facts">
+                            <dt>Posted by</dt>
+                            <dd>#{petDetailBean.pet.owner.fullName}</dd>
+                            <dt>Email</dt>
+                            <dd><a href="mailto:#{petDetailBean.pet.owner.email}">#{petDetailBean.pet.owner.email}</a></dd>
+                            <dt>Telephone</dt>
+                            <dd><a href="tel:#{petDetailBean.pet.owner.phoneNumber}">#{petDetailBean.pet.owner.phoneNumber}</a></dd>
+                        </dl>
+                    </h:panelGroup>
+
+                    <h:panelGroup layout="block" styleClass="panel"
+                                  rendered="#{not petDetailBean.contactVisible}">
+                        <p>Log in to see how to contact the owner</p>
+                        <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="button">
+                            Log in
+                        </h:outputLink>
+                    </h:panelGroup>
+
+                    <div class="actions">
+                        <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button-secondary">
+                            Back to the gallery</h:outputLink>
+                    </div>
+                </div>
+
+            </div>
+        </ui:fragment>
+
+    </ui:define>
+
+</ui:composition>

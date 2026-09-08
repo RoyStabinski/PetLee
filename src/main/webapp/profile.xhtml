@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">My profile - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+
+        <h1>My profile</h1>
+
+        <!-- The user's own details, so no privacy gate applies here. -->
+        <div class="panel">
+            <dl class="detail-facts">
+                <dt>Full name</dt>
+                <dd>#{userBean.currentUser.fullName}</dd>
+                <dt>Username</dt>
+                <dd>#{userBean.currentUser.userName}</dd>
+                <dt>Email</dt>
+                <dd>#{userBean.currentUser.email}</dd>
+                <dt>Telephone</dt>
+                <dd>#{userBean.currentUser.phoneNumber}</dd>
+                <dt>Status</dt>
+                <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
+            </dl>
+        </div>
+
+        <h2>My listings</h2>
+
+        <ui:fragment rendered="#{petBean.noListings}">
+            <div class="empty-state">
+                <p>You have not posted any listings yet.</p>
+                <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
+                    Add your first pet
+                </h:outputLink>
+            </div>
+        </ui:fragment>
+
+        <ui:fragment rendered="#{not petBean.noListings}">
+            <h:form id="listingsForm">
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Photograph</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Category</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <ui:repeat id="rows" value="#{petBean.myListings}" var="pet">
+                                <tr>
+                                    <td class="cell-thumb">
+                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.petName}"/>
+                                    </td>
+                                    <td>#{pet.petName}</td>
+                                    <td>#{pet.category.categoryName}</td>
+                                    <td>
+                                        <span class="#{petBean.statusStyle(pet)}">
+                                            #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="actions">
+                                            <h:commandLink id="edit" value="Edit" styleClass="button-secondary"
+                                                           action="#{petBean.edit(pet.petId)}"/>
+                                            <!-- Confirmed before the call: deletion is permanent. -->
+                                            <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
+                                                           action="#{petBean.delete(pet.petId)}"
+                                                           onclick="return confirm('Delete this listing permanently? Its photographs go with it.');"/>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ui:repeat>
+                        </tbody>
+                    </table>
+                </div>
+            </h:form>
+        </ui:fragment>
+
+    </ui:define>
+
+</ui:composition>

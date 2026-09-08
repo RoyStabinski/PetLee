@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Deliberately declares no <servlet>: the server registers the Faces servlet itself, and
+  @ApplicationPath("/api") declares the REST one. A hand-written mapping would collide with both.
+
+  The <error-page> entries cover the JSF tier only - a request to /api is answered by an
+  exception mapper before the container's error machinery is involved.
+-->
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+    <display-name>Pet-Lee</display-name>
+
+    <!-- 'Development' would leak exception detail onto the error view. -->
+    <context-param>
+        <param-name>jakarta.faces.PROJECT_STAGE</param-name>
+        <param-value>Production</param-value>
+    </context-param>
+
+    <!-- 5 MB matches ImageStore.MAX_BYTES; the request cap leaves room for the rest of the form. -->
+    <context-param>
+        <param-name>jakarta.faces.UPLOADER_MAX_FILE_SIZE</param-name>
+        <param-value>5242880</param-value>
+    </context-param>
+    <context-param>
+        <param-name>jakarta.faces.UPLOADER_MAX_REQUEST_SIZE</param-name>
+        <param-value>6291456</param-value>
+    </context-param>
+
+    <!-- Load-bearing, not tidiness: Facelets otherwise copies comments into the response and
+         evaluates any EL inside them, so a comment naming an expression *is* one. -->
+    <context-param>
+        <param-name>jakarta.faces.FACELETS_SKIP_COMMENTS</param-name>
+        <param-value>true</param-value>
+    </context-param>
+
+    <!-- The cookie is the credential here, so http-only keeps JavaScript away from it. -->
+    <session-config>
+        <session-timeout>30</session-timeout>
+        <cookie-config>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
+    <!-- Two pages, not four: 404 is the one case worth naming. The container sets the status
+         before forwarding, so these answer 403/404/500 rather than a cheerful 200. -->
+    <error-page>
+        <error-code>403</error-code>
+        <location>/error/error.xhtml</location>
+    </error-page>
+    <error-page>
+        <error-code>404</error-code>
+        <location>/error/404.xhtml</location>
+    </error-page>
+    <error-page>
+        <error-code>500</error-code>
+        <location>/error/error.xhtml</location>
+    </error-page>
+    <error-page>
+        <exception-type>jakarta.faces.application.ViewExpiredException</exception-type>
+        <location>/error/error.xhtml</location>
+    </error-page>
+
+    <welcome-file-list>
+        <welcome-file>index.xhtml</welcome-file>
+    </welcome-file-list>
+
+</web-app>

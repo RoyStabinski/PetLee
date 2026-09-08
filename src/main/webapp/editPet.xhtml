@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <f:metadata>
+        <f:viewParam name="id" value="#{petFormBean.petId}"/>
+        <f:viewAction action="#{petFormBean.load}"/>
+    </f:metadata>
+
+    <ui:define name="title">Edit your listing - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+        <div class="panel">
+            <h1>Edit your listing</h1>
+
+            <!-- No file input: a photograph is chosen when the listing is created, and there
+                 is no path to add or replace one afterwards. -->
+            <h:form id="petForm">
+                <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
+
+                <div class="actions">
+                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml"
+                                  styleClass="button-secondary">Cancel</h:outputLink>
+                </div>
+            </h:form>
+        </div>
+    </ui:define>
+
+</ui:composition>

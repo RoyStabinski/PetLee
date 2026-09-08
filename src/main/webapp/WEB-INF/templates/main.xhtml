@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The frame every screen is written inside (T-25).
+
+    Three regions - title, content, footer - so a page is content and nothing else. It lives under
+    WEB-INF so no browser can request it directly; a template rendered on its own would show a
+    header, an empty middle, and every EL expression a page was supposed to supply.
+
+    Two things here that every page therefore inherits for free:
+
+      * <h:messages globalOnly="true"> - one feedback region, so a bean only has to add a
+        FacesMessage and never has to remember a per-page placeholder (requirement 3).
+      * The navigation bar, which is state-aware. Its three shapes - guest, member, administrator -
+        are driven by the userBean's loggedIn and admin flags. That is menu visibility only and
+        never a security boundary: T-18 enforces every rule server-side, and a hidden link is not a
+        closed door.
+
+    All text comes from the msg bundle (requirement 6). No hard-coded English, no inline style=.
+-->
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
+      xmlns:ui="jakarta.faces.facelets">
+
+<h:head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title><ui:insert name="title">#{msg['app.name']}</ui:insert></title>
+    <h:outputStylesheet library="css" name="petlee.css"/>
+</h:head>
+
+<h:body styleClass="page">
+
+    <!-- First stop for a keyboard or screen-reader user; visible only once focused. -->
+    <a class="skip-link" href="#content">#{msg['app.skipToContent']}</a>
+
+    <header class="site-header">
+        <div class="container">
+
+            <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="brand">
+                <span class="brand-name">#{msg['app.name']}</span>
+                <span class="brand-tagline">#{msg['app.tagline']}</span>
+            </h:outputLink>
+
+            <nav class="nav" aria-label="#{msg['nav.label']}">
+
+                <h:outputLink value="#{request.contextPath}/index.xhtml">#{msg['nav.home']}</h:outputLink>
+
+                <!-- Guest -->
+                <ui:fragment rendered="#{not userBean.loggedIn}">
+                    <h:outputLink value="#{request.contextPath}/login.xhtml">#{msg['nav.login']}</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/register.xhtml">#{msg['nav.register']}</h:outputLink>
+                </ui:fragment>
+
+                <!-- Member -->
+                <ui:fragment rendered="#{userBean.loggedIn}">
+                    <h:outputLink value="#{request.contextPath}/addPet.xhtml">#{msg['nav.addPet']}</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml">#{msg['nav.myListings']}</h:outputLink>
+
+                    <!-- Administrator: the member links plus this one. -->
+                    <ui:fragment rendered="#{userBean.admin}">
+                        <h:outputLink value="#{request.contextPath}/admin.xhtml">#{msg['nav.admin']}</h:outputLink>
+                    </ui:fragment>
+
+                    <span class="nav-user">
+                        <h:outputFormat value="#{msg['nav.signedInAs']}">
+                            <f:param value="#{userBean.displayName}"/>
+                        </h:outputFormat>
+                    </span>
+
+                    <!--
+                        A POST, not a link. Logging out changes server state, and a GET that does
+                        so can be triggered by any image tag on any page the user visits.
+                    -->
+                    <h:form id="logoutForm">
+                        <h:commandButton id="logout" value="#{msg['nav.logout']}"
+                                         action="#{userBean.logout}"
+                                         styleClass="button-secondary"/>
+                    </h:form>
+                </ui:fragment>
+
+            </nav>
+        </div>
+    </header>
+
+    <main class="main" id="content">
+        <div class="container">
+
+            <!--
+                globalOnly: field-level messages belong beside their field, where the user is
+                looking. Anything a bean reports about the request as a whole surfaces here.
+            -->
+            <h:messages globalOnly="true"
+                        layout="list"
+                        styleClass="messages"
+                        infoClass="message-info"
+                        warnClass="message-error"
+                        errorClass="message-error"
+                        fatalClass="message-error"/>
+
+            <ui:insert name="content"/>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <ui:insert name="footer">#{msg['app.footer']}</ui:insert>
+        </div>
+    </footer>
+
+</h:body>
+</html>

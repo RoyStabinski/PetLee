@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <f:metadata>
+        <f:viewAction action="#{userBean.redirectHome}" if="#{userBean.loggedIn}"/>
+    </f:metadata>
+
+    <ui:define name="title">#{msg['auth.register.title']} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+
+        <div class="panel panel-narrow">
+            <h1>#{msg['auth.register.title']}</h1>
+
+            <h:form id="registerForm">
+                <fieldset class="form-grid">
+
+                    <div class="field field-wide">
+                        <h:outputLabel for="username" value="#{msg['auth.username']}"/>
+                        <h:inputText id="username"
+                                     value="#{userBean.username}"
+                                     required="true"
+                                     requiredMessage="#{msg['form.required']}"
+                                     autocomplete="username"
+                                     validatorMessage="#{msg['auth.username.length']}">
+                            <f:validateLength minimum="3" maximum="20"/>
+                        </h:inputText>
+                        <h:message for="username" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="password" value="#{msg['auth.password']}"/>
+                        <h:inputSecret id="password"
+                                       value="#{userBean.password}"
+                                       required="true"
+                                       requiredMessage="#{msg['form.required']}"
+                                       redisplay="false"
+                                       autocomplete="new-password"
+                                     validatorMessage="#{msg['auth.password.length']}">
+                            <f:validateLength minimum="8"/>
+                        </h:inputSecret>
+                        <h:message for="password" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="confirmPassword" value="#{msg['auth.confirmPassword']}"/>
+                        <h:inputSecret id="confirmPassword"
+                                       value="#{userBean.confirmPassword}"
+                                       required="true"
+                                       requiredMessage="#{msg['form.required']}"
+                                       redisplay="false"
+                                       autocomplete="new-password"/>
+                        <h:message for="confirmPassword" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field field-wide">
+                        <h:outputLabel for="fullName" value="#{msg['auth.fullName']}"/>
+                        <h:inputText id="fullName"
+                                     value="#{userBean.fullName}"
+                                     required="true"
+                                     requiredMessage="#{msg['form.required']}"
+                                     autocomplete="name"
+                                     validatorMessage="#{msg['auth.fullName.length']}">
+                            <f:validateLength maximum="50"/>
+                        </h:inputText>
+                        <h:message for="fullName" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="email" value="#{msg['auth.email']}"/>
+                        <h:inputText id="email"
+                                     value="#{userBean.email}"
+                                     type="email"
+                                     required="true"
+                                     requiredMessage="#{msg['form.required']}"
+                                     autocomplete="email"
+                                     validatorMessage="#{msg['auth.email.length']}">
+                            <f:validateLength maximum="100"/>
+                        </h:inputText>
+                        <h:message for="email" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="phone" value="#{msg['auth.phone']}"/>
+                        <h:inputText id="phone"
+                                     value="#{userBean.phone}"
+                                     maxlength="20"
+                                     autocomplete="tel"
+                                     validatorMessage="#{msg['auth.phone.length']}">
+                            <f:validateLength maximum="20"/>
+                        </h:inputText>
+                        <h:message for="phone" styleClass="field-error"/>
+                        <span class="field-hint">#{msg['auth.phone.hint']}</span>
+                    </div>
+
+                    <div class="field field-wide">
+                        <h:outputLabel for="region" value="#{msg['auth.region']}"/>
+                        <h:inputText id="region"
+                                     value="#{userBean.region}"
+                                     autocomplete="address-level1"
+                                     validatorMessage="#{msg['auth.region.length']}">
+                            <f:validateLength maximum="100"/>
+                        </h:inputText>
+                        <h:message for="region" styleClass="field-error"/>
+                    </div>
+
+                </fieldset>
+
+                <div class="actions">
+                    <h:commandButton id="submit" value="#{msg['auth.register.submit']}" action="#{userBean.register}"/>
+                </div>
+
+            </h:form>
+
+            <p>
+                #{msg['auth.register.haveAccount']}
+                <h:outputLink value="#{request.contextPath}/login.xhtml">#{msg['nav.login']}</h:outputLink>
+            </p>
+        </div>
+
+    </ui:define>
+
+</ui:composition>

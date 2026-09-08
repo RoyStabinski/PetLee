@@ -433,6 +433,14 @@ input[type="submit"]:hover {
     background: #862a22;
 }
 
+/* A disabled h:commandLink renders as a <span>, keeping its classes but losing its href. It has to
+ * look inert, or the admin panel offers a Delete that silently does nothing. */
+span.button,
+span.button-danger {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* --- messages -------------------------------------------------------------------------------------
  * Faces renders <h:messages> as a <ul>; these are the classes handed to it, so success and failure
  * are told apart by more than colour alone - each carries a leading marker glyph.

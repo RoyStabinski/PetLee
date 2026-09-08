@@ -1,5 +1,6 @@
 package com.petlee.web.client;
 
+import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.CategoryDTO;
 import com.petlee.dto.ErrorDTO;
 import com.petlee.dto.LoginForm;
@@ -8,6 +9,7 @@ import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
 import com.petlee.dto.PetImageDTO;
 import com.petlee.dto.RegisterForm;
+import com.petlee.dto.StatusForm;
 import com.petlee.dto.UserDTO;
 import com.petlee.session.SessionLifecycle;
 
@@ -107,6 +109,9 @@ public class ApiClient {
     private static final long READ_TIMEOUT_SECONDS = 10;
 
     private static final GenericType<List<CategoryDTO>> CATEGORY_LIST = new GenericType<>() {
+    };
+
+    private static final GenericType<List<AdminPetDTO>> ADMIN_PET_LIST = new GenericType<>() {
     };
 
     private static final GenericType<List<PetDTO>> PET_LIST = new GenericType<>() {
@@ -216,6 +221,73 @@ public class ApiClient {
      */
     public List<CategoryDTO> getCategories() {
         return send("GET", target("categories"), null, CATEGORY_LIST);
+    }
+
+    /**
+     * {@code POST /api/categories} — admin. T-34's addition to the contract.
+     *
+     * @param name the new category's name
+     * @return the created category
+     * @throws ApiException 401 or 403 for anyone but an administrator, 400 for a blank name,
+     *         409 {@code CATEGORY_EXISTS} for a duplicate
+     */
+    public CategoryDTO createCategory(String name) {
+        CategoryDTO body = new CategoryDTO();
+        body.setName(name);
+        return send("POST", target("categories"), Entity.json(body), CategoryDTO.class);
+    }
+
+    /**
+     * {@code DELETE /api/categories/{id}} — admin. Answers 204, so there is nothing to return.
+     *
+     * @param id the category
+     * @throws ApiException 409 {@code CATEGORY_IN_USE} when listings still reference it, 404 for an
+     *         unknown id
+     */
+    public void deleteCategory(Integer id) {
+        send("DELETE", target("categories").path(String.valueOf(id)), null, (Class<Void>) null);
+    }
+
+    // ----------------------------------------------------------------------------- moderation
+
+    /**
+     * {@code GET /api/admin/pets} — admin. Every listing in every status, with its owner and
+     * creation date; the feed behind T-35's moderation table.
+     *
+     * @param categoryId a category id, or {@code null}
+     * @param size       {@code SMALL}, {@code MEDIUM}, {@code LARGE}, or {@code null}
+     * @param gender     {@code MALE}, {@code FEMALE}, or {@code null}
+     * @return every matching listing, newest first
+     * @throws ApiException 401 for a guest, 403 {@code NOT_ADMIN} for a member
+     */
+    public List<AdminPetDTO> getAllPets(Integer categoryId, String size, String gender) {
+        WebTarget target = target("admin").path("pets");
+        if (categoryId != null) {
+            target = target.queryParam("categoryId", categoryId);
+        }
+        if (isPresent(size)) {
+            target = target.queryParam("size", size.trim());
+        }
+        if (isPresent(gender)) {
+            target = target.queryParam("gender", gender.trim());
+        }
+        return send("GET", target, null, ADMIN_PET_LIST);
+    }
+
+    /**
+     * {@code PUT /api/admin/pets/{id}/status} — admin. The reversible half of moderation:
+     * {@code REMOVED} hides a listing from the gallery, {@code AVAILABLE} puts it back.
+     *
+     * @param id     the listing
+     * @param status {@code REMOVED} or {@code AVAILABLE}
+     * @return the listing in its new state
+     * @throws ApiException 400 for any other status, 404 for an unknown listing
+     */
+    public PetDTO setPetStatus(Long id, String status) {
+        StatusForm body = new StatusForm();
+        body.setStatus(status);
+        return send("PUT", target("admin").path("pets").path(String.valueOf(id)).path("status"),
+                Entity.json(body), PetDTO.class);
     }
 
     // ------------------------------------------------------------------------------------ pets

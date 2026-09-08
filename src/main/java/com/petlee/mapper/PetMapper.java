@@ -1,5 +1,6 @@
 package com.petlee.mapper;
 
+import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetImageDTO;
@@ -42,6 +43,32 @@ public final class PetMapper {
         dto.setStatus(name(pet.getStatus()));
         dto.setCategoryName(pet.getCategory() == null ? null : pet.getCategory().getCategoryName());
         dto.setMainImageUrl(mainImageUrl(pet));
+        return dto;
+    }
+
+    /**
+     * The moderation shape: everything the gallery shows, plus the owner's name and the date the
+     * listing was created. T-34's {@code GET /api/admin/pets} is its only caller.
+     *
+     * @param pet the pet, may be {@code null}
+     * @return the DTO, or {@code null} for a {@code null} argument
+     */
+    public static AdminPetDTO toAdminDto(Pet pet) {
+        if (pet == null) {
+            return null;
+        }
+        AdminPetDTO dto = new AdminPetDTO();
+        dto.setId(pet.getPetId());
+        dto.setName(pet.getPetName());
+        dto.setShortDesc(pet.getShortDesc());
+        dto.setAge(pet.getAge());
+        dto.setSize(name(pet.getSize()));
+        dto.setGender(name(pet.getGender()));
+        dto.setStatus(name(pet.getStatus()));
+        dto.setCategoryName(pet.getCategory() == null ? null : pet.getCategory().getCategoryName());
+        dto.setMainImageUrl(mainImageUrl(pet));
+        dto.setOwnerName(pet.getOwner() == null ? null : pet.getOwner().getFullName());
+        dto.setCreatedAt(pet.getCreatedAt() == null ? null : pet.getCreatedAt().toString());
         return dto;
     }
 

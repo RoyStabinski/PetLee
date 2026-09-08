@@ -5,7 +5,9 @@ import com.petlee.repository.CategoryRepository;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -38,6 +40,36 @@ class FakeCategoryRepository extends CategoryRepository {
         return rows.stream()
                 .sorted(Comparator.comparing(Category::getCategoryName))
                 .toList();
+    }
+
+    /** How many pets each category holds, as the tests choose to pretend. */
+    final Map<Integer, Long> petCounts = new HashMap<>();
+
+    private int nextId = 7;
+
+    @Override
+    public Category save(Category entity) {
+        if (entity.getCategoryId() == null) {
+            entity.setCategoryId(nextId++);
+            rows.add(entity);
+        }
+        return entity;
+    }
+
+    @Override
+    public void delete(Category entity) {
+        rows.remove(entity);
+    }
+
+    @Override
+    public boolean existsByName(String name) {
+        return name != null && rows.stream()
+                .anyMatch(c -> c.getCategoryName().equalsIgnoreCase(name));
+    }
+
+    @Override
+    public long countPetsInCategory(Integer categoryId) {
+        return petCounts.getOrDefault(categoryId, 0L);
     }
 
     @Override

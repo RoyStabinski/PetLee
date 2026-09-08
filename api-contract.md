@@ -126,6 +126,52 @@ Response 200 (PetImageDTO):
 
 ---
 
+## ADMIN  (extension — see ADR-002 rows 6 and 12; not part of the frozen set)
+
+Every endpoint here requires a session whose role is ADMIN: 401 with no session, 403 code
+NOT_ADMIN for a USER. Deleting a listing is not here — it is DELETE /api/pets/{id}, which already
+allows the owner or an admin.
+
+### GET /api/admin/pets   — admin
+Optional filter params: ?categoryId=1&size=SMALL&gender=MALE  (same as GET /api/pets)
+Response 200 (List<AdminPetDTO> — every status, newest first; PetDTO plus two moderation fields):
+[
+{
+"id": 10,
+"name": "Rex",
+"shortDesc": "Friendly and energetic",
+"age": 3,
+"size": "MEDIUM",
+"gender": "MALE",
+"status": "REMOVED",
+"categoryName": "Dogs",
+"mainImageUrl": "/images/rex-main.jpg",
+"ownerName": "Donald Trump",
+"createdAt": "2026-09-08T10:15:30"
+}
+]
+
+### PUT /api/admin/pets/{id}/status   — admin
+Request:
+{ "status": "REMOVED" }
+Response 200: the updated PetDTO.
+Errors: 400 if status is anything but REMOVED or AVAILABLE. 404 if no such pet.
+
+### POST /api/categories   — admin
+Request:
+{ "name": "Birds" }
+Response 200 (CategoryDTO):
+{ "id": 7, "name": "Birds" }
+Errors: 400 if the name is blank or over 50 characters. 409 code CATEGORY_EXISTS if the name is
+already taken (case-insensitively).
+
+### DELETE /api/categories/{id}   — admin
+Response 204: no body.
+Errors: 404 if no such category. 409 code CATEGORY_IN_USE if any listing still references it,
+REMOVED listings included.
+
+---
+
 ## ENUM VALUES (shared — use these exact strings)
 size:   SMALL | MEDIUM | LARGE
 gender: MALE | FEMALE

@@ -3,7 +3,6 @@ package com.petlee.rest;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
-import com.petlee.exception.ValidationException;
 import com.petlee.model.Pet;
 import com.petlee.repository.PetFilter;
 import com.petlee.rest.security.CurrentUser;
@@ -27,7 +26,6 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -79,11 +77,8 @@ public class PetResource {
      * <em>"Response 200 (List&lt;PetDTO&gt; — gallery view, main image only, newest first)"</em>.
      * An empty catalogue is 200 and {@code []}.
      *
-     * <p>The three parameters are taken as strings and converted here rather than declared as
-     * {@code Integer} and enum types. Jakarta REST answers a conversion failure on a
-     * {@code @QueryParam} with <strong>404</strong>, which for {@code ?size=HUGE} would say the
-     * collection does not exist — the caller would look for a routing problem and never find the
-     * typo. Converting by hand makes it a 400 that names the field and lists the values.
+     * <p>The three parameters are taken as strings and converted by {@link RestParams} rather than
+     * declared as {@code Integer} and enum types; that class says why.
      *
      * @param categoryId the category to restrict to, or absent for all
      * @param size       {@code SMALL}, {@code MEDIUM} or {@code LARGE}, or absent
@@ -96,9 +91,9 @@ public class PetResource {
                                     @QueryParam("size") String size,
                                     @QueryParam("gender") String gender) {
         return pets.findGallery(PetFilter.builder()
-                .categoryId(parseCategoryId(categoryId))
-                .size(parseEnum(Pet.PetSize.class, size, "size"))
-                .gender(parseEnum(Pet.PetGender.class, gender, "gender"))
+                .categoryId(RestParams.categoryId(categoryId))
+                .size(RestParams.enumValue(Pet.PetSize.class, size, "size"))
+                .gender(RestParams.enumValue(Pet.PetGender.class, gender, "gender"))
                 .build());
     }
 
@@ -217,53 +212,5 @@ public class PetResource {
     private SessionUser caller() {
         return CurrentUser.from(request).orElseThrow(() -> new IllegalStateException(
                 "no session on a @Secured endpoint; the annotation is missing or the filter is not bound"));
-    }
-
-    private static Integer parseCategoryId(String value) {
-        String trimmed = blankToNull(value);
-        if (trimmed == null) {
-            return null;
-        }
-        try {
-            return Integer.valueOf(trimmed);
-        } catch (NumberFormatException notANumber) {
-            throw new ValidationException("categoryId", "INVALID_FILTER",
-                    "categoryId must be a whole number");
-        }
-    }
-
-    /**
-     * Converts one filter parameter, or refuses the request.
-     *
-     * <p>A bad value is a 400 rather than a silently empty result, because an ignored filter looks
-     * exactly like "nothing matched" — the caller sees an empty gallery and blames the data.
-     * Case and surrounding space are forgiven; the contract's own strings are upper case, and
-     * accepting {@code small} hides nothing from anybody.
-     */
-    private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String field) {
-        String trimmed = blankToNull(value);
-        if (trimmed == null) {
-            return null;
-        }
-        try {
-            return Enum.valueOf(type, trimmed.toUpperCase());
-        } catch (IllegalArgumentException unknown) {
-            throw new ValidationException(field, "INVALID_FILTER",
-                    field + " must be one of " + String.join(", ", names(type)));
-        }
-    }
-
-    private static <E extends Enum<E>> List<String> names(Class<E> type) {
-        return Arrays.stream(type.getEnumConstants()).map(Enum::name).toList();
-    }
-
-    private static String blankToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        // An absent parameter and "?size=" mean the same thing: no restriction. Treating the empty
-        // string as a value would make a form that submits its unset selects fail with a 400.
-        return trimmed.isEmpty() ? null : trimmed;
     }
 }

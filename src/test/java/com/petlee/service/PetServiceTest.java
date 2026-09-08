@@ -1,5 +1,6 @@
 package com.petlee.service;
 
+import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
@@ -498,5 +499,44 @@ class PetServiceTest {
         assertFalse(service.isOwner(999L, OWNER_ID), "an unknown pet is 'no', not an exception");
         assertFalse(service.isOwner(pet.getPetId(), null));
         assertFalse(service.isOwner(null, OWNER_ID));
+    }
+
+    // ---------------------------------------------------------------- T-34's moderation methods
+
+    @Test
+    @DisplayName("T-34 criterion 1: the admin listing shows every status, the gallery does not")
+    void adminListingShowsEveryStatus() throws IOException {
+        Pet hidden = persistedPetWithImages();
+        service.changeStatus(hidden.getPetId(), "REMOVED");
+
+        assertTrue(service.findGallery(PetFilter.none()).isEmpty(), "a REMOVED pet leaves the gallery");
+
+        List<AdminPetDTO> all = service.findAllForAdmin(PetFilter.none());
+        assertEquals(1, all.size());
+        assertEquals("REMOVED", all.get(0).getStatus());
+        assertEquals("Roy Stein", all.get(0).getOwnerName(), "the moderator sees who posted it");
+        assertNotNull(all.get(0).getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("T-34 criterion 3: restoring a listing puts it back in the gallery")
+    void restoringMakesAListingPublicAgain() throws IOException {
+        Pet pet = persistedPetWithImages();
+        service.changeStatus(pet.getPetId(), "REMOVED");
+
+        PetDTO restored = service.changeStatus(pet.getPetId(), "available");
+
+        assertEquals("AVAILABLE", restored.getStatus(), "case is forgiven");
+        assertEquals(1, service.findGallery(PetFilter.none()).size());
+    }
+
+    @Test
+    @DisplayName("only the two moderation statuses are accepted, and an unknown pet is 404")
+    void refusesAnyOtherStatus() throws IOException {
+        Pet pet = persistedPetWithImages();
+
+        assertThrows(ValidationException.class, () -> service.changeStatus(pet.getPetId(), "ADOPTED"));
+        assertThrows(ValidationException.class, () -> service.changeStatus(pet.getPetId(), null));
+        assertThrows(NotFoundException.class, () -> service.changeStatus(999L, "REMOVED"));
     }
 }

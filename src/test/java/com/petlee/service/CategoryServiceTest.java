@@ -1,7 +1,9 @@
 package com.petlee.service;
 
 import com.petlee.dto.CategoryDTO;
+import com.petlee.exception.ConflictException;
 import com.petlee.exception.NotFoundException;
+import com.petlee.exception.ValidationException;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
 
@@ -110,5 +112,58 @@ class CategoryServiceTest {
     void ordersByNameNotByInsertion() {
         List<String> names = service.findAll().stream().map(CategoryDTO::getName).toList();
         assertEquals(names.stream().sorted(Comparator.naturalOrder()).toList(), names);
+    }
+
+    // ------------------------------------------------------------------- T-34's write methods
+
+    @Test
+    @DisplayName("T-34 criterion 4: a created category joins the vocabulary")
+    void createsACategory() {
+        CategoryDTO created = service.create("  Horses ");
+
+        assertEquals("Horses", created.getName(), "the name is trimmed");
+        assertTrue(service.findAll().stream().map(CategoryDTO::getName).anyMatch("Horses"::equals));
+    }
+
+    @Test
+    @DisplayName("T-34 criterion 5: a duplicate name is 409 CATEGORY_EXISTS, whatever its case")
+    void rejectsADuplicateName() {
+        ConflictException e = assertThrows(ConflictException.class, () -> service.create("dOgS"));
+        assertEquals("CATEGORY_EXISTS", e.getCode());
+        assertEquals(6, service.findAll().size());
+    }
+
+    @Test
+    @DisplayName("a blank name is 400, not a nameless row")
+    void rejectsABlankName() {
+        assertThrows(ValidationException.class, () -> service.create("   "));
+        assertThrows(ValidationException.class, () -> service.create(null));
+        assertThrows(ValidationException.class, () -> service.create("x".repeat(51)));
+    }
+
+    @Test
+    @DisplayName("T-34 criterion 6: an unused category is deleted")
+    void deletesAnUnusedCategory() {
+        service.delete(6);
+
+        assertEquals(5, service.findAll().size());
+        assertThrows(NotFoundException.class, () -> service.findById(6));
+    }
+
+    @Test
+    @DisplayName("T-34 criterion 7: a category holding pets is 409 CATEGORY_IN_USE, not 500")
+    void refusesToDeleteACategoryInUse() {
+        categories.petCounts.put(1, 3L);
+
+        ConflictException e = assertThrows(ConflictException.class, () -> service.delete(1));
+        assertEquals("CATEGORY_IN_USE", e.getCode());
+        assertTrue(e.getMessage().contains("3"), "the message names the count");
+        assertEquals(6, service.findAll().size());
+    }
+
+    @Test
+    @DisplayName("deleting an unknown category is 404")
+    void refusesToDeleteAnUnknownCategory() {
+        assertThrows(NotFoundException.class, () -> service.delete(999));
     }
 }

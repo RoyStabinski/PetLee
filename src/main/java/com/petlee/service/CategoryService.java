@@ -1,7 +1,9 @@
 package com.petlee.service;
 
 import com.petlee.dto.CategoryDTO;
+import com.petlee.exception.ConflictException;
 import com.petlee.exception.NotFoundException;
+import com.petlee.exception.ValidationException;
 import com.petlee.mapper.CategoryMapper;
 import com.petlee.model.Category;
 import com.petlee.repository.CategoryRepository;
@@ -26,6 +28,9 @@ import java.util.List;
  */
 @ApplicationScoped
 public class CategoryService {
+
+    /** {@code category_name} is {@code VARCHAR(50)} in T-03's schema. */
+    private static final int NAME_MAX = 50;
 
     private CategoryRepository categories;
 
@@ -59,6 +64,60 @@ public class CategoryService {
     @Transactional(Transactional.TxType.SUPPORTS)
     public CategoryDTO findById(Integer id) {
         return CategoryMapper.toDto(requireById(id));
+    }
+
+    /**
+     * Adds a category — {@code POST /api/categories}, administrators only (T-34).
+     *
+     * <p>Duplicates are rejected before the insert so the caller gets a 409 it can act on rather
+     * than a constraint violation surfacing as a 500. The check is not the guarantee: two admins
+     * racing past it both reach {@code ux_category_name_lower}, and the loser's insert is refused
+     * by the database. Names are compared case-insensitively, because {@code Dogs} and {@code dogs}
+     * are the same entry in the same dropdown.
+     *
+     * @param name the new category's name
+     * @return the created category
+     * @throws ValidationException <strong>400</strong> — the name is blank or over 50 characters,
+     *         which is the column's width
+     * @throws ConflictException <strong>409</strong>, code {@code CATEGORY_EXISTS}
+     */
+    @Transactional
+    public CategoryDTO create(String name) {
+        String trimmed = name == null ? null : name.trim();
+        if (trimmed == null || trimmed.isEmpty() || trimmed.length() > NAME_MAX) {
+            throw new ValidationException("name", "NAME_INVALID",
+                    "A category name is required, of at most " + NAME_MAX + " characters");
+        }
+        if (categories.existsByName(trimmed)) {
+            throw new ConflictException("CATEGORY_EXISTS", "A category named " + trimmed
+                    + " already exists");
+        }
+        return CategoryMapper.toDto(categories.save(new Category(trimmed)));
+    }
+
+    /**
+     * Removes a category — {@code DELETE /api/categories/{id}}, administrators only (T-34).
+     *
+     * <p>A category still holding listings is refused here, with a message naming the count.
+     * Specification §5 requires every pet to belong to a category, and T-03's foreign key is
+     * {@code ON DELETE RESTRICT}, so without this check the administrator would see a raw 500 for
+     * a rule the application knows perfectly well.
+     *
+     * @param id the category to remove
+     * @throws NotFoundException <strong>404</strong> — no category has that id
+     * @throws ConflictException <strong>409</strong>, code {@code CATEGORY_IN_USE} — listings still
+     *         reference it, {@code REMOVED} ones included: they hold the foreign key too
+     */
+    @Transactional
+    public void delete(Integer id) {
+        Category category = requireById(id);
+
+        long listings = categories.countPetsInCategory(id);
+        if (listings > 0) {
+            throw new ConflictException("CATEGORY_IN_USE", "The category " + category.getCategoryName()
+                    + " still holds " + listings + " listing(s), so it cannot be deleted");
+        }
+        categories.delete(category);
     }
 
     /**

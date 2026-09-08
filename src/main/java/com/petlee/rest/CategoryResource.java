@@ -1,14 +1,21 @@
 package com.petlee.rest;
 
 import com.petlee.dto.CategoryDTO;
+import com.petlee.exception.ValidationException;
+import com.petlee.rest.security.AdminOnly;
 import com.petlee.service.CategoryService;
 
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 import java.util.List;
 
@@ -20,9 +27,11 @@ import java.util.List;
  * filtering the gallery, and a filter panel cannot be drawn without this list. There is nothing
  * private in it — six names that are the same for everyone.
  *
- * <p>No POST, PUT or DELETE. Specification §5 requires that every pet belongs to a
- * <em>predefined</em> category, so the vocabulary is not something a user extends; T-34 adds the
- * administrator's management endpoints to this same class.
+ * <p>The write methods are {@code @AdminOnly} (T-34). Specification §5 requires that every pet
+ * belongs to a <em>predefined</em> category, so the vocabulary is not something a member extends —
+ * only the administrator who is responsible for it. They live in this class rather than under
+ * {@code /api/admin} because they are the same collection: a category created here is the one
+ * {@code GET /api/categories} returns, and splitting the paths would suggest otherwise.
  */
 @Path("categories")
 @RequestScoped
@@ -60,5 +69,45 @@ public class CategoryResource {
     @Produces(MediaType.APPLICATION_JSON)
     public List<CategoryDTO> findAll() {
         return categories.findAll();
+    }
+
+    /**
+     * {@code POST /api/categories} — admin. Body {@code {"name":"Birds"}}.
+     *
+     * <p>200 with the created category, matching the shape every other create in the contract uses
+     * ({@code POST /api/pets} answers 200, not 201). A duplicate name is 409 {@code CATEGORY_EXISTS}
+     * from {@code CategoryService}; nothing is decided here.
+     *
+     * @param body the new category; only {@code name} is read, and an {@code id} in the body is
+     *             ignored — the database assigns it
+     * @return the created category
+     */
+    @POST
+    @AdminOnly
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public CategoryDTO create(CategoryDTO body) {
+        if (body == null) {
+            throw new ValidationException("name", "NAME_INVALID", "A category name is required");
+        }
+        return categories.create(body.getName());
+    }
+
+    /**
+     * {@code DELETE /api/categories/{id}} — admin.
+     *
+     * <p>204 on success; 409 {@code CATEGORY_IN_USE} when listings still reference it, which is the
+     * readable form of T-03's {@code ON DELETE RESTRICT}.
+     *
+     * @param id the category to remove
+     * @return {@code 204 No Content}
+     */
+    @DELETE
+    @Path("{id: \\d+}")
+    @AdminOnly
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response delete(@PathParam("id") Integer id) {
+        categories.delete(id);
+        return Response.noContent().build();
     }
 }

@@ -1,6 +1,7 @@
 package com.petlee.service;
 
 import com.petlee.config.StorageConfig;
+import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
@@ -96,6 +97,59 @@ public class PetService {
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<PetDTO> findGallery(PetFilter filter) {
         return pets.findByFilter(filter).stream().map(PetMapper::toDto).toList();
+    }
+
+    /**
+     * The moderation listing — {@code GET /api/admin/pets} (T-34).
+     *
+     * <p>The same filters as the gallery, without the status restriction: {@code ADOPTED} and
+     * {@code REMOVED} listings are included, which is the whole point of the endpoint. Nothing
+     * here checks the caller's role — {@code @AdminOnly} on the resource has already done it, and
+     * a second check that could disagree is worse than none.
+     *
+     * @param filter the criteria; {@code null} means no filter
+     * @return every matching listing, newest first, in every status
+     */
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public List<AdminPetDTO> findAllForAdmin(PetFilter filter) {
+        return pets.findAllForAdmin(filter).stream().map(PetMapper::toAdminDto).toList();
+    }
+
+    /**
+     * Hides or restores a listing — {@code PUT /api/admin/pets/{id}/status} (T-34).
+     *
+     * <p>Specification §2 asks an administrator to prevent offensive listings. {@link #delete} is
+     * the irreversible answer; this is the recoverable one, so only the two statuses that move a
+     * listing out of and back into the public gallery are accepted. {@code ADOPTED} is not: nothing
+     * in specification §3 asks for it, and an administrator is not the person who would know.
+     *
+     * @param petId  the listing to hide or restore
+     * @param status {@code REMOVED} or {@code AVAILABLE}, in any case
+     * @return the listing in its new state
+     * @throws NotFoundException <strong>404</strong> — no pet has that id
+     * @throws ValidationException <strong>400</strong> — {@code status} is missing or is any other
+     *         value
+     */
+    @Transactional
+    public PetDTO changeStatus(Long petId, String status) {
+        Pet pet = requireById(petId);
+        pet.setStatus(moderationStatus(status));
+        Pet saved = pets.save(pet);
+
+        LOGGER.log(Level.INFO, () -> "Admin set pet " + petId + " to " + saved.getStatus());
+        return PetMapper.toDto(saved);
+    }
+
+    private static Pet.PetStatus moderationStatus(String status) {
+        String value = status == null ? null : status.trim().toUpperCase(Locale.ROOT);
+        if (Pet.PetStatus.REMOVED.name().equals(value)) {
+            return Pet.PetStatus.REMOVED;
+        }
+        if (Pet.PetStatus.AVAILABLE.name().equals(value)) {
+            return Pet.PetStatus.AVAILABLE;
+        }
+        throw new ValidationException("status", "INVALID_STATUS",
+                "status must be REMOVED or AVAILABLE");
     }
 
     /**

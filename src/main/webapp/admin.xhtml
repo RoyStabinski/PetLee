@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The administrator's page.
+
+    T-35 fills the content region with specification section 8's listing and category management
+    tables, on top of T-34's endpoints. The shell exists now because T-25's navigation bar draws an
+    Admin panel link for an administrator, and a link to a page that does not exist is a 404 the
+    application put in front of its own user - a defect regardless of which task owns the tables.
+
+    It is not a "coming soon" notice. The page is real, it is reachable only by an administrator
+    (T-33 answers 403 to anyone else, and the API answers 403 again behind it), and it says plainly
+    that there is nothing to do here yet.
+-->
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <ui:define name="title">#{msg['admin.title']} - #{msg['app.name']}</ui:define>
+
+    <ui:define name="content">
+        <h1>#{msg['admin.title']}</h1>
+
+        <div class="empty-state">
+            <p>#{msg['admin.empty']}</p>
+        </div>
+    </ui:define>
+
+</ui:composition>

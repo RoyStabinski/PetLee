@@ -3,7 +3,8 @@
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:f="jakarta.faces.core"
-                xmlns:ui="jakarta.faces.facelets">
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
 
     <f:metadata>
         <f:viewAction action="#{userBean.redirectHome}" if="#{userBean.loggedIn}"/>
@@ -86,9 +87,18 @@
 
                     <div class="field">
                         <h:outputLabel for="phone" value="#{msg['auth.phone']}"/>
+                        <!--
+                            maxlength is 20 and not the 10 T-27 requirement 9 asks for, because 10
+                            would make this form reject the contract's own example. ADR-002 #9
+                            widened the column and T-13 to 20 for exactly that reason, after
+                            "050-1234567" - eleven characters, straight out of api-contract.md -
+                            failed the INSERT. RegisterFormTest pins the two together, so a future
+                            edit that shortens this field fails the build rather than the user.
+                        -->
                         <h:inputText id="phone"
                                      value="#{userBean.phone}"
                                      maxlength="20"
+                                     p:placeholder="#{msg['auth.phone.example']}"
                                      autocomplete="tel"
                                      validatorMessage="#{msg['auth.phone.length']}">
                             <f:validateLength maximum="20"/>

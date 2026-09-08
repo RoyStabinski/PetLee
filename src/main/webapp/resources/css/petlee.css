@@ -466,6 +466,21 @@ input[type="submit"]:hover {
     content: "\2713";
 }
 
+/* A partial success is not a failure. T-31's "the listing was added, the photograph was not" has
+ * to look different from "nothing happened", or the user re-submits the whole form and ends up
+ * with two listings. */
+.message-warn {
+    background: #fdf3e3;
+    border-color: #b07d1a;
+    color: #8a6212;
+}
+
+.message-warn::before {
+    content: "\26A0";
+    font-weight: 700;
+    margin-right: 0.5rem;
+}
+
 .message-error {
     background: var(--danger-tint);
     border-color: var(--danger);
@@ -572,6 +587,19 @@ input[type="submit"]:hover {
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--ink-soft);
+}
+
+.cell-thumb img {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+}
+
+.table .actions {
+    margin-top: 0;
+    flex-wrap: nowrap;
 }
 
 /* --- narrow screens -------------------------------------------------------------------------------

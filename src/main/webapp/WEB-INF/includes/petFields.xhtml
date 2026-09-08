@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The listing fields, shared by addPet.xhtml and editPet.xhtml.
+
+    One copy, because the field set has to match PetForm in the frozen contract exactly - no extra
+    fields, since the API ignores them - and two copies of that set would drift the first time the
+    contract's own did.
+
+    Under WEB-INF so no browser can request the fragment on its own.
+-->
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <fieldset class="form-grid">
+
+        <div class="field">
+            <h:outputLabel for="name" value="#{msg['pet.name']}"/>
+            <h:inputText id="name" value="#{petFormBean.form.name}"
+                         required="true" requiredMessage="#{msg['form.required']}"
+                         validatorMessage="#{msg['pet.name.length']}">
+                <f:validateLength maximum="50"/>
+            </h:inputText>
+            <h:message for="name" styleClass="field-error"/>
+        </div>
+
+        <div class="field">
+            <h:outputLabel for="breed" value="#{msg['pet.breed']}"/>
+            <h:inputText id="breed" value="#{petFormBean.form.breed}"/>
+            <h:message for="breed" styleClass="field-error"/>
+        </div>
+
+        <div class="field">
+            <h:outputLabel for="age" value="#{msg['pet.age']}"/>
+            <h:inputText id="age" value="#{petFormBean.form.age}"
+                         validatorMessage="#{msg['pet.age.range']}"
+                         converterMessage="#{msg['pet.age.range']}">
+                <f:validateLongRange minimum="0" maximum="50"/>
+            </h:inputText>
+            <h:message for="age" styleClass="field-error"/>
+        </div>
+
+        <div class="field">
+            <h:outputLabel for="category" value="#{msg['pet.category']}"/>
+            <h:selectOneMenu id="category" value="#{petFormBean.form.categoryId}"
+                             required="true" requiredMessage="#{msg['form.required']}">
+                <f:selectItem itemValue="#{null}" itemLabel="" noSelectionOption="true"/>
+                <f:selectItems value="#{petFormBean.categories}" var="c"
+                               itemValue="#{c.id}" itemLabel="#{c.name}"/>
+            </h:selectOneMenu>
+            <h:message for="category" styleClass="field-error"/>
+        </div>
+
+        <div class="field">
+            <h:outputLabel for="size" value="#{msg['pet.size']}"/>
+            <h:selectOneMenu id="size" value="#{petFormBean.form.size}"
+                             required="true" requiredMessage="#{msg['form.required']}">
+                <f:selectItems value="#{petFormBean.sizeOptions}"/>
+            </h:selectOneMenu>
+            <h:message for="size" styleClass="field-error"/>
+        </div>
+
+        <div class="field">
+            <h:outputLabel for="gender" value="#{msg['pet.gender']}"/>
+            <h:selectOneMenu id="gender" value="#{petFormBean.form.gender}"
+                             required="true" requiredMessage="#{msg['form.required']}">
+                <f:selectItems value="#{petFormBean.genderOptions}"/>
+            </h:selectOneMenu>
+            <h:message for="gender" styleClass="field-error"/>
+        </div>
+
+        <div class="field field-wide">
+            <h:outputLabel for="shortDesc" value="#{msg['pet.shortDesc']}"/>
+            <h:inputText id="shortDesc" value="#{petFormBean.form.shortDesc}"
+                         required="true" requiredMessage="#{msg['form.required']}"
+                         validatorMessage="#{msg['pet.shortDesc.length']}">
+                <f:validateLength maximum="255"/>
+            </h:inputText>
+            <h:message for="shortDesc" styleClass="field-error"/>
+        </div>
+
+        <div class="field field-wide">
+            <h:outputLabel for="longDesc" value="#{msg['pet.description']}"/>
+            <h:inputTextarea id="longDesc" value="#{petFormBean.form.longDesc}" rows="6"/>
+            <h:message for="longDesc" styleClass="field-error"/>
+        </div>
+
+    </fieldset>
+
+</ui:composition>

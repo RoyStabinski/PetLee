@@ -1,5 +1,6 @@
 package com.petlee.service;
 
+import com.petlee.test.Fakes;
 import com.petlee.dto.RegisterForm;
 import com.petlee.dto.UserDTO;
 import com.petlee.exception.ConflictException;
@@ -32,12 +33,12 @@ class UserServiceTest {
     private static final String CONTRACT_EMAIL = "djt@usa.com";
     private static final String CONTRACT_PHONE = "050-1234567";
 
-    private FakeUserRepository users;
+    private Fakes.Users users;
     private UserService service;
 
     @BeforeEach
     void setUp() {
-        users = new FakeUserRepository();
+        users = new Fakes.Users();
         service = new UserService(users);
     }
 

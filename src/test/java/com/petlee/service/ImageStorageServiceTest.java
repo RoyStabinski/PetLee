@@ -1,5 +1,6 @@
 package com.petlee.service;
 
+import com.petlee.test.Fakes;
 import com.petlee.config.StorageConfig;
 import com.petlee.dto.PetForm;
 import com.petlee.dto.PetImageDTO;
@@ -47,19 +48,19 @@ class ImageStorageServiceTest {
     @TempDir
     Path uploadRoot;
 
-    private FakePetImageRepository images;
-    private FakePetRepository pets;
-    private FakeUserRepository users;
+    private Fakes.Images images;
+    private Fakes.Pets pets;
+    private Fakes.Users users;
     private ImageStorageService service;
     private Pet pet;
 
     @BeforeEach
     void setUp() {
-        images = new FakePetImageRepository();
-        pets = new FakePetRepository();
-        users = new FakeUserRepository();
+        images = new Fakes.Images();
+        pets = new Fakes.Pets();
+        users = new Fakes.Users();
         PetService petService = new PetService(pets, users,
-                new CategoryService(new FakeCategoryRepository()), new FixedRoot(uploadRoot));
+                new CategoryService(new Fakes.Categories()), new FixedRoot(uploadRoot));
 
         user(OWNER_ID, "roy");
         user(STRANGER_ID, "stranger");

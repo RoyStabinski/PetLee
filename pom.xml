@@ -27,6 +27,7 @@
         <jakartaee.version>10.0.0</jakartaee.version>
         <postgresql.version>42.6.0</postgresql.version>
         <junit.version>5.10.0</junit.version>
+        <eclipselink.version>4.0.2</eclipselink.version>
 
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
@@ -35,8 +36,9 @@
     </properties>
 
     <!--
-      The dependency list is closed — see docs/decisions/ADR-003-technology-constraint.md.
-      Exactly three entries, none of them shipped inside the WAR: WEB-INF/lib is empty.
+      The dependency list is closed — see docs/decisions/ADR-003-technology-constraint.md, and
+      ADR-004 for the one addition it has taken since. Four entries, none of them shipped inside
+      the WAR: two are 'provided' and two are 'test', so WEB-INF/lib is empty.
       JSF, JPA, Jakarta REST, CDI, JTA, JSON-B and connection pooling are platform services
       supplied by the application server. Bundling a second copy of any of them causes
       classloader conflicts at deployment. Adding a dependency requires a new ADR.
@@ -81,6 +83,18 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- A JPA provider for the tests that run outside a container (T-36, T-38): the platform
+             API artifact above has jakarta.persistence.Persistence but no implementation of it,
+             so DatabaseTest could not build an EntityManagerFactory without this. EclipseLink
+             because Payara runs it — see ADR-004. Scope 'test', so WEB-INF/lib stays empty and
+             the deployed persistence.xml still names no provider. -->
+        <dependency>
+            <groupId>org.eclipse.persistence</groupId>
+            <artifactId>eclipselink</artifactId>
+            <version>${eclipselink.version}</version>
             <scope>test</scope>
         </dependency>
 

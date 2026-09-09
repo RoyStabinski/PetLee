@@ -1,5 +1,6 @@
 package com.petlee.service;
 
+import com.petlee.test.Fakes;
 import com.petlee.dto.CategoryDTO;
 import com.petlee.exception.ConflictException;
 import com.petlee.exception.NotFoundException;
@@ -27,12 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** T-14's five acceptance criteria. */
 class CategoryServiceTest {
 
-    private FakeCategoryRepository categories;
+    private Fakes.Categories categories;
     private CategoryService service;
 
     @BeforeEach
     void setUp() {
-        categories = new FakeCategoryRepository();
+        categories = new Fakes.Categories();
         service = new CategoryService(categories);
     }
 

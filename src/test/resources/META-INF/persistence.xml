@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
+             version="3.1">
+
+    <!--
+      The TEST persistence unit. Never packaged: it lives in src/test/resources, which the WAR
+      plugin does not copy.
+
+      RESOURCE_LOCAL, unlike the deployed petlee-pu (T-02). Tests run outside a container, so there
+      is no JTA transaction manager to join and no JNDI data source to look up; DatabaseTest owns
+      the EntityManagerFactory and begins and commits transactions itself. This file and that class
+      are the only places in the project where that is allowed.
+    -->
+    <persistence-unit name="petlee-test-pu" transaction-type="RESOURCE_LOCAL">
+
+        <!--
+          A provider IS named here, and only here. The deployed unit names none on purpose, so each
+          server can use its own (specification §4, portability). Out of container there is nobody
+          to choose one, so the tests name EclipseLink — the provider Payara runs — per ADR-004.
+        -->
+        <provider>org.eclipse.persistence.jpa.PersistenceProvider</provider>
+
+        <class>com.petlee.model.User</class>
+        <class>com.petlee.model.Category</class>
+        <class>com.petlee.model.Pet</class>
+        <class>com.petlee.model.PetImage</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+
+        <!--
+          No second-level cache in tests.
+
+          EclipseLink enables one by default, and it defeats a test suite twice over: a native
+          UPDATE (DatabaseTest.backdate) leaves the cached copy behind, and a test that writes rows
+          in one EntityManager and reads them in another can be served a snapshot rather than the
+          database. Production keeps the provider's default — this is a testing decision, so it
+          lives only in this file.
+        -->
+        <shared-cache-mode>NONE</shared-cache-mode>
+
+        <properties>
+            <!--
+              No jakarta.persistence.jdbc.* here, deliberately: this file carries no URL, no user
+              and no password. DatabaseTest supplies them from system properties with localhost
+              defaults, so nobody's local settings are committed and CI can point elsewhere without
+              editing the repository.
+            -->
+
+            <!-- The schema is schema.sql's, exactly as in production. A test run must never create
+                 or alter a table: a suite that builds its own schema stops testing the real one. -->
+            <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
+            <property name="jakarta.persistence.validation.mode" value="NONE"/>
+
+            <!-- One connection, created and closed by the test JVM. The server's pool is not here
+                 and is not what these tests are about. -->
+            <property name="jakarta.persistence.jdbc.driver" value="org.postgresql.Driver"/>
+        </properties>
+    </persistence-unit>
+</persistence>

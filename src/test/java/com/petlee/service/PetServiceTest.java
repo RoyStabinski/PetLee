@@ -1,5 +1,6 @@
 package com.petlee.service;
 
+import com.petlee.test.Fakes;
 import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
@@ -40,9 +41,9 @@ class PetServiceTest {
     private static final Long STRANGER_ID = 2L;
     private static final Long ADMIN_ID = 3L;
 
-    private FakePetRepository pets;
-    private FakeUserRepository users;
-    private FakeCategoryRepository categories;
+    private Fakes.Pets pets;
+    private Fakes.Users users;
+    private Fakes.Categories categories;
     private PetService service;
 
     /** Where a listing's photographs live, so the delete path has real files to remove. */
@@ -53,9 +54,9 @@ class PetServiceTest {
 
     @BeforeEach
     void setUp() {
-        pets = new FakePetRepository();
-        users = new FakeUserRepository();
-        categories = new FakeCategoryRepository();
+        pets = new Fakes.Pets();
+        users = new Fakes.Users();
+        categories = new Fakes.Categories();
         service = new PetService(pets, users, new CategoryService(categories),
                 new ImageStorageServiceTest.FixedRoot(uploadRoot));
 

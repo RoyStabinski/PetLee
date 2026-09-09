@@ -40,6 +40,15 @@ mvn test                                  # unit + repository tests
 mvn verify -Dpetlee.baseUrl=http://localhost:8080/pet-lee   # + the API tests, against a deployment
 ```
 
+### Coverage
+
+```bash
+mvn test jacoco:report      # target/site/jacoco/index.html
+```
+
+JaCoCo is a build **plugin**, not a dependency: it runs as a test-time agent and adds nothing to the
+compile classpath or the WAR, so ADR-003's closed dependency list is untouched.
+
 ### System properties
 
 | Property | Default | Used by |
@@ -73,4 +82,9 @@ mvn test -Dpetlee.test.db.user=petlee_test -Dpetlee.test.db.password=…
 - **A JPA provider is on the test classpath only** — EclipseLink, `test` scope, ADR-004. The
   deployed `persistence.xml` still names no provider; the one in `src/test/resources` does.
 - **No test depends on another.** `DatabaseTest` truncates before each test method, so order and
-  leftovers cannot matter.
+  leftovers cannot matter. To prove it, run the suite in a random order:
+
+  ```bash
+  mvn surefire:test -Djunit.jupiter.testclass.order.default=org.junit.jupiter.api.ClassOrderer\$Random \
+                    -Djunit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer\$Random
+  ```

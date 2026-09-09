@@ -19,6 +19,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -197,5 +198,69 @@ class UserServiceTest {
         assertEquals(CONTRACT_USERNAME, service.findById(id).orElseThrow().getUsername());
         assertTrue(service.findById(9999L).isEmpty());
         assertTrue(service.findById(null).isEmpty());
+    }
+
+    // -------------------------------------------------------- T-13 requirement 1, field by field
+
+    /**
+     * T-13 requirement 1 lists six rules and the two above cover two of them. These are the rest,
+     * one test per field, so a failure names the rule that broke rather than "registration".
+     */
+    @Test
+    @DisplayName("T-13 req 1: a username outside 3-20 characters is a 400 naming 'username'")
+    void register_whenUsernameIsTooShortOrTooLong_throwsValidation() {
+        assertEquals("username", fieldRejecting(form -> form.setUsername("ab")));
+        assertEquals("username", fieldRejecting(form -> form.setUsername("a".repeat(21))));
+    }
+
+    @Test
+    @DisplayName("T-13 req 1: a username with anything but letters, digits and _ is a 400")
+    void register_whenUsernameHasIllegalCharacters_throwsValidation() {
+        assertEquals("username", fieldRejecting(form -> form.setUsername("donald trump")));
+        assertEquals("username", fieldRejecting(form -> form.setUsername("donald-t")));
+    }
+
+    @Test
+    @DisplayName("T-13 req 1: a blank or over-long full name is a 400 naming 'fullName'")
+    void register_whenFullNameIsBlankOrTooLong_throwsValidation() {
+        assertEquals("fullName", fieldRejecting(form -> form.setFullName("   ")));
+        assertEquals("fullName", fieldRejecting(form -> form.setFullName("N".repeat(51))));
+    }
+
+    @Test
+    @DisplayName("T-13 req 1: an address that is not one is a 400 naming 'email'")
+    void register_whenEmailIsNotAnAddress_throwsValidation() {
+        assertEquals("email", fieldRejecting(form -> form.setEmail("djt-at-usa.com")));
+        assertEquals("email", fieldRejecting(form -> form.setEmail("   ")));
+    }
+
+    @Test
+    @DisplayName("T-13 req 1: region is optional, and over 100 characters is a 400")
+    void register_whenRegionIsTooLong_throwsValidation() {
+        RegisterForm noRegion = contractExample();
+        noRegion.setUsername("noregion");
+        noRegion.setEmail("noregion@usa.com");
+        noRegion.setRegion(null);
+        assertNotNull(service.register(noRegion), "region is optional");
+
+        assertEquals("region", fieldRejecting(form -> form.setRegion("R".repeat(101))));
+    }
+
+    /**
+     * Applies one mutation to the contract's example body, registers it, and reports which field
+     * the 400 named — so each rule above is one line and reads as the rule.
+     *
+     * @param mutation what to break
+     * @return the field named by the {@link ValidationException}
+     */
+    private String fieldRejecting(java.util.function.Consumer<RegisterForm> mutation) {
+        RegisterForm form = contractExample();
+        mutation.accept(form);
+
+        ValidationException e = assertThrows(ValidationException.class, () -> service.register(form));
+        assertTrue(users.saved.stream().noneMatch(u -> form.getUsername() != null
+                        && form.getUsername().equals(u.getUserName())),
+                "nothing may be stored when validation fails");
+        return e.getField();
     }
 }

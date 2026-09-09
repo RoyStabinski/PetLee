@@ -33,6 +33,7 @@
         <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
         <maven-failsafe-plugin.version>3.1.2</maven-failsafe-plugin.version>
+        <jacoco-plugin.version>0.8.11</jacoco-plugin.version>
     </properties>
 
     <!--
@@ -132,6 +133,24 @@
                         <include>**/*Test.java</include>
                     </includes>
                 </configuration>
+            </plugin>
+
+            <!-- Line coverage, for T-37 criterion 6. A build PLUGIN, not a dependency: it runs
+                 as a test-time agent, adds nothing to the classpath the application compiles
+                 against and nothing to the WAR, so ADR-003's closed dependency list is untouched.
+                 Report: target/site/jacoco/index.html after 'mvn test jacoco:report'. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Integration tests: *IT.java, run during 'mvn verify' against a real

@@ -73,6 +73,7 @@ mvn test -Dpetlee.test.db.user=petlee_test -Dpetlee.test.db.password=…
 | `com.petlee.test.TestData` | Fluent entity builders — `aUser()`, `anAdmin()`, `aCategory()`, `aPet()`, `aPetImage()` |
 | `com.petlee.test.Fakes` | Hand-written repository doubles: `Fakes.Users`, `Fakes.Categories`, `Fakes.Pets`, `Fakes.Images` |
 | `com.petlee.test.CountingDriver` | A JDBC driver that delegates to PostgreSQL's and counts statements, so the N+1 test asserts a number. Off until a test calls `startRecording()` |
+| `com.petlee.it.ApiTestClient` | The `*IT` suites' HTTP client: one session, cookie carried between calls, responses read as `JsonObject`, multipart built by hand |
 
 ## The rules these tests are written to
 
@@ -82,6 +83,13 @@ mvn test -Dpetlee.test.db.user=petlee_test -Dpetlee.test.db.password=…
 - **No mocking library, no assertion library.** JUnit 5 and hand-written doubles (ADR-003).
 - **A JPA provider is on the test classpath only** — EclipseLink, `test` scope, ADR-004. The
   deployed `persistence.xml` still names no provider; the one in `src/test/resources` does.
+- **So are a Jakarta REST client and a JSON-P provider** — Jersey and Parsson, `test` scope,
+  ADR-005. The API tests use specification §7's own client API, the one `ApiClient` uses in
+  production; only the implementation is added, and only for tests.
+- **The API tests clean up after themselves.** Every listing, photograph and category a suite
+  creates, it deletes, so `mvn verify` can run repeatedly against one deployment. The exception is
+  registered users: no endpoint deletes a user (T-34 requirement 8 deliberately adds none), so each
+  run leaves its accounts behind, named with a per-run id.
 - **No test depends on another.** `DatabaseTest` truncates before each test method, so order and
   leftovers cannot matter. To prove it, run the suite in a random order:
 

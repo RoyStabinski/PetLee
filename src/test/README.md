@@ -72,6 +72,7 @@ mvn test -Dpetlee.test.db.user=petlee_test -Dpetlee.test.db.password=…
 | `com.petlee.test.DatabaseTest` | Base class: one `EntityManagerFactory` per JVM, a fresh `EntityManager` and an **empty database** per test method, plus `inTransaction`, `persist` and `backdate` |
 | `com.petlee.test.TestData` | Fluent entity builders — `aUser()`, `anAdmin()`, `aCategory()`, `aPet()`, `aPetImage()` |
 | `com.petlee.test.Fakes` | Hand-written repository doubles: `Fakes.Users`, `Fakes.Categories`, `Fakes.Pets`, `Fakes.Images` |
+| `com.petlee.test.CountingDriver` | A JDBC driver that delegates to PostgreSQL's and counts statements, so the N+1 test asserts a number. Off until a test calls `startRecording()` |
 
 ## The rules these tests are written to
 

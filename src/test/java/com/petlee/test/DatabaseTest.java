@@ -171,9 +171,15 @@ public abstract class DatabaseTest {
      */
     private static synchronized EntityManagerFactory entityManagerFactory() {
         if (factory == null) {
+            CountingDriver.register();
+
             Map<String, String> connection = new HashMap<>();
-            connection.put("jakarta.persistence.jdbc.url", property("url",
-                    "jdbc:postgresql://localhost:5432/petlee_test"));
+            // Through CountingDriver, which delegates to the PostgreSQL one and counts statements
+            // on the way past. It records nothing until a test asks it to, so the only cost here is
+            // one extra proxy per call.
+            connection.put("jakarta.persistence.jdbc.driver", CountingDriver.class.getName());
+            connection.put("jakarta.persistence.jdbc.url", counting(property("url",
+                    "jdbc:postgresql://localhost:5432/petlee_test")));
             connection.put("jakarta.persistence.jdbc.user", property("user", "postgres"));
             connection.put("jakarta.persistence.jdbc.password", property("password", "postgres"));
 
@@ -193,5 +199,37 @@ public abstract class DatabaseTest {
 
     private static String property(String name, String fallback) {
         return System.getProperty("petlee.test.db." + name, fallback);
+    }
+
+    /** {@code jdbc:postgresql://…} → {@code jdbc:counting:postgresql://…}. */
+    private static String counting(String url) {
+        return url.startsWith(CountingDriver.PREFIX) ? url
+                : CountingDriver.PREFIX + url.substring("jdbc:".length());
+    }
+
+    /**
+     * Hands a repository this test's {@link EntityManager}.
+     *
+     * <p>In production the container injects it: the field is {@code private} and carries
+     * {@code @PersistenceContext}, which is exactly right for a deployment and useless in a plain
+     * JUnit test, where there is no container to do the injecting. Reflection is the honest way to
+     * stand in for it — the alternative would be a setter that exists only for tests and that
+     * production code could call by accident.
+     *
+     * @param repository a repository instance
+     * @param <R>        its type
+     * @return the same instance, now able to reach the database
+     */
+    protected <R> R inject(R repository) {
+        try {
+            java.lang.reflect.Field field =
+                    com.petlee.repository.AbstractRepository.class.getDeclaredField("em");
+            field.setAccessible(true);
+            field.set(repository, em);
+            return repository;
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(
+                    "AbstractRepository no longer has an 'em' field for the tests to fill", e);
+        }
     }
 }

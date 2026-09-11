@@ -1,11 +1,9 @@
 package com.petlee.service;
 
 import com.petlee.dto.RegisterForm;
-import com.petlee.dto.UserDTO;
 import com.petlee.exception.ConflictException;
 import com.petlee.exception.UnauthorizedException;
 import com.petlee.exception.ValidationException;
-import com.petlee.mapper.UserMapper;
 import com.petlee.model.User;
 import com.petlee.repository.UserRepository;
 import com.petlee.utilities.PasswordHasher;
@@ -30,10 +28,11 @@ import java.util.regex.Pattern;
  * is what lets these rules be tested without a container, and what stops a second caller from
  * quietly depending on a session that a JSF request would not have.
  *
- * <h2>DTOs only</h2>
- * No method returns a {@link User}. That is not tidiness: {@code User} carries the password digest
- * and the region, {@link UserDTO} has nowhere to put either, so a leak through this boundary is a
- * compile error rather than a review finding.
+ * <h2>Returns the entity now</h2>
+ * {@link #register(RegisterForm)}, {@link #authenticate(String, String)} and
+ * {@link #findById(Long)} return {@link User}. The password digest and the region travel with it;
+ * it is the REST resource's job to map to {@code UserDTO} — which has no field for either — before
+ * the value reaches the wire, and the JSF tier's job to never render {@code #{user.password}}.
  */
 @ApplicationScoped
 public class UserService {
@@ -101,17 +100,17 @@ public class UserService {
      *         constraint if two registrations race past it.
      */
     @Transactional
-    public UserDTO register(RegisterForm form) {
+    public User register(RegisterForm form) {
         if (form == null) {
             throw new ValidationException("EMPTY_BODY", "A registration body is required");
         }
 
-        String username = trimToNull(form.getUsername());
-        String password = form.getPassword();
-        String fullName = trimToNull(form.getFullName());
-        String email = trimToNull(form.getEmail());
-        String phone = trimToNull(form.getPhone());
-        String region = trimToNull(form.getRegion());
+        String username = trimToNull(form.username());
+        String password = form.password();
+        String fullName = trimToNull(form.fullName());
+        String email = trimToNull(form.email());
+        String phone = trimToNull(form.phone());
+        String region = trimToNull(form.region());
 
         validateForRegistration(username, password, fullName, email, phone, region);
 
@@ -137,7 +136,7 @@ public class UserService {
         try {
             User saved = users.save(user);
             LOGGER.log(Level.INFO, () -> "Registered user " + saved.getUserName());
-            return UserMapper.toDto(saved);
+            return saved;
         } catch (PersistenceException e) {
             // UserRepository.save flushes, so a unique-index violation arrives here rather
             // than at commit, where it would already be wrapped as a rollback and be unreadable.
@@ -146,6 +145,23 @@ public class UserService {
             throw new ConflictException("USER_EXISTS",
                     "That username or email address is already registered", e);
         }
+    }
+
+    /**
+     * The JSF tier's entry point into {@link #register(RegisterForm)}.
+     *
+     * <p>The web tier's package may not import the DTO package at all — a record cannot be
+     * bound into a Facelets view, so nothing in that package should have a reason to reach for
+     * one. {@code UserBean} holds its fields individually instead and calls this overload, which
+     * is the one place a {@link RegisterForm} is assembled from them before delegating to the
+     * canonical method that {@link com.petlee.rest.UserResource} calls directly with the record
+     * JSON-B already built.
+     *
+     * @see #register(RegisterForm)
+     */
+    public User register(String username, String password, String fullName, String email,
+                         String phone, String region) {
+        return register(new RegisterForm(username, password, fullName, email, phone, region));
     }
 
     /**
@@ -163,7 +179,7 @@ public class UserService {
      *         credentials are wrong"
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public UserDTO authenticate(String username, String password) {
+    public User authenticate(String username, String password) {
         Optional<User> found = users.findByUsername(trimToNull(username));
 
         if (found.isEmpty() || password == null
@@ -173,7 +189,7 @@ public class UserService {
             throw new UnauthorizedException(BAD_CREDENTIALS_CODE, BAD_CREDENTIALS_MESSAGE);
         }
 
-        return UserMapper.toDto(found.get());
+        return found.get();
     }
 
     /**
@@ -191,8 +207,8 @@ public class UserService {
      *         the ordinary answer here rather than a 404 — the caller decides what it means.
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public Optional<UserDTO> findById(Long id) {
-        return users.findById(id).map(UserMapper::toDto);
+    public Optional<User> findById(Long id) {
+        return users.findById(id);
     }
 
     private void validateForRegistration(String username, String password, String fullName,

@@ -1,16 +1,11 @@
 package com.petlee.rest;
 
-import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
-import com.petlee.dto.StatusForm;
-import com.petlee.exception.ValidationException;
-import com.petlee.model.Pet;
 import com.petlee.rest.security.AdminOnly;
 import com.petlee.service.PetService;
 
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -68,38 +63,35 @@ public class AdminResource {
      * @param categoryId the category to restrict to, or absent for all
      * @param size       {@code SMALL}, {@code MEDIUM} or {@code LARGE}, or absent
      * @param gender     {@code MALE} or {@code FEMALE}, or absent
-     * @return the matching listings with their owner and creation date
+     * @return the matching listings, mapped to the gallery shape
      */
     @GET
     @Path("pets")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<AdminPetDTO> findAll(@QueryParam("categoryId") String categoryId,
-                                     @QueryParam("size") String size,
-                                     @QueryParam("gender") String gender) {
-        return pets.findAllForAdmin(RestParams.categoryId(categoryId),
-                RestParams.enumValue(Pet.PetSize.class, size, "size"),
-                RestParams.enumValue(Pet.PetGender.class, gender, "gender"));
+    public List<PetDTO> findAll(@QueryParam("categoryId") Integer categoryId,
+                                @QueryParam("size") String size,
+                                @QueryParam("gender") String gender) {
+        return pets.findAllForAdmin(categoryId, PetResource.parseSize(size), PetResource.parseGender(gender))
+                .stream().map(PetDTO::of).toList();
     }
 
     /**
-     * {@code PUT /api/admin/pets/{id}/status} — admin. Body {@code {"status":"REMOVED"}}.
+     * {@code PUT /api/admin/pets/{id}/status} — admin.
      *
      * <p>The reversible half of moderation: {@code REMOVED} takes a listing out of the public
      * gallery and {@code AVAILABLE} puts it back, with the row and its photographs untouched.
-     * Which values are legal is {@code PetService}'s decision, not this method's.
+     * Which values are legal is {@code PetService}'s decision, not this method's. A query
+     * parameter rather than a one-field JSON body — ADR-002 #11 — since a whole request body for
+     * one string bought nothing.
      *
-     * @param id   the listing to hide or restore
-     * @param form the new status
+     * @param id     the listing to hide or restore
+     * @param status the new status
      * @return the listing in its new state
      */
     @PUT
     @Path("pets/{id: \\d+}/status")
-    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetDTO changeStatus(@PathParam("id") Long id, StatusForm form) {
-        if (form == null) {
-            throw new ValidationException("status", "INVALID_STATUS", "A status is required");
-        }
-        return pets.changeStatus(id, form.getStatus());
+    public PetDTO changeStatus(@PathParam("id") Long id, @QueryParam("status") String status) {
+        return PetDTO.of(pets.changeStatus(id, status));
     }
 }

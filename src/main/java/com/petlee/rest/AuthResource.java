@@ -2,6 +2,7 @@ package com.petlee.rest;
 
 import com.petlee.dto.LoginForm;
 import com.petlee.dto.UserDTO;
+import com.petlee.model.User;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
 import com.petlee.rest.security.SessionUser;
@@ -82,15 +83,15 @@ public class AuthResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public UserDTO login(LoginForm form) {
-        LoginForm credentials = form != null ? form : new LoginForm();
+        LoginForm credentials = form != null ? form : new LoginForm(null, null);
 
-        UserDTO user = users.authenticate(credentials.getUsername(), credentials.getPassword());
+        User user = users.authenticate(credentials.username(), credentials.password());
 
         // Rotates the session id as it goes - see CurrentUser.establish on why that is not
         // optional, and why the decision does not live in this method.
         CurrentUser.establish(request, SessionUser.of(user));
 
-        return user;
+        return UserDTO.of(user);
     }
 
     /**

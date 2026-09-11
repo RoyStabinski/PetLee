@@ -100,11 +100,11 @@
                                 <tr>
                                     <td class="cell-thumb">
                                         <h:graphicImage value="#{adminBean.thumbnailOf(pet)}"
-                                                        alt="#{pet.name}"/>
+                                                        alt="#{pet.petName}"/>
                                     </td>
-                                    <td>#{pet.name}</td>
-                                    <td>#{pet.ownerName}</td>
-                                    <td>#{pet.categoryName}</td>
+                                    <td>#{pet.petName}</td>
+                                    <td>#{pet.owner.fullName}</td>
+                                    <td>#{pet.category.categoryName}</td>
                                     <td>
                                         <span class="#{adminBean.statusStyle(pet)}">
                                             #{msg['status.'.concat(pet.status)]}
@@ -115,16 +115,16 @@
                                         <div class="actions">
                                             <h:commandLink id="hide"
                                                            rendered="#{not adminBean.isHidden(pet)}"
-                                                           action="#{adminBean.hide(pet.id)}"
+                                                           action="#{adminBean.hide(pet.petId)}"
                                                            styleClass="button-secondary"
                                                            value="#{msg['admin.hide']}"/>
                                             <h:commandLink id="restore"
                                                            rendered="#{adminBean.isHidden(pet)}"
-                                                           action="#{adminBean.restore(pet.id)}"
+                                                           action="#{adminBean.restore(pet.petId)}"
                                                            styleClass="button-secondary"
                                                            value="#{msg['admin.restore']}"/>
                                             <h:commandLink id="delete"
-                                                           action="#{adminBean.deletePet(pet.id)}"
+                                                           action="#{adminBean.deletePet(pet.petId)}"
                                                            styleClass="button button-danger"
                                                            value="#{msg['form.delete']}"
                                                            onclick="return confirm('#{adminBean.confirmDelete(pet)}');"/>
@@ -166,7 +166,7 @@
                     <tbody>
                         <ui:repeat id="categoryRows" value="#{adminBean.categories}" var="category">
                             <tr>
-                                <td>#{category.name}</td>
+                                <td>#{category.categoryName}</td>
                                 <td>#{adminBean.listingCount(category)}</td>
                                 <td>
                                     <!--
@@ -176,7 +176,7 @@
                                         and click, and the server is the one that decides.
                                     -->
                                     <h:commandLink id="deleteCategory"
-                                                   action="#{adminBean.deleteCategory(category.id)}"
+                                                   action="#{adminBean.deleteCategory(category.categoryId)}"
                                                    styleClass="button button-danger"
                                                    value="#{msg['form.delete']}"
                                                    disabled="#{adminBean.isInUse(category)}"

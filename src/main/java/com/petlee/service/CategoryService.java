@@ -1,10 +1,8 @@
 package com.petlee.service;
 
-import com.petlee.dto.CategoryDTO;
 import com.petlee.exception.ConflictException;
 import com.petlee.exception.NotFoundException;
 import com.petlee.exception.ValidationException;
-import com.petlee.mapper.CategoryMapper;
 import com.petlee.model.Category;
 import com.petlee.repository.CategoryRepository;
 
@@ -46,24 +44,11 @@ public class CategoryService {
     /**
      * The whole vocabulary, alphabetically — the body of {@code GET /api/categories}.
      *
-     * @return every category as a DTO, ordered by name; empty if the table is empty, never
-     *         {@code null}
+     * @return every category, ordered by name; empty if the table is empty, never {@code null}
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<CategoryDTO> findAll() {
-        return CategoryMapper.toDtoList(categories.findAll());
-    }
-
-    /**
-     * One category, for a REST caller.
-     *
-     * @param id the category id, may be {@code null}
-     * @return the category as a DTO
-     * @throws NotFoundException <strong>404</strong> — no category has that id
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public CategoryDTO findById(Integer id) {
-        return CategoryMapper.toDto(requireById(id));
+    public List<Category> findAll() {
+        return categories.findAll();
     }
 
     /**
@@ -82,7 +67,7 @@ public class CategoryService {
      * @throws ConflictException <strong>409</strong>, code {@code CATEGORY_EXISTS}
      */
     @Transactional
-    public CategoryDTO create(String name) {
+    public Category create(String name) {
         String trimmed = name == null ? null : name.trim();
         if (trimmed == null || trimmed.isEmpty() || trimmed.length() > NAME_MAX) {
             throw new ValidationException("name", "NAME_INVALID",
@@ -92,7 +77,7 @@ public class CategoryService {
             throw new ConflictException("CATEGORY_EXISTS", "A category named " + trimmed
                     + " already exists");
         }
-        return CategoryMapper.toDto(categories.save(new Category(trimmed)));
+        return categories.save(new Category(trimmed));
     }
 
     /**

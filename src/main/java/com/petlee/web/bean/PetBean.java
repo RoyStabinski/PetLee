@@ -1,9 +1,8 @@
 package com.petlee.web.bean;
 
-import com.petlee.dto.CategoryDTO;
-import com.petlee.dto.PetDTO;
 import com.petlee.exception.ForbiddenException;
 import com.petlee.exception.PetLeeException;
+import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
@@ -54,14 +53,14 @@ public class PetBean implements Serializable {
     /** Not {@code transient}: see {@link UserBean}'s own field for why. */
     @Inject private UserBean userBean;
 
-    private List<PetDTO> pets = List.of();
-    private List<CategoryDTO> categories = List.of();
+    private List<Pet> pets = List.of();
+    private List<Category> categories = List.of();
     private Integer selectedCategoryId;
     private String selectedSize;
     private String selectedGender;
 
     /** The owner's own listings, every status included; loaded lazily by {@link #getMyListings()}. */
-    private List<PetDTO> myListings;
+    private List<Pet> myListings;
 
     @PostConstruct
     void init() {
@@ -95,8 +94,8 @@ public class PetBean implements Serializable {
         return "/petDetails.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
-    public String imageUrlOf(PetDTO pet) {
-        String url = pet == null ? null : pet.getMainImageUrl();
+    public String imageUrlOf(Pet pet) {
+        String url = pet == null ? null : pet.getImageUrl();
         return url == null || url.isBlank() ? PLACEHOLDER_IMAGE : url;
     }
 
@@ -120,9 +119,9 @@ public class PetBean implements Serializable {
     // ----------------------------------------------------------------------- the owner's dashboard
 
     /** @return this user's listings, newest first, every status; loaded on first use */
-    public List<PetDTO> getMyListings() {
+    public List<Pet> getMyListings() {
         if (myListings == null) {
-            Long ownerId = userBean.getCurrentUser() == null ? null : userBean.getCurrentUser().getId();
+            Long ownerId = userBean.getCurrentUserId();
             myListings = petService.findByOwner(ownerId);
         }
         return myListings;
@@ -161,25 +160,25 @@ public class PetBean implements Serializable {
         return "/editPet.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
-    public String statusStyle(PetDTO pet) {
+    public String statusStyle(Pet pet) {
         if (pet == null || pet.getStatus() == null) {
             return "tag";
         }
         return switch (pet.getStatus()) {
-            case "ADOPTED" -> "tag tag-adopted";
-            case "REMOVED" -> "tag tag-removed";
+            case ADOPTED -> "tag tag-adopted";
+            case REMOVED -> "tag tag-removed";
             default -> "tag";
         };
     }
 
-    public String thumbnailOf(PetDTO pet) {
+    public String thumbnailOf(Pet pet) {
         return imageUrlOf(pet);
     }
 
     // -------------------------------------------------------------------------------- properties
 
-    public List<PetDTO> getPets() { return pets; }
-    public List<CategoryDTO> getCategories() { return categories; }
+    public List<Pet> getPets() { return pets; }
+    public List<Category> getCategories() { return categories; }
     public boolean isEmpty() { return pets.isEmpty(); }
     public Integer getSelectedCategoryId() { return selectedCategoryId; }
     public void setSelectedCategoryId(Integer v) { this.selectedCategoryId = v; }

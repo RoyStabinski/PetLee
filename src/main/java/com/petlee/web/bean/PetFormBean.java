@@ -1,12 +1,10 @@
 package com.petlee.web.bean;
 
-import com.petlee.dto.CategoryDTO;
-import com.petlee.dto.PetDTO;
-import com.petlee.dto.PetDetailDTO;
-import com.petlee.dto.PetForm;
 import com.petlee.exception.ConflictException;
 import com.petlee.exception.NotFoundException;
 import com.petlee.exception.PetLeeException;
+import com.petlee.model.Category;
+import com.petlee.model.Pet;
 import com.petlee.service.AppException;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
@@ -31,6 +29,18 @@ import java.util.List;
 /**
  * Creating and editing a listing — {@code #{petFormBean}}, behind both {@code addPet.xhtml} and
  * {@code editPet.xhtml}.
+ *
+ * <h2>Why this bean does not hold a {@code PetForm}</h2>
+ * {@code PetForm} is a record now, in the DTO package that lives at the REST boundary, where
+ * JSON-B builds one from a request body. A record has no setters and its accessor is
+ * {@code name()}, not {@code getName()}, so it cannot be the target of
+ * {@code <h:inputText value="...">} two-way binding, which needs both; and this whole package is
+ * not permitted to reach into the DTO package at all, so this class cannot even name the type.
+ * This bean therefore holds the eight fields individually, as ordinary mutable properties that
+ * {@code petFields.xhtml} binds to directly ({@code #{petFormBean.name}}), and calls
+ * {@link PetService}'s scalar overloads of {@code create} and {@code update}, which are the place
+ * a {@code PetForm} gets assembled from them, inside the service package that is allowed to know
+ * the type.
  *
  * <h2>Two calls that cannot be one transaction</h2>
  * Creating a listing with a photograph is {@link PetService#create} followed by
@@ -63,9 +73,17 @@ public class PetFormBean implements Serializable {
     @Inject
     private UserBean userBean;
 
-    private final PetForm form = new PetForm();
+    // Form backing — see the class documentation for why these are not a PetForm.
+    private String name;
+    private String breed;
+    private Integer age;
+    private String size;
+    private String gender;
+    private String shortDesc;
+    private String longDesc;
+    private Integer categoryId;
 
-    private List<CategoryDTO> categories = Collections.emptyList();
+    private List<Category> categories = Collections.emptyList();
 
     /** Set on the edit page by its view parameter; {@code null} means "creating". */
     private Long petId;
@@ -97,20 +115,20 @@ public class PetFormBean implements Serializable {
             return fail(HttpServletResponse.SC_NOT_FOUND);
         }
         try {
-            PetDetailDTO pet = petService.findDetail(petId, userBean.getCurrentUserId());
+            Pet pet = petService.findDetail(petId);
 
             if (!isOwnedByCurrentUser(pet)) {
                 return fail(HttpServletResponse.SC_FORBIDDEN);
             }
 
-            form.setName(pet.getName());
-            form.setBreed(pet.getBreed());
-            form.setAge(pet.getAge());
-            form.setSize(pet.getSize());
-            form.setGender(pet.getGender());
-            form.setShortDesc(pet.getShortDesc());
-            form.setLongDesc(pet.getLongDesc());
-            form.setCategoryId(categoryIdOf(pet.getCategoryName()));
+            name = pet.getPetName();
+            breed = pet.getBreed();
+            age = pet.getAge();
+            size = pet.getSize().name();
+            gender = pet.getGender().name();
+            shortDesc = pet.getShortDesc();
+            longDesc = pet.getLongDesc();
+            categoryId = pet.getCategory() == null ? null : pet.getCategory().getCategoryId();
             return null;
 
         } catch (NotFoundException noSuchPet) {
@@ -130,9 +148,10 @@ public class PetFormBean implements Serializable {
     }
 
     private String create() {
-        PetDTO created;
+        Pet created;
         try {
-            created = petService.create(form, userBean.getCurrentUserId());
+            created = petService.create(name, breed, age, size, gender, shortDesc, longDesc,
+                    categoryId, userBean.getCurrentUserId());
         } catch (PetLeeException failure) {
             return reportAndStay(failure);
         }
@@ -142,7 +161,7 @@ public class PetFormBean implements Serializable {
         }
 
         try {
-            petService.attachImage(created.getId(), uploadedFile, userBean.getCurrentUserId());
+            petService.attachImage(created.getPetId(), uploadedFile, userBean.getCurrentUserId());
             return done("Your listing and its photograph have been added.");
 
         } catch (PetLeeException | AppException photographFailed) {
@@ -158,7 +177,8 @@ public class PetFormBean implements Serializable {
 
     private String update() {
         try {
-            petService.update(petId, form, userBean.getCurrentUserId());
+            petService.update(petId, name, breed, age, size, gender, shortDesc, longDesc,
+                    categoryId, userBean.getCurrentUserId());
             return done("Your listing has been updated.");
 
         } catch (ConflictException staleEdit) {
@@ -180,7 +200,7 @@ public class PetFormBean implements Serializable {
 
     // ------------------------------------------------------------------------------ the menus
 
-    public List<CategoryDTO> getCategories() {
+    public List<Category> getCategories() {
         return categories;
     }
 
@@ -211,21 +231,11 @@ public class PetFormBean implements Serializable {
     /**
      * @param pet the listing being opened for editing
      * @return whether the signed-in user owns it
-     *         <p>{@code ownerEmail} is only populated for a logged-in caller, and there is no
-     *         owner id on this DTO, so the comparison is by email.
      */
-    private boolean isOwnedByCurrentUser(PetDetailDTO pet) {
-        return userBean.getCurrentUser() != null
-                && pet.getOwnerEmail() != null
-                && pet.getOwnerEmail().equalsIgnoreCase(userBean.getCurrentUser().getEmail());
-    }
-
-    private Integer categoryIdOf(String name) {
-        return categories.stream()
-                .filter(category -> category.getName().equals(name))
-                .map(CategoryDTO::getId)
-                .findFirst()
-                .orElse(null);
+    private boolean isOwnedByCurrentUser(Pet pet) {
+        return userBean.getCurrentUserId() != null
+                && pet.getOwner() != null
+                && userBean.getCurrentUserId().equals(pet.getOwner().getUserId());
     }
 
     private static String reasonOf(RuntimeException failure) {
@@ -289,8 +299,68 @@ public class PetFormBean implements Serializable {
 
     // ------------------------------------------------------------------------ form properties
 
-    public PetForm getForm() {
-        return form;
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getBreed() {
+        return breed;
+    }
+
+    public void setBreed(String breed) {
+        this.breed = breed;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    public String getShortDesc() {
+        return shortDesc;
+    }
+
+    public void setShortDesc(String shortDesc) {
+        this.shortDesc = shortDesc;
+    }
+
+    public String getLongDesc() {
+        return longDesc;
+    }
+
+    public void setLongDesc(String longDesc) {
+        this.longDesc = longDesc;
+    }
+
+    public Integer getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(Integer categoryId) {
+        this.categoryId = categoryId;
     }
 
     public Long getPetId() {

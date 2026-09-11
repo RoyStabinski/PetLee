@@ -21,11 +21,11 @@
                 <dt>#{msg['auth.fullName']}</dt>
                 <dd>#{userBean.currentUser.fullName}</dd>
                 <dt>#{msg['auth.username']}</dt>
-                <dd>#{userBean.currentUser.username}</dd>
+                <dd>#{userBean.currentUser.userName}</dd>
                 <dt>#{msg['auth.email']}</dt>
                 <dd>#{userBean.currentUser.email}</dd>
                 <dt>#{msg['auth.phone']}</dt>
-                <dd>#{userBean.currentUser.phone}</dd>
+                <dd>#{userBean.currentUser.phoneNumber}</dd>
                 <dt>#{msg['pet.status']}</dt>
                 <dd>#{msg['role.'.concat(userBean.currentUser.role)]}</dd>
             </dl>
@@ -60,10 +60,10 @@
                                 <tr>
                                     <td class="cell-thumb">
                                         <h:graphicImage value="#{petBean.thumbnailOf(pet)}"
-                                                        alt="#{pet.name}"/>
+                                                        alt="#{pet.petName}"/>
                                     </td>
-                                    <td>#{pet.name}</td>
-                                    <td>#{pet.categoryName}</td>
+                                    <td>#{pet.petName}</td>
+                                    <td>#{pet.category.categoryName}</td>
                                     <td>
                                         <span class="#{petBean.statusStyle(pet)}">
                                             #{msg['status.'.concat(pet.status)]}
@@ -72,7 +72,7 @@
                                     <td>
                                         <div class="actions">
                                             <h:commandLink id="edit"
-                                                           action="#{petBean.edit(pet.id)}"
+                                                           action="#{petBean.edit(pet.petId)}"
                                                            styleClass="button-secondary"
                                                            value="#{msg['form.edit']}"/>
                                             <!--
@@ -81,7 +81,7 @@
                                                 mis-click must not be able to reach the server.
                                             -->
                                             <h:commandLink id="delete"
-                                                           action="#{petBean.delete(pet.id)}"
+                                                           action="#{petBean.delete(pet.petId)}"
                                                            styleClass="button button-danger"
                                                            value="#{msg['form.delete']}"
                                                            onclick="return confirm('#{msg['form.confirmDelete']}');"/>

@@ -68,7 +68,7 @@ public class CategoryResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public List<CategoryDTO> findAll() {
-        return categories.findAll();
+        return categories.findAll().stream().map(CategoryDTO::of).toList();
     }
 
     /**
@@ -90,7 +90,7 @@ public class CategoryResource {
         if (body == null) {
             throw new ValidationException("name", "NAME_INVALID", "A category name is required");
         }
-        return categories.create(body.getName());
+        return CategoryDTO.of(categories.create(body.name()));
     }
 
     /**

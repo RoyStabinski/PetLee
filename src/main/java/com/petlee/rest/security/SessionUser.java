@@ -1,12 +1,9 @@
 package com.petlee.rest.security;
 
-import com.petlee.dto.UserDTO;
 import com.petlee.model.User;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * What "logged in" means, in full: the four facts the REST tier keeps about the caller between
@@ -37,8 +34,6 @@ public final class SessionUser implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private static final Logger LOGGER = Logger.getLogger(SessionUser.class.getName());
-
     private final Long userId;
     private final String username;
     private final String fullName;
@@ -59,34 +54,15 @@ public final class SessionUser implements Serializable {
     }
 
     /**
-     * Builds a session payload from the DTO {@code UserService} returns at login.
-     *
-     * <p>{@link UserDTO#getRole()} is a string, because that is what the contract puts on the
-     * wire. An unrecognised value is treated as {@code USER} and logged at {@code WARNING}: the
-     * alternative — throwing — turns a data problem into a failed login for a user who did nothing
-     * wrong, and the alternative to that — defaulting to {@code ADMIN} — is not an alternative.
+     * Builds a session payload from the entity {@code UserService} returns at login.
      *
      * @param user the authenticated user; must not be {@code null}
      * @return the payload to store in the session
      */
-    public static SessionUser of(UserDTO user) {
+    public static SessionUser of(User user) {
         Objects.requireNonNull(user, "user");
-        return new SessionUser(user.getId(), user.getUsername(), user.getFullName(),
-                parseRole(user.getRole(), user.getUsername()));
-    }
-
-    private static User.Role parseRole(String role, String username) {
-        if (role != null) {
-            try {
-                return User.Role.valueOf(role.trim().toUpperCase());
-            } catch (IllegalArgumentException unknown) {
-                // Falls through to the warning below. The exception carries the bad value, which
-                // is exactly what must not be trusted, so it is not rethrown.
-            }
-        }
-        LOGGER.log(Level.WARNING, () -> "Unrecognised role '" + role + "' for user " + username
-                + "; treating the session as USER");
-        return User.Role.USER;
+        return new SessionUser(user.getUserId(), user.getUserName(), user.getFullName(),
+                user.getRole());
     }
 
     public Long getUserId() {

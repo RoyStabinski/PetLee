@@ -22,7 +22,7 @@
                         <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
                             <f:selectItem itemValue="#{null}" itemLabel="#{msg['gallery.filter.any']}"/>
                             <f:selectItems value="#{petBean.categories}" var="c"
-                                           itemValue="#{c.id}" itemLabel="#{c.name}"/>
+                                           itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
                         </h:selectOneMenu>
                     </div>
 
@@ -84,22 +84,22 @@
                                         gives /pet-lee/pet-lee/... and a broken image on every card.
                                     -->
                                     <h:graphicImage value="#{petBean.imageUrlOf(pet)}"
-                                                    alt="#{pet.name}"/>
+                                                    alt="#{pet.petName}"/>
                                 </div>
 
                                 <div class="card-body">
-                                    <h3 class="card-title">#{pet.name}</h3>
+                                    <h3 class="card-title">#{pet.petName}</h3>
                                     <p class="card-desc">#{pet.shortDesc}</p>
 
                                     <ul class="tags">
                                         <li class="tag">#{msg['size.'.concat(pet.size)]}</li>
                                         <li class="tag">#{msg['gender.'.concat(pet.gender)]}</li>
-                                        <li class="tag">#{pet.categoryName}</li>
+                                        <li class="tag">#{pet.category.categoryName}</li>
                                     </ul>
 
                                     <div class="card-actions">
                                         <h:form>
-                                            <h:commandLink action="#{petBean.viewDetails(pet.id)}"
+                                            <h:commandLink action="#{petBean.viewDetails(pet.petId)}"
                                                            styleClass="button"
                                                            value="#{msg['gallery.card.details']}"/>
                                         </h:form>

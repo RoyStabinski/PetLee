@@ -2,6 +2,7 @@ package com.petlee.rest;
 
 import com.petlee.dto.RegisterForm;
 import com.petlee.dto.UserDTO;
+import com.petlee.model.User;
 import com.petlee.service.UserService;
 
 import jakarta.enterprise.context.RequestScoped;
@@ -67,6 +68,7 @@ public class UserResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public UserDTO register(RegisterForm form) {
-        return users.register(form);
+        User user = users.register(form);
+        return UserDTO.of(user);
     }
 }

@@ -1,8 +1,7 @@
 package com.petlee.web.bean;
 
-import com.petlee.dto.AdminPetDTO;
-import com.petlee.dto.CategoryDTO;
 import com.petlee.exception.PetLeeException;
+import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
@@ -17,6 +16,7 @@ import jakarta.inject.Named;
 
 import java.io.Serializable;
 import java.text.MessageFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -47,6 +47,9 @@ public class AdminBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private static final DateTimeFormatter CREATED_ON =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     /** The contract's enum strings, paired with the labels a moderator reads. */
     private static final String[] SIZES = {"SMALL", "MEDIUM", "LARGE"};
     private static final String[] SIZE_LABELS = {"Small", "Medium", "Large"};
@@ -62,8 +65,8 @@ public class AdminBean implements Serializable {
     @Inject
     private UserBean userBean;
 
-    private List<AdminPetDTO> listings = Collections.emptyList();
-    private List<CategoryDTO> categories = Collections.emptyList();
+    private List<Pet> listings = Collections.emptyList();
+    private List<Category> categories = Collections.emptyList();
 
     /** How many listings each category holds, keyed by name — the delete guard's evidence. */
     private Map<String, Long> listingsPerCategory = Map.of();
@@ -160,8 +163,8 @@ public class AdminBean implements Serializable {
      */
     public String addCategory() {
         try {
-            CategoryDTO created = categoryService.create(newCategoryName);
-            info("Category added: " + created.getName());
+            Category created = categoryService.create(newCategoryName);
+            info("Category added: " + created.getCategoryName());
             newCategoryName = null;
             load();
         } catch (PetLeeException failure) {
@@ -193,15 +196,15 @@ public class AdminBean implements Serializable {
      * @return how many listings reference it, {@code REMOVED} ones included — they hold the foreign
      *         key too, so they are what a delete would trip over
      */
-    public long listingCount(CategoryDTO category) {
-        if (category == null || category.getName() == null) {
+    public long listingCount(Category category) {
+        if (category == null || category.getCategoryName() == null) {
             return 0L;
         }
-        return listingsPerCategory.getOrDefault(category.getName(), 0L);
+        return listingsPerCategory.getOrDefault(category.getCategoryName(), 0L);
     }
 
     /** @param category a category @return whether deleting it would be refused */
-    public boolean isInUse(CategoryDTO category) {
+    public boolean isInUse(Category category) {
         return listingCount(category) > 0;
     }
 
@@ -209,13 +212,13 @@ public class AdminBean implements Serializable {
 
     private void load() {
         try {
-            List<AdminPetDTO> all = petService.findAllForAdmin(selectedCategoryId,
+            List<Pet> all = petService.findAllForAdmin(selectedCategoryId,
                     selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
                     selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
             listings = all.stream().filter(this::matchesStatus).toList();
             listingsPerCategory = all.stream()
-                    .filter(pet -> pet.getCategoryName() != null)
-                    .collect(Collectors.groupingBy(AdminPetDTO::getCategoryName,
+                    .filter(pet -> pet.getCategory() != null && pet.getCategory().getCategoryName() != null)
+                    .collect(Collectors.groupingBy(pet -> pet.getCategory().getCategoryName(),
                             Collectors.counting()));
             categories = categoryService.findAll();
         } catch (PetLeeException failure) {
@@ -223,15 +226,15 @@ public class AdminBean implements Serializable {
         }
     }
 
-    private boolean matchesStatus(AdminPetDTO pet) {
+    private boolean matchesStatus(Pet pet) {
         return selectedStatus == null || selectedStatus.isEmpty()
-                || selectedStatus.equals(pet.getStatus());
+                || selectedStatus.equals(pet.getStatus().name());
     }
 
     // --------------------------------------------------------------------------- presentation
 
     /** @return the listings the filters select, newest first, in every status */
-    public List<AdminPetDTO> getListings() {
+    public List<Pet> getListings() {
         return listings;
     }
 
@@ -241,46 +244,45 @@ public class AdminBean implements Serializable {
     }
 
     /** @return the whole category vocabulary, alphabetically */
-    public List<CategoryDTO> getCategories() {
+    public List<Category> getCategories() {
         return categories;
     }
 
     /** @param pet a listing @return whether it is currently hidden from the public gallery */
-    public boolean isHidden(AdminPetDTO pet) {
-        return pet != null && "REMOVED".equals(pet.getStatus());
+    public boolean isHidden(Pet pet) {
+        return pet != null && pet.getStatus() == Pet.PetStatus.REMOVED;
     }
 
     /** @param pet a listing @return the CSS class that colours its status badge */
-    public String statusStyle(AdminPetDTO pet) {
+    public String statusStyle(Pet pet) {
         if (pet == null || pet.getStatus() == null) {
             return "tag";
         }
         return switch (pet.getStatus()) {
-            case "ADOPTED" -> "tag tag-adopted";
-            case "REMOVED" -> "tag tag-removed";
+            case ADOPTED -> "tag tag-adopted";
+            case REMOVED -> "tag tag-removed";
             default -> "tag";
         };
     }
 
     /** @param pet a listing @return its photograph, or the bundled placeholder */
-    public String thumbnailOf(AdminPetDTO pet) {
-        if (pet == null || pet.getMainImageUrl() == null || pet.getMainImageUrl().isBlank()) {
+    public String thumbnailOf(Pet pet) {
+        if (pet == null || pet.getImageUrl() == null || pet.getImageUrl().isBlank()) {
             return PetBean.PLACEHOLDER_IMAGE;
         }
-        return pet.getMainImageUrl();
+        return pet.getImageUrl();
     }
 
     /**
      * @param pet a listing
-     * @return its creation date as {@code yyyy-MM-dd HH:mm}. The wire carries a full ISO-8601
-     *         timestamp down to the nanosecond, which no moderator needs and which wraps the column.
+     * @return its creation date as {@code yyyy-MM-dd HH:mm}. The entity carries a full timestamp
+     *         down to the nanosecond, which no moderator needs and which wraps the column.
      */
-    public String createdOn(AdminPetDTO pet) {
-        String iso = pet == null ? null : pet.getCreatedAt();
-        if (iso == null || iso.length() < 16) {
-            return iso == null ? "" : iso;
+    public String createdOn(Pet pet) {
+        if (pet == null || pet.getCreatedAt() == null) {
+            return "";
         }
-        return iso.substring(0, 10) + " " + iso.substring(11, 16);
+        return CREATED_ON.format(pet.getCreatedAt());
     }
 
     /**
@@ -294,8 +296,8 @@ public class AdminBean implements Serializable {
      * @param pet the listing about to be deleted
      * @return the question to put to the administrator
      */
-    public String confirmDelete(AdminPetDTO pet) {
-        String name = pet == null || pet.getName() == null ? "" : pet.getName();
+    public String confirmDelete(Pet pet) {
+        String name = pet == null || pet.getPetName() == null ? "" : pet.getPetName();
         return MessageFormat.format(
                         "Delete {0} permanently? The listing and its photographs cannot be recovered.", name)
                 .replace("\\", "\\\\")
@@ -306,8 +308,8 @@ public class AdminBean implements Serializable {
     public List<SelectItem> getCategoryOptions() {
         List<SelectItem> items = new ArrayList<>(categories.size() + 1);
         items.add(new SelectItem(null, "Any"));
-        for (CategoryDTO category : categories) {
-            items.add(new SelectItem(category.getId(), category.getName()));
+        for (Category category : categories) {
+            items.add(new SelectItem(category.getCategoryId(), category.getCategoryName()));
         }
         return items;
     }

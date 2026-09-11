@@ -17,7 +17,7 @@
 
         <div class="field">
             <h:outputLabel for="name" value="#{msg['pet.name']}"/>
-            <h:inputText id="name" value="#{petFormBean.form.name}"
+            <h:inputText id="name" value="#{petFormBean.name}"
                          required="true" requiredMessage="#{msg['form.required']}"
                          validatorMessage="#{msg['pet.name.length']}">
                 <f:validateLength maximum="50"/>
@@ -27,13 +27,13 @@
 
         <div class="field">
             <h:outputLabel for="breed" value="#{msg['pet.breed']}"/>
-            <h:inputText id="breed" value="#{petFormBean.form.breed}"/>
+            <h:inputText id="breed" value="#{petFormBean.breed}"/>
             <h:message for="breed" styleClass="field-error"/>
         </div>
 
         <div class="field">
             <h:outputLabel for="age" value="#{msg['pet.age']}"/>
-            <h:inputText id="age" value="#{petFormBean.form.age}"
+            <h:inputText id="age" value="#{petFormBean.age}"
                          validatorMessage="#{msg['pet.age.range']}"
                          converterMessage="#{msg['pet.age.range']}">
                 <f:validateLongRange minimum="0" maximum="50"/>
@@ -43,18 +43,18 @@
 
         <div class="field">
             <h:outputLabel for="category" value="#{msg['pet.category']}"/>
-            <h:selectOneMenu id="category" value="#{petFormBean.form.categoryId}"
+            <h:selectOneMenu id="category" value="#{petFormBean.categoryId}"
                              required="true" requiredMessage="#{msg['form.required']}">
                 <f:selectItem itemValue="#{null}" itemLabel="" noSelectionOption="true"/>
                 <f:selectItems value="#{petFormBean.categories}" var="c"
-                               itemValue="#{c.id}" itemLabel="#{c.name}"/>
+                               itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
             </h:selectOneMenu>
             <h:message for="category" styleClass="field-error"/>
         </div>
 
         <div class="field">
             <h:outputLabel for="size" value="#{msg['pet.size']}"/>
-            <h:selectOneMenu id="size" value="#{petFormBean.form.size}"
+            <h:selectOneMenu id="size" value="#{petFormBean.size}"
                              required="true" requiredMessage="#{msg['form.required']}">
                 <f:selectItems value="#{petFormBean.sizeOptions}"/>
             </h:selectOneMenu>
@@ -63,7 +63,7 @@
 
         <div class="field">
             <h:outputLabel for="gender" value="#{msg['pet.gender']}"/>
-            <h:selectOneMenu id="gender" value="#{petFormBean.form.gender}"
+            <h:selectOneMenu id="gender" value="#{petFormBean.gender}"
                              required="true" requiredMessage="#{msg['form.required']}">
                 <f:selectItems value="#{petFormBean.genderOptions}"/>
             </h:selectOneMenu>
@@ -72,7 +72,7 @@
 
         <div class="field field-wide">
             <h:outputLabel for="shortDesc" value="#{msg['pet.shortDesc']}"/>
-            <h:inputText id="shortDesc" value="#{petFormBean.form.shortDesc}"
+            <h:inputText id="shortDesc" value="#{petFormBean.shortDesc}"
                          required="true" requiredMessage="#{msg['form.required']}"
                          validatorMessage="#{msg['pet.shortDesc.length']}">
                 <f:validateLength maximum="255"/>
@@ -82,7 +82,7 @@
 
         <div class="field field-wide">
             <h:outputLabel for="longDesc" value="#{msg['pet.description']}"/>
-            <h:inputTextarea id="longDesc" value="#{petFormBean.form.longDesc}" rows="6"/>
+            <h:inputTextarea id="longDesc" value="#{petFormBean.longDesc}" rows="6"/>
             <h:message for="longDesc" styleClass="field-error"/>
         </div>
 

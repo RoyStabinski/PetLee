@@ -1,15 +1,11 @@
 package com.petlee.service;
 
-import com.petlee.dto.AdminPetDTO;
-import com.petlee.dto.PetDTO;
-import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
 import com.petlee.exception.ConflictException;
 import com.petlee.exception.ForbiddenException;
 import com.petlee.exception.NotFoundException;
 import com.petlee.exception.UnauthorizedException;
 import com.petlee.exception.ValidationException;
-import com.petlee.mapper.PetMapper;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.model.User;
@@ -39,10 +35,11 @@ import java.util.logging.Logger;
  * managed bean, where a second copy would eventually disagree with this one.
  *
  * <h2>The privacy rule</h2>
- * {@link #findDetail(Long, Long)} is the <strong>only</strong> place that decides whether owner
- * contact details are visible. Specification §6: "Unregistered clients can view details of pets
- * offered for adoption without seeing private contact information." No resource and no managed
- * bean may re-derive it — a UI check is not a security boundary.
+ * {@link #findDetail(Long)} returns the full entity, owner attached; specification §6 —
+ * "Unregistered clients can view details of pets offered for adoption without seeing private
+ * contact information" — is enforced by each caller at its own boundary: {@code PetDetailDTO.of}
+ * on the REST side, {@code PetDetailBean.isContactVisible()} on the JSF side. Both must gate; the
+ * entity itself carries the owner unconditionally.
  *
  * <h2>Statuses</h2>
  * Nothing here moves a pet to {@code ADOPTED}. Specification §3 does not ask for it, so it is not
@@ -94,8 +91,8 @@ public class PetService {
      * @return the matching pets in gallery shape; empty when none match, never {@code null}
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<PetDTO> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, true).stream().map(PetMapper::toDto).toList();
+    public List<Pet> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
+        return pets.find(categoryId, size, gender, null, true);
     }
 
     /**
@@ -112,9 +109,8 @@ public class PetService {
      * @return every matching listing, newest first, in every status
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<AdminPetDTO> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, false).stream()
-                .map(PetMapper::toAdminDto).toList();
+    public List<Pet> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
+        return pets.find(categoryId, size, gender, null, false);
     }
 
     /**
@@ -133,13 +129,13 @@ public class PetService {
      *         value
      */
     @Transactional
-    public PetDTO changeStatus(Long petId, String status) {
+    public Pet changeStatus(Long petId, String status) {
         Pet pet = requireById(petId);
         pet.setStatus(moderationStatus(status));
         Pet saved = pets.save(pet);
 
         LOGGER.log(Level.INFO, () -> "Admin set pet " + petId + " to " + saved.getStatus());
-        return PetMapper.toDto(saved);
+        return saved;
     }
 
     private static Pet.PetStatus moderationStatus(String status) {
@@ -155,22 +151,20 @@ public class PetService {
     }
 
     /**
-     * One pet in full — {@code GET /api/pets/{id}}.
+     * One pet in full, owner attached — {@code GET /api/pets/{id}}.
      *
-     * <p><strong>This is where the contact-details decision is made, and the only place.</strong>
-     * A {@code null} caller is a guest, and the contract is explicit: "Owner contact fields are
-     * filled ONLY if the caller is logged in; otherwise null."
+     * <p>Whether the owner's contact details may be shown is no longer decided here: the caller
+     * — {@code PetResource} for REST, {@code PetDetailBean} for JSF — gates it at its own
+     * boundary. Specification §6's rule still applies; it is just enforced twice now, once per
+     * tier, because a record and an entity cannot share one gating method.
      *
-     * @param id           the pet's id
-     * @param callerUserId the logged-in caller's id, or {@code null} for a guest
-     * @return the pet with {@code ownerFullName}, {@code ownerEmail} and {@code ownerPhone}
-     *         populated for a logged-in caller and {@code null} for a guest
+     * @param id the pet's id
+     * @return the managed pet, with its category and owner loaded
      * @throws NotFoundException <strong>404</strong> — no pet has that id
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public PetDetailDTO findDetail(Long id, Long callerUserId) {
-        Pet pet = requireById(id);
-        return PetMapper.toDetailDto(pet, callerUserId != null);
+    public Pet findDetail(Long id) {
+        return requireById(id);
     }
 
     /**
@@ -197,7 +191,7 @@ public class PetService {
      *         §5, "Every posted pet must belong to a predefined category"
      */
     @Transactional
-    public PetDTO create(PetForm form, Long ownerUserId) {
+    public Pet create(PetForm form, Long ownerUserId) {
         if (ownerUserId == null) {
             throw new IllegalStateException(
                     "create requires an authenticated caller; T-18 should have rejected this request");
@@ -216,7 +210,25 @@ public class PetService {
 
         Pet saved = pets.save(pet);
         LOGGER.log(Level.INFO, () -> "User " + ownerUserId + " created pet " + saved.getPetId());
-        return PetMapper.toDto(saved);
+        return saved;
+    }
+
+    /**
+     * The JSF tier's entry point into {@link #create(PetForm, Long)}.
+     *
+     * <p>The web tier's package may not import the DTO package at all — a record cannot be
+     * bound into a Facelets view, so nothing in that package should have a reason to reach for
+     * one. {@code PetFormBean} holds its fields individually instead and calls this overload,
+     * which is the one place a {@link PetForm} is assembled from them before delegating to the
+     * canonical method that {@link com.petlee.rest.PetResource} calls directly with the record
+     * JSON-B already built.
+     *
+     * @see #create(PetForm, Long)
+     */
+    public Pet create(String name, String breed, Integer age, String size, String gender,
+                      String shortDesc, String longDesc, Integer categoryId, Long ownerUserId) {
+        return create(new PetForm(name, breed, age, size, gender, shortDesc, longDesc, categoryId),
+                ownerUserId);
     }
 
     /**
@@ -244,7 +256,7 @@ public class PetService {
      *         the same pet listing simultaneously and overwrite data" — made visible to the client.
      */
     @Transactional
-    public PetDTO update(Long petId, PetForm form, Long callerUserId) {
+    public Pet update(Long petId, PetForm form, Long callerUserId) {
         Pet pet = requireById(petId);
 
         if (!isSameUser(pet.getOwner(), callerUserId)) {
@@ -257,8 +269,7 @@ public class PetService {
         applyForm(form, pet);
 
         try {
-            Pet saved = pets.save(pet);
-            return PetMapper.toDto(saved);
+            return pets.save(pet);
         } catch (OptimisticLockException e) {
             // @Version caught a concurrent edit. PetRepository.save flushes, so it arrives
             // here rather than at commit, where the transaction manager would have wrapped it.
@@ -266,6 +277,20 @@ public class PetService {
             throw new ConflictException("STALE_PET",
                     "This listing was changed by someone else; reload it and try again", e);
         }
+    }
+
+    /**
+     * The JSF tier's entry point into {@link #update(Long, PetForm, Long)}. See
+     * {@link #create(String, String, Integer, String, String, String, String, Integer, Long)} for
+     * why this overload exists.
+     *
+     * @see #update(Long, PetForm, Long)
+     */
+    public Pet update(Long petId, String name, String breed, Integer age, String size,
+                      String gender, String shortDesc, String longDesc, Integer categoryId,
+                      Long callerUserId) {
+        return update(petId, new PetForm(name, breed, age, size, gender, shortDesc, longDesc,
+                categoryId), callerUserId);
     }
 
     /**
@@ -321,7 +346,7 @@ public class PetService {
      * @throws AppException <strong>403</strong> — only the owner of a listing may change its photo
      */
     @Transactional
-    public PetDTO attachImage(Long petId, Part file, Long callerUserId) {
+    public Pet attachImage(Long petId, Part file, Long callerUserId) {
         Pet pet = requireById(petId);
         if (!isSameUser(pet.getOwner(), callerUserId)) {
             throw new AppException(403, "Only the owner of a listing can change its photo");
@@ -332,7 +357,7 @@ public class PetService {
         if (previous != null) {
             images.delete(previous);
         }
-        return PetMapper.toDto(saved);
+        return saved;
     }
 
     /**
@@ -345,11 +370,11 @@ public class PetService {
      * @return that owner's listings, newest first; empty for a {@code null} or unknown id
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<PetDTO> findByOwner(Long ownerUserId) {
+    public List<Pet> findByOwner(Long ownerUserId) {
         if (ownerUserId == null) {
             return List.of();
         }
-        return pets.find(null, null, null, ownerUserId, false).stream().map(PetMapper::toDto).toList();
+        return pets.find(null, null, null, ownerUserId, false);
     }
 
     /**
@@ -406,13 +431,13 @@ public class PetService {
      * a listing that could be created but not re-saved unchanged would be the result.
      */
     private void applyForm(PetForm form, Pet pet) {
-        String name = trimToNull(form.getName());
+        String name = trimToNull(form.name());
         if (name == null || name.length() > NAME_MAX) {
             throw new ValidationException("name", "NAME_INVALID",
                     "A name is required, of at most " + NAME_MAX + " characters");
         }
 
-        String breed = trimToNull(form.getBreed());
+        String breed = trimToNull(form.breed());
         // Not in the task file's list, but breed is VARCHAR(100): without this bound an over-long
         // value fails at the INSERT as a 500 the caller cannot act on. Same reasoning as T-13's
         // phone bound.
@@ -421,30 +446,30 @@ public class PetService {
                     "Breed must be at most " + BREED_MAX + " characters");
         }
 
-        Integer age = form.getAge();
+        Integer age = form.age();
         if (age != null && (age < AGE_MIN || age > AGE_MAX)) {
             throw new ValidationException("age", "AGE_OUT_OF_RANGE",
                     "Age must be between " + AGE_MIN + " and " + AGE_MAX + " years");
         }
 
-        String shortDesc = trimToNull(form.getShortDesc());
+        String shortDesc = trimToNull(form.shortDesc());
         if (shortDesc != null && shortDesc.length() > SHORT_DESC_MAX) {
             throw new ValidationException("shortDesc", "SHORT_DESC_TOO_LONG",
                     "The short description must be at most " + SHORT_DESC_MAX + " characters");
         }
 
-        Pet.PetSize size = parseEnum(Pet.PetSize.class, form.getSize(), "size",
+        Pet.PetSize size = parseEnum(Pet.PetSize.class, form.size(), "size",
                 "SMALL, MEDIUM or LARGE");
-        Pet.PetGender gender = parseEnum(Pet.PetGender.class, form.getGender(), "gender",
+        Pet.PetGender gender = parseEnum(Pet.PetGender.class, form.gender(), "gender",
                 "MALE or FEMALE");
 
-        if (form.getCategoryId() == null) {
+        if (form.categoryId() == null) {
             throw new ValidationException("categoryId", "CATEGORY_REQUIRED",
                     "A category is required");
         }
         // Specification §5: every posted pet must belong to a predefined category. Resolving it
         // through CategoryService means an unknown id is a 404 here, not a foreign-key 500 later.
-        Category category = categories.requireById(form.getCategoryId());
+        Category category = categories.requireById(form.categoryId());
 
         pet.setPetName(name);
         pet.setBreed(breed);
@@ -452,7 +477,7 @@ public class PetService {
         pet.setSize(size);
         pet.setGender(gender);
         pet.setShortDesc(shortDesc);
-        pet.setLongDesc(trimToNull(form.getLongDesc()));
+        pet.setLongDesc(trimToNull(form.longDesc()));
         pet.setCategory(category);
     }
 

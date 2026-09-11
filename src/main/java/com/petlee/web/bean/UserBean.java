@@ -1,8 +1,7 @@
 package com.petlee.web.bean;
 
-import com.petlee.dto.RegisterForm;
-import com.petlee.dto.UserDTO;
 import com.petlee.exception.PetLeeException;
+import com.petlee.model.User;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.SessionUser;
 import com.petlee.service.UserService;
@@ -19,11 +18,13 @@ import java.io.Serializable;
 /**
  * Who is signed in, and the three actions that change that — {@code #{userBean}}.
  *
- * <h2>What it holds, and what it refuses to hold</h2>
- * A {@link UserDTO}, which by construction has no password field. The form-backing password
- * properties exist for the length of one submission and are cleared in a {@code finally} whether
- * the attempt succeeded or not, so a password never sits in a session for the thirty minutes the
- * session lasts.
+ * <h2>What it holds, and what it must never render</h2>
+ * A {@link User} entity — the JSF tier binds to entities, not records, because Jakarta EL resolves
+ * properties through {@code Introspector} and a record's accessors do not match. That entity
+ * carries a password digest; no view may ever write {@code #{userBean.currentUser.password}}. The
+ * form-backing password properties on this bean are a different thing — they exist for the length
+ * of one submission and are cleared in a {@code finally} whether the attempt succeeded or not, so a
+ * password never sits in a session for the thirty minutes the session lasts.
  *
  * <h2>Where the session actually lives</h2>
  * This bean is {@code @SessionScoped} so the browser keeps its user across requests, but the
@@ -60,7 +61,7 @@ public class UserBean implements Serializable {
     private UserService userService;
 
     /** The signed-in user, or {@code null}. The only long-lived state in this bean. */
-    private UserDTO currentUser;
+    private User currentUser;
 
     // Form backing. Populated by one submission and, for the passwords, cleared by its finally.
     private String username;
@@ -80,7 +81,7 @@ public class UserBean implements Serializable {
      */
     public String login() {
         try {
-            UserDTO user = userService.authenticate(trimmed(username), password);
+            User user = userService.authenticate(trimmed(username), password);
 
             HttpServletRequest request = (HttpServletRequest) FacesContext.getCurrentInstance()
                     .getExternalContext().getRequest();
@@ -113,15 +114,8 @@ public class UserBean implements Serializable {
                 return null;
             }
 
-            RegisterForm form = new RegisterForm();
-            form.setUsername(trimmed(username));
-            form.setPassword(password);
-            form.setFullName(trimmed(fullName));
-            form.setEmail(trimmed(email));
-            form.setPhone(trimmed(phone));
-            form.setRegion(trimmed(region));
-
-            userService.register(form);
+            userService.register(trimmed(username), password, trimmed(fullName),
+                    trimmed(email), trimmed(phone), trimmed(region));
 
             info("Your account has been created. Please log in.");
             return keepingMessages(LOGIN);
@@ -172,7 +166,7 @@ public class UserBean implements Serializable {
      * @return whether the signed-in user's role is {@code ADMIN}
      */
     public boolean isAdmin() {
-        return currentUser != null && "ADMIN".equals(currentUser.getRole());
+        return currentUser != null && currentUser.isAdmin();
     }
 
     /** @return the user's full name for the navigation bar, or {@code null} when signed out */
@@ -182,11 +176,15 @@ public class UserBean implements Serializable {
 
     /** @return the signed-in user's id, or {@code null} */
     public Long getCurrentUserId() {
-        return currentUser == null ? null : currentUser.getId();
+        return currentUser == null ? null : currentUser.getUserId();
     }
 
-    /** @return the signed-in user, or {@code null}. Never carries a password — {@link UserDTO} has none. */
-    public UserDTO getCurrentUser() {
+    /**
+     * @return the signed-in user, or {@code null}.
+     *         <p><strong>Carries a password digest.</strong> No view may bind
+     *         {@code #{userBean.currentUser.password}}; every other field is safe to render.
+     */
+    public User getCurrentUser() {
         return currentUser;
     }
 

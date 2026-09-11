@@ -7,6 +7,7 @@ import com.petlee.model.Pet;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
 import com.petlee.rest.security.SessionUser;
+import com.petlee.service.AppException;
 import com.petlee.service.PetService;
 
 import jakarta.enterprise.context.RequestScoped;
@@ -28,6 +29,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * {@code /api/pets} — the five endpoints at the centre of {@code api-contract.md}, plus
@@ -35,10 +37,18 @@ import java.util.List;
  * contract has no equivalent of.
  *
  * <h2>No rule is decided here</h2>
- * Ownership, the privacy of contact details, the category check, the optimistic-lock conflict:
- * all of them are {@code PetService}'s, and every status other than 200/204 arrives through T-19
- * from an exception it threw. What this class does is decide <em>who is asking</em> — from the
- * session, never from the body — and turn three query strings into typed values.
+ * Ownership, the category check, the optimistic-lock conflict: all of them are
+ * {@code PetService}'s, and every status other than 200/204 arrives through T-19 from an exception
+ * it threw. What this class does is decide <em>who is asking</em> — from the session, never from
+ * the body — turn three query strings into typed values, and map the entity {@code PetService}
+ * hands back onto the record the wire carries.
+ *
+ * <h2>The contact-gating rule lives here now</h2>
+ * {@code PetService.findDetail} returns the full entity, owner attached, unconditionally.
+ * {@link #findDetail(Long)} is what decides whether the caller is allowed to see the owner's
+ * contact details — specification §6 — by passing {@code CurrentUser.from(request).isPresent()}
+ * into {@link PetDetailDTO#of(Pet, boolean)}. The JSF tier makes the same decision independently,
+ * in {@code PetDetailBean}, because a record cannot be bound into a Facelets view.
  *
  * <h2>Where the caller comes from</h2>
  * The session, in every case. {@link PetForm} has no owner field and must not gain one:
@@ -78,9 +88,6 @@ public class PetResource {
      * <em>"Response 200 (List&lt;PetDTO&gt; — gallery view, main image only, newest first)"</em>.
      * An empty catalogue is 200 and {@code []}.
      *
-     * <p>The three parameters are taken as strings and converted by {@link RestParams} rather than
-     * declared as {@code Integer} and enum types; that class says why.
-     *
      * @param categoryId the category to restrict to, or absent for all
      * @param size       {@code SMALL}, {@code MEDIUM} or {@code LARGE}, or absent
      * @param gender     {@code MALE} or {@code FEMALE}, or absent
@@ -88,12 +95,11 @@ public class PetResource {
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<PetDTO> findGallery(@QueryParam("categoryId") String categoryId,
+    public List<PetDTO> findGallery(@QueryParam("categoryId") Integer categoryId,
                                     @QueryParam("size") String size,
                                     @QueryParam("gender") String gender) {
-        return pets.findGallery(RestParams.categoryId(categoryId),
-                RestParams.enumValue(Pet.PetSize.class, size, "size"),
-                RestParams.enumValue(Pet.PetGender.class, gender, "gender"));
+        return pets.findGallery(categoryId, parseSize(size), parseGender(gender))
+                .stream().map(PetDTO::of).toList();
     }
 
     /**
@@ -102,10 +108,9 @@ public class PetResource {
      * <p>The contract's footnote is the whole point of this method:
      * <em>"*Owner contact fields are filled ONLY if the caller is logged in; otherwise null."</em>
      * So it carries no {@code @Secured} — a guest is allowed through, and only the content changes
-     * — and the single argument that changes it is
-     * {@link CurrentUser#userIdOrNull(HttpServletRequest)}: {@code null} for a guest, an id for a
-     * logged-in caller. {@code PetService.findDetail} decides what that means, which is
-     * specification §6's privacy rule in one place rather than in every caller.
+     * — and the single argument that changes it is whether {@link CurrentUser#from(HttpServletRequest)}
+     * finds a session. {@link PetDetailDTO#of(Pet, boolean)} decides what that means, which is
+     * specification §6's privacy rule for this tier.
      *
      * @param id the pet id
      * @return the pet in full, with owner contact details only for a logged-in caller
@@ -114,7 +119,7 @@ public class PetResource {
     @Path("{id: \\d+}")
     @Produces(MediaType.APPLICATION_JSON)
     public PetDetailDTO findDetail(@PathParam("id") Long id) {
-        return pets.findDetail(id, CurrentUser.userIdOrNull(request));
+        return PetDetailDTO.of(pets.findDetail(id), CurrentUser.from(request).isPresent());
     }
 
     /**
@@ -141,7 +146,7 @@ public class PetResource {
     @Secured
     @Produces(MediaType.APPLICATION_JSON)
     public List<PetDTO> findMine() {
-        return pets.findByOwner(caller().getUserId());
+        return pets.findByOwner(caller().getUserId()).stream().map(PetDTO::of).toList();
     }
 
     /**
@@ -157,7 +162,7 @@ public class PetResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO create(PetForm form) {
-        return pets.create(form, caller().getUserId());
+        return PetDTO.of(pets.create(form, caller().getUserId()));
     }
 
     /**
@@ -177,7 +182,7 @@ public class PetResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO update(@PathParam("id") Long id, PetForm form) {
-        return pets.update(id, form, caller().getUserId());
+        return PetDTO.of(pets.update(id, form, caller().getUserId()));
     }
 
     /**
@@ -189,7 +194,7 @@ public class PetResource {
      *
      * @param id   the pet to attach the photo to
      * @param file the uploaded file
-     * @return the pet, with its new {@code mainImageUrl}
+     * @return the pet, with its new {@code imageUrl}
      */
     @POST
     @Path("{id: \\d+}/image")
@@ -198,7 +203,7 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO uploadImage(@PathParam("id") Long id,
                               @FormParam("file") Part file) {
-        return pets.attachImage(id, file, caller().getUserId());
+        return PetDTO.of(pets.attachImage(id, file, caller().getUserId()));
     }
 
     /**
@@ -232,5 +237,48 @@ public class PetResource {
     private SessionUser caller() {
         return CurrentUser.from(request).orElseThrow(() -> new IllegalStateException(
                 "no session on a @Secured endpoint; the annotation is missing or the filter is not bound"));
+    }
+
+    /**
+     * The two query-parameter conversions this class and {@link AdminResource} share.
+     *
+     * <h2>Why not {@code @QueryParam("size") Pet.PetSize}</h2>
+     * Jakarta REST answers a conversion failure on a {@code @QueryParam} with <strong>404</strong>,
+     * which for {@code ?size=HUGE} would say the collection does not exist — the caller would look
+     * for a routing problem and never find the typo. Converting by hand makes it a 400 that names
+     * the field and lists the values. Package-private so {@link AdminResource} — the only other
+     * caller — can reuse them rather than duplicating the parse.
+     */
+    static Pet.PetSize parseSize(String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        try {
+            return Pet.PetSize.valueOf(trimmed.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            throw new AppException(400, "size must be one of SMALL, MEDIUM, LARGE");
+        }
+    }
+
+    static Pet.PetGender parseGender(String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        try {
+            return Pet.PetGender.valueOf(trimmed.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            throw new AppException(400, "gender must be one of MALE, FEMALE");
+        }
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        // An absent parameter and "?size=" mean the same thing: no restriction.
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

@@ -1,8 +1,8 @@
 package com.petlee.web.bean;
 
-import com.petlee.dto.PetDetailDTO;
 import com.petlee.exception.NotFoundException;
 import com.petlee.exception.PetLeeException;
+import com.petlee.model.Pet;
 import com.petlee.service.PetService;
 
 import jakarta.faces.application.FacesMessage;
@@ -22,11 +22,15 @@ import java.io.Serializable;
  * The id arrives as a view parameter and {@link #load()} runs as an {@code <f:viewAction>}.
  * Fetching in a getter instead would call the service once per EL evaluation on the page.
  *
- * <h2>Contact details are the server's decision</h2>
- * This bean never redacts anything. {@link PetService#findDetail(Long, Long)} returns
- * {@code ownerFullName}, {@code ownerEmail} and {@code ownerPhone} as {@code null} for a guest
- * caller — specification §6's privacy rule. The page's {@code rendered} check is a second layer on
- * top of that, not a substitute for it.
+ * <h2>Contact details are gated here, not by the service</h2>
+ * {@link PetService#findDetail(Long)} now returns the full entity, owner attached,
+ * unconditionally — it has to, because {@code Pet} has one shape and cannot answer differently for
+ * a guest and a member. {@link #isContactVisible()} is this tier's own copy of specification §6's
+ * rule, delegating to {@link UserBean#isLoggedIn()}; {@code petDetails.xhtml} wraps the contact
+ * block in {@code rendered="#{petDetailBean.contactVisible}"}. The REST side makes the identical
+ * decision independently, in {@code PetDetailDTO.of(Pet, boolean)} — the two cannot share one
+ * method because a record and an entity are different types, so both must gate or a guest on one
+ * tier sees what a guest on the other cannot.
  */
 @Named("petDetailBean")
 @ViewScoped
@@ -40,7 +44,7 @@ public class PetDetailBean implements Serializable {
     @Inject private UserBean userBean;
 
     private Long petId;
-    private PetDetailDTO pet;
+    private Pet pet;
 
     /**
      * Fetches the listing, or sends the visitor to the not-found page.
@@ -57,7 +61,7 @@ public class PetDetailBean implements Serializable {
             return notFound();
         }
         try {
-            pet = petService.findDetail(petId, userBean.getCurrentUserId());
+            pet = petService.findDetail(petId);
             return null;
 
         } catch (NotFoundException noSuchPet) {
@@ -99,16 +103,18 @@ public class PetDetailBean implements Serializable {
 
     /** @return whether the listing is no longer available, so the page can say so plainly */
     public boolean isWithdrawn() {
-        return pet != null && !"AVAILABLE".equals(pet.getStatus());
+        return pet != null && pet.getStatus() != Pet.PetStatus.AVAILABLE;
     }
 
     /**
-     * @return whether the owner's contact details are present.
-     *         <p><strong>This is the second layer, not the only one.</strong> The service has
-     *         already replaced these fields with {@code null} for a caller with no session.
+     * @return whether the owner's contact details may be shown.
+     *         <p><strong>This is the JSF tier's own gate, not a convenience.</strong> The entity
+     *         {@link #getPet()} exposes always carries its owner; nothing about the object itself
+     *         says whether the current visitor may see the owner's phone number and email address.
+     *         Specification §6 is enforced here, by delegating to {@link UserBean#isLoggedIn()}.
      */
-    public boolean isContactAvailable() {
-        return pet != null && pet.getOwnerEmail() != null;
+    public boolean isContactVisible() {
+        return userBean.isLoggedIn();
     }
 
     public Long getPetId() {
@@ -119,7 +125,7 @@ public class PetDetailBean implements Serializable {
         this.petId = petId;
     }
 
-    public PetDetailDTO getPet() {
+    public Pet getPet() {
         return pet;
     }
 }

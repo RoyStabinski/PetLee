@@ -12,9 +12,12 @@ import java.lang.annotation.Target;
  * {@code ADMIN} — specification §8's administration capabilities, used by T-34.
  *
  * <h2>It implies {@link Secured}</h2>
- * Not by meta-annotation — Jakarta REST name binding does not follow one — but because
- * {@link AuthenticationFilter} is bound to both annotations and performs the authentication check
- * before the role check. So {@code @AdminOnly} alone is enough, and a guest calling an
+ * Not by meta-annotation — Jakarta REST name binding does not follow one — and not by
+ * {@link SecurityFilter} being name-bound to both annotations either, which would only fire for a
+ * resource carrying <em>both</em> (name binding is an AND, not an OR; see that class's javadoc).
+ * Instead {@code SecurityFilter} carries no binding at all: it runs for every request and reads
+ * {@code @AdminOnly}'s presence with reflection, treating it as requiring authentication in the
+ * same step as the role check. So {@code @AdminOnly} alone is enough, and a guest calling an
  * {@code @AdminOnly} endpoint gets <strong>401</strong>, not 403: "who are you" is answered before
  * "are you allowed", and answering them in the other order would tell an anonymous caller which
  * endpoints exist for administrators.

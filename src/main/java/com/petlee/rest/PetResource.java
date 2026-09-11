@@ -146,7 +146,7 @@ public class PetResource {
     @Secured
     @Produces(MediaType.APPLICATION_JSON)
     public List<PetDTO> findMine() {
-        return pets.findByOwner(caller().getUserId()).stream().map(PetDTO::of).toList();
+        return pets.findByOwner(caller().userId()).stream().map(PetDTO::of).toList();
     }
 
     /**
@@ -162,7 +162,7 @@ public class PetResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO create(PetForm form) {
-        return PetDTO.of(pets.create(form, caller().getUserId()));
+        return PetDTO.of(pets.create(form, caller().userId()));
     }
 
     /**
@@ -182,7 +182,7 @@ public class PetResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO update(@PathParam("id") Long id, PetForm form) {
-        return PetDTO.of(pets.update(id, form, caller().getUserId()));
+        return PetDTO.of(pets.update(id, form, caller().userId()));
     }
 
     /**
@@ -203,7 +203,7 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO uploadImage(@PathParam("id") Long id,
                               @FormParam("file") Part file) {
-        return PetDTO.of(pets.attachImage(id, file, caller().getUserId()));
+        return PetDTO.of(pets.attachImage(id, file, caller().userId()));
     }
 
     /**
@@ -225,7 +225,7 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response delete(@PathParam("id") Long id) {
         SessionUser caller = caller();
-        pets.delete(id, caller.getUserId(), caller.isAdmin());
+        pets.delete(id, caller.userId(), caller.admin());
         return Response.noContent().build();
     }
 

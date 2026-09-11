@@ -20,8 +20,9 @@ import java.lang.annotation.Target;
  *
  * <p>A method that is missing it is not protected by anything else. There is no servlet filter
  * behind this one and no security constraint in {@code web.xml}; the presence of the annotation
- * <em>is</em> the protection, because {@link AuthenticationFilter} is bound to it by name and runs
- * for nothing else.
+ * <em>is</em> the protection — {@link SecurityFilter} runs for every request and checks for this
+ * annotation (and {@link AdminOnly}) itself, by reflection, rather than relying on Jakarta REST
+ * name binding to select it.
  *
  * <h2>What it does not mark</h2>
  * Endpoints that are open but session-sensitive — {@code GET /api/pets/{id}}, marked {@code open*}

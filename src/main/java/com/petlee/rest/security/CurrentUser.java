@@ -89,7 +89,7 @@ public final class CurrentUser {
      * @return the logged-in user's id, or {@code null} for a guest
      */
     public static Long userIdOrNull(HttpServletRequest request) {
-        return from(request).map(SessionUser::getUserId).orElse(null);
+        return from(request).map(SessionUser::userId).orElse(null);
     }
 
     /**
@@ -138,7 +138,7 @@ public final class CurrentUser {
 
         session.setAttribute(SESSION_ATTRIBUTE, user);
 
-        LOGGER.log(Level.FINE, () -> "Session established for " + user.getUsername());
+        LOGGER.log(Level.FINE, () -> "Session established for " + user.username());
     }
 
     /**

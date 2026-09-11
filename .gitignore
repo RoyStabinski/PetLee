@@ -42,3 +42,5 @@ build/
 /uploads/
 # Server and application logs
 *.log
+
+.idea/

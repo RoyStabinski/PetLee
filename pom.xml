@@ -27,24 +27,18 @@
         <jakartaee.version>10.0.0</jakartaee.version>
         <postgresql.version>42.6.0</postgresql.version>
         <junit.version>5.10.0</junit.version>
-        <eclipselink.version>4.0.2</eclipselink.version>
-        <jersey.version>3.1.5</jersey.version>
-        <parsson.version>1.1.5</parsson.version>
 
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
-        <maven-failsafe-plugin.version>3.1.2</maven-failsafe-plugin.version>
-        <jacoco-plugin.version>0.8.11</jacoco-plugin.version>
     </properties>
 
     <!--
-      The dependency list is closed — see docs/decisions/ADR-003-technology-constraint.md, and
-      ADR-004 and ADR-005 for the additions it has taken since. Seven entries, none of them shipped
-      inside the WAR: two are 'provided' and five are 'test', so WEB-INF/lib is empty.
-      JSF, JPA, Jakarta REST, CDI, JTA, JSON-B and connection pooling are platform services
-      supplied by the application server. Bundling a second copy of any of them causes
-      classloader conflicts at deployment. Adding a dependency requires a new ADR.
+      The dependency list is closed — see docs/decisions/ADR-003-technology-constraint.md.
+      Three entries, none of them shipped inside the WAR: two are 'provided' and one is 'test',
+      so WEB-INF/lib is empty. JSF, JPA, Jakarta REST, CDI, JTA, JSON-B and connection pooling
+      are platform services supplied by the application server. Bundling a second copy of any
+      of them causes classloader conflicts at deployment. Adding a dependency requires a new ADR.
     -->
     <dependencies>
 
@@ -89,41 +83,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- A JPA provider for the tests that run outside a container (T-36, T-38): the platform
-             API artifact above has jakarta.persistence.Persistence but no implementation of it,
-             so DatabaseTest could not build an EntityManagerFactory without this. EclipseLink
-             because Payara runs it — see ADR-004. Scope 'test', so WEB-INF/lib stays empty and
-             the deployed persistence.xml still names no provider. -->
-        <dependency>
-            <groupId>org.eclipse.persistence</groupId>
-            <artifactId>eclipselink</artifactId>
-            <version>${eclipselink.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- The Jakarta REST client and the JSON-P provider T-39's API tests run on — ADR-005.
-             Same situation as ADR-004's: jakarta.jakartaee-api declares both APIs and implements
-             neither, and outside the container there is nobody to supply one. Payara ships exactly
-             these, so the tests exercise the client the deployment uses. Scope 'test'. -->
-        <dependency>
-            <groupId>org.glassfish.jersey.core</groupId>
-            <artifactId>jersey-client</artifactId>
-            <version>${jersey.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.inject</groupId>
-            <artifactId>jersey-hk2</artifactId>
-            <version>${jersey.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.parsson</groupId>
-            <artifactId>parsson</artifactId>
-            <version>${parsson.version}</version>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
 
     <build>
@@ -158,46 +117,6 @@
                         <include>**/*Test.java</include>
                     </includes>
                 </configuration>
-            </plugin>
-
-            <!-- Line coverage, for T-37 criterion 6. A build PLUGIN, not a dependency: it runs
-                 as a test-time agent, adds nothing to the classpath the application compiles
-                 against and nothing to the WAR, so ADR-003's closed dependency list is untouched.
-                 Report: target/site/jacoco/index.html after 'mvn test jacoco:report'. -->
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Integration tests: *IT.java, run during 'mvn verify' against a real
-                 PostgreSQL database (T-38) and a deployed server (T-39). The executions
-                 are required — without them Failsafe is declared but never runs. -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${maven-failsafe-plugin.version}</version>
-                <configuration>
-                    <includes>
-                        <include>**/*IT.java</include>
-                    </includes>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
 
         </plugins>

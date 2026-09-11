@@ -3,19 +3,15 @@ package com.petlee.mapper;
 import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
-import com.petlee.dto.PetImageDTO;
 import com.petlee.model.Pet;
-import com.petlee.model.PetImage;
 import com.petlee.model.User;
-
-import java.util.List;
 
 /**
  * {@link Pet} to its two wire shapes.
  *
  * <p>These methods read an already-fetched graph and nothing else: no {@code EntityManager}, no
- * lazy loading. T-08's queries fetch the category, owner and images they need, so if something is
- * missing here the fix belongs in the repository query.
+ * lazy loading. T-08's queries fetch the category and owner they need, so if something is missing
+ * here the fix belongs in the repository query.
  */
 public final class PetMapper {
 
@@ -27,7 +23,7 @@ public final class PetMapper {
      *
      * @param pet the pet, may be {@code null}
      * @return the DTO, or {@code null} for a {@code null} argument. {@code mainImageUrl} is
-     *         {@code null} when the pet has no image flagged main.
+     *         {@code null} when the pet has no photograph.
      */
     public static PetDTO toDto(Pet pet) {
         if (pet == null) {
@@ -42,7 +38,7 @@ public final class PetMapper {
         dto.setGender(name(pet.getGender()));
         dto.setStatus(name(pet.getStatus()));
         dto.setCategoryName(pet.getCategory() == null ? null : pet.getCategory().getCategoryName());
-        dto.setMainImageUrl(mainImageUrl(pet));
+        dto.setMainImageUrl(pet.getImageUrl());
         return dto;
     }
 
@@ -66,7 +62,7 @@ public final class PetMapper {
         dto.setGender(name(pet.getGender()));
         dto.setStatus(name(pet.getStatus()));
         dto.setCategoryName(pet.getCategory() == null ? null : pet.getCategory().getCategoryName());
-        dto.setMainImageUrl(mainImageUrl(pet));
+        dto.setMainImageUrl(pet.getImageUrl());
         dto.setOwnerName(pet.getOwner() == null ? null : pet.getOwner().getFullName());
         dto.setCreatedAt(pet.getCreatedAt() == null ? null : pet.getCreatedAt().toString());
         return dto;
@@ -99,7 +95,7 @@ public final class PetMapper {
         dto.setLongDesc(pet.getLongDesc());
         dto.setStatus(name(pet.getStatus()));
         dto.setCategoryName(pet.getCategory() == null ? null : pet.getCategory().getCategoryName());
-        dto.setImages(toImageDtos(pet.getImages()));
+        dto.setImageUrl(pet.getImageUrl());
 
         User owner = pet.getOwner();
         if (includeContact && owner != null) {
@@ -108,39 +104,6 @@ public final class PetMapper {
             dto.setOwnerPhone(owner.getPhoneNumber());
         }
         return dto;
-    }
-
-    /**
-     * @param image the image, may be {@code null}
-     * @return the DTO, or {@code null} for a {@code null} argument
-     */
-    public static PetImageDTO toImageDto(PetImage image) {
-        if (image == null) {
-            return null;
-        }
-        PetImageDTO dto = new PetImageDTO();
-        dto.setId(image.getImageId());
-        dto.setImageUrl(image.getImageUrl());
-        dto.setIsMain(Boolean.TRUE.equals(image.getIsMain()));
-        return dto;
-    }
-
-    private static List<PetImageDTO> toImageDtos(List<PetImage> images) {
-        if (images == null) {
-            return List.of();
-        }
-        return images.stream().map(PetMapper::toImageDto).toList();
-    }
-
-    private static String mainImageUrl(Pet pet) {
-        if (pet.getImages() == null) {
-            return null;
-        }
-        return pet.getImages().stream()
-                .filter(i -> Boolean.TRUE.equals(i.getIsMain()))
-                .map(PetImage::getImageUrl)
-                .findFirst()
-                .orElse(null);
     }
 
     private static String name(Enum<?> value) {

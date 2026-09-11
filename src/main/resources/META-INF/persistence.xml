@@ -42,7 +42,6 @@
         <class>com.petlee.model.User</class>
         <class>com.petlee.model.Category</class>
         <class>com.petlee.model.Pet</class>
-        <class>com.petlee.model.PetImage</class>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
 
         <properties>

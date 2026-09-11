@@ -7,8 +7,8 @@ import com.petlee.dto.PetForm;
 import com.petlee.exception.ConflictException;
 import com.petlee.exception.NotFoundException;
 import com.petlee.exception.PetLeeException;
+import com.petlee.service.AppException;
 import com.petlee.service.CategoryService;
-import com.petlee.service.ImageStorageService;
 import com.petlee.service.PetService;
 
 import jakarta.annotation.PostConstruct;
@@ -23,7 +23,6 @@ import jakarta.servlet.http.Part;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,7 +34,7 @@ import java.util.List;
  *
  * <h2>Two calls that cannot be one transaction</h2>
  * Creating a listing with a photograph is {@link PetService#create} followed by
- * {@link ImageStorageService#store}. The interesting case is the one in the middle:
+ * {@link PetService#attachImage}. The interesting case is the one in the middle:
  * <strong>the pet was created and the photograph was not</strong>. {@link #save()} does not
  * pretend either that everything worked or that nothing did. It says what happened and lands the
  * user on their dashboard, where the listing is waiting and the photograph can be added again.
@@ -59,7 +58,6 @@ public class PetFormBean implements Serializable {
 
     @Inject private transient PetService petService;
     @Inject private transient CategoryService categoryService;
-    @Inject private transient ImageStorageService imageStorageService;
 
     /** Not {@code transient}: see {@link UserBean}'s own field for why. */
     @Inject
@@ -144,12 +142,10 @@ public class PetFormBean implements Serializable {
         }
 
         try {
-            imageStorageService.store(created.getId(), uploadedFile.getInputStream(),
-                    uploadedFile.getSubmittedFileName(), uploadedFile.getContentType(),
-                    uploadedFile.getSize(), true, userBean.getCurrentUserId());
+            petService.attachImage(created.getId(), uploadedFile, userBean.getCurrentUserId());
             return done("Your listing and its photograph have been added.");
 
-        } catch (PetLeeException | IOException | UncheckedIOException photographFailed) {
+        } catch (PetLeeException | AppException photographFailed) {
             // The listing exists. Saying "that failed" would be a lie the user would act on by
             // filling the whole form in again, and creating a duplicate. Saying "that worked"
             // would leave them wondering where the photograph went. So: what worked, what did
@@ -232,8 +228,14 @@ public class PetFormBean implements Serializable {
                 .orElse(null);
     }
 
-    private static String reasonOf(Exception failure) {
-        return failure instanceof PetLeeException business ? business.getMessage() : "";
+    private static String reasonOf(RuntimeException failure) {
+        if (failure instanceof PetLeeException business) {
+            return business.getMessage();
+        }
+        if (failure instanceof AppException business) {
+            return business.getMessage();
+        }
+        return "";
     }
 
     private String fail(int status) {

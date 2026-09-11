@@ -2,8 +2,6 @@ package com.petlee.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "pet")
@@ -61,8 +59,8 @@ public class Pet {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<PetImage> images = new ArrayList<>();
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
 
     // updatable = false: specification §11 orders the gallery newest-first on created_at, so an
     // edit must never silently reorder listings. ADR-002 #4.
@@ -177,12 +175,12 @@ public class Pet {
         this.owner = owner;
     }
 
-    public List<PetImage> getImages(){
-        return images;
+    public String getImageUrl(){
+        return imageUrl;
     }
 
-    public void setImages(List<PetImage> images){
-        this.images = images;
+    public void setImageUrl(String imageUrl){
+        this.imageUrl = imageUrl;
     }
 
     public LocalDateTime getCreatedAt(){

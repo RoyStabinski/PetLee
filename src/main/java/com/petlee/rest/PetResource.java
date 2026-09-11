@@ -13,8 +13,10 @@ import com.petlee.service.PetService;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -179,6 +181,27 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO update(@PathParam("id") Long id, PetForm form) {
         return pets.update(id, form, caller().getUserId());
+    }
+
+    /**
+     * {@code POST /api/pets/{id}/image} — auth + owner.
+     *
+     * <p>Deviates from {@code api-contract.md}, which names this endpoint with a plural path and
+     * has it answer with a per-image DTO. There is one photo per pet now, so neither means
+     * anything; this answers with the updated {@link PetDTO} instead. Recorded in ADR-002.
+     *
+     * @param id   the pet to attach the photo to
+     * @param file the uploaded file
+     * @return the pet, with its new {@code mainImageUrl}
+     */
+    @POST
+    @Path("{id: \\d+}/image")
+    @Secured
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public PetDTO uploadImage(@PathParam("id") Long id,
+                              @FormParam("file") Part file) {
+        return pets.attachImage(id, file, caller().getUserId());
     }
 
     /**

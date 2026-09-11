@@ -1,6 +1,5 @@
 package com.petlee.service;
 
-import com.petlee.config.StorageConfig;
 import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
@@ -13,7 +12,6 @@ import com.petlee.exception.ValidationException;
 import com.petlee.mapper.PetMapper;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
-import com.petlee.model.PetImage;
 import com.petlee.model.User;
 import com.petlee.repository.PetFilter;
 import com.petlee.repository.PetRepository;
@@ -22,11 +20,11 @@ import com.petlee.repository.UserRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.OptimisticLockException;
+import jakarta.servlet.http.Part;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -67,10 +65,10 @@ public class PetService {
     private CategoryService categories;
 
     /**
-     * Only for the files behind a deleted listing. The rows cascade in the database; the
-     * photographs on disk do not, and nothing else in this class touches storage.
+     * Stores and removes the single photograph a pet may carry. Used both by
+     * {@link #attachImage} and, for cleanup, by {@link #delete}.
      */
-    private StorageConfig storage;
+    private ImageStore images;
 
     /** For CDI only — an {@code @ApplicationScoped} proxy needs a no-argument constructor. */
     protected PetService() {
@@ -78,11 +76,11 @@ public class PetService {
 
     @Inject
     public PetService(PetRepository pets, UserRepository users, CategoryService categories,
-                      StorageConfig storage) {
+                      ImageStore images) {
         this.pets = pets;
         this.users = users;
         this.categories = categories;
-        this.storage = storage;
+        this.images = images;
     }
 
     /**
@@ -290,23 +288,47 @@ public class PetService {
                     "Only the owner of a listing, or an administrator, can remove it");
         }
 
-        // Collected before the row goes, because after it the collection is gone with it.
-        List<String> photographs = pet.getImages() == null ? List.of()
-                : pet.getImages().stream().map(PetImage::getImageUrl).filter(Objects::nonNull).toList();
+        // Read before the row goes, because after it the pet is gone with it.
+        String photograph = pet.getImageUrl();
 
         pets.delete(pet);
 
-        // The database cascade takes the rows (T-03, T-09); nothing took the files. Until T-32
-        // criterion 6 went looking, every deleted listing left its photographs on disk - and
-        // ImageServlet went on serving them by public URL to anyone who had seen one. Deleting a
-        // withdrawn listing has to mean the photographs are gone, not merely unlisted.
-        //
-        // Last, and quietly: a file that will not delete is a smaller problem than a listing that
-        // will not delete, and storage.deleteStored logs loudly enough to be found.
-        photographs.forEach(storage::deleteStored);
+        // The database cascade takes the row; nothing took the file. Deleting a withdrawn
+        // listing has to mean its photograph is gone, not merely unlisted.
+        images.delete(photograph);
 
         LOGGER.log(Level.INFO, () -> "User " + callerUserId + (callerIsAdmin ? " (admin)" : "")
-                + " deleted pet " + petId + " and its " + photographs.size() + " photograph(s)");
+                + " deleted pet " + petId);
+    }
+
+    /**
+     * Replaces a listing's photograph — {@code POST /api/pets/{id}/image}.
+     *
+     * <p>Deviates from {@code api-contract.md}'s {@code POST /api/pets/{id}/images}: a pet now
+     * carries one photograph, not a gallery, so there is nothing left to be "main" among. The
+     * previous file, if there was one, is deleted only after the new one is safely attached — so
+     * a failed upload never loses a listing's existing photograph.
+     *
+     * @param petId        the pet's id
+     * @param file         the uploaded file
+     * @param callerUserId the session user's id
+     * @return the pet, with its new photograph
+     * @throws NotFoundException  <strong>404</strong> — no pet has that id
+     * @throws AppException <strong>403</strong> — only the owner of a listing may change its photo
+     */
+    @Transactional
+    public PetDTO attachImage(Long petId, Part file, Long callerUserId) {
+        Pet pet = requireById(petId);
+        if (!isSameUser(pet.getOwner(), callerUserId)) {
+            throw new AppException(403, "Only the owner of a listing can change its photo");
+        }
+        String previous = pet.getImageUrl();
+        pet.setImageUrl(images.store(file));
+        Pet saved = pets.save(pet);
+        if (previous != null) {
+            images.delete(previous);
+        }
+        return PetMapper.toDto(saved);
     }
 
     /**
@@ -349,13 +371,12 @@ public class PetService {
     }
 
     /**
-     * The pet as a <strong>managed entity</strong>, with its category, owner and images loaded, or
-     * a 404.
+     * The pet as a <strong>managed entity</strong>, with its category and owner loaded, or a 404.
      *
      * <p>Every method here that names a pet by id goes through it, so "unknown id is a 404" is
-     * written once. T-16 also calls it, to attach a {@link com.petlee.model.PetImage} to the pet
-     * it has just authorised — an image needs the entity, not a DTO, and routing T-16 through this
-     * method keeps it out of {@link PetRepository} and out of a second copy of the 404 rule.
+     * written once. {@link #attachImage} also calls it, to set the entity's photograph after
+     * authorising the caller — routing it through this method keeps the 404 rule from being
+     * duplicated in {@link PetRepository}.
      *
      * <p>Like {@code CategoryService.requireById}, it is <strong>package-private</strong>, and the
      * visibility is the enforcement: REST resources are not in {@code com.petlee.service}, so no

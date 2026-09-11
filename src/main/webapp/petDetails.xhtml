@@ -25,39 +25,10 @@
             <div class="detail">
 
                 <div>
-                    <h:panelGroup id="mainImageBox" layout="block" styleClass="detail-media">
-                        <ui:fragment rendered="#{not empty petDetailBean.selectedImage}">
-                            <h:graphicImage value="#{petDetailBean.selectedImage.imageUrl}"
-                                            alt="#{petDetailBean.pet.name}"/>
-                        </ui:fragment>
-                        <ui:fragment rendered="#{empty petDetailBean.selectedImage}">
-                            <h:graphicImage value="/resources/images/placeholder-pet.png"
-                                            alt="#{msg['pet.image.none']}"/>
-                        </ui:fragment>
+                    <h:panelGroup layout="block" styleClass="detail-media">
+                        <h:graphicImage value="#{petDetailBean.imageUrl}"
+                                        alt="#{petDetailBean.pet.name}"/>
                     </h:panelGroup>
-
-                    <!--
-                        A thumbnail strip only when there is more than one photograph: a strip of
-                        one is a row of nothing useful. Each thumbnail is an AJAX action that
-                        re-renders the frame above - plain JSF, no image-gallery library, and it
-                        degrades to a full postback with JavaScript switched off.
-                    -->
-                    <ui:fragment rendered="#{petDetailBean.hasThumbnails}">
-                        <h3>#{msg['pet.photographs']}</h3>
-                        <h:form id="thumbForm">
-                            <ul class="thumbs">
-                                <ui:repeat id="thumbs" value="#{petDetailBean.images}" var="image" varStatus="row">
-                                    <li>
-                                        <h:commandLink id="thumb" action="#{petDetailBean.select(row.index)}">
-                                            <f:ajax render=":mainImageBox"/>
-                                            <h:graphicImage value="#{image.imageUrl}"
-                                                            alt="#{petDetailBean.pet.name}"/>
-                                        </h:commandLink>
-                                    </li>
-                                </ui:repeat>
-                            </ul>
-                        </h:form>
-                    </ui:fragment>
                 </div>
 
                 <div>

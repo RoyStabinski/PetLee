@@ -8,11 +8,12 @@
     Faces artifacts are present, mapped to *.xhtml among others. Declaring it by hand risks a
     duplicate mapping, and on some servers a deployment failure. (T-17 criterion 6.)
   * No <servlet> for Jakarta REST. @ApplicationPath("/api") on JakartaRestApplication is the
-    declaration; a hand-written mapping would collide with it. T-23 needs multipart limits on that
-    servlet and they are set programmatically in MultipartConfigurator instead, because naming the
-    servlet here - even with no class and no mapping, purely to add <multipart-config> - makes
-    RESTEasy conclude the application is configured by hand and skip registering it. On WildFly
-    that produced a deployment that started cleanly and answered 404 to every /api path.
+    declaration; a hand-written mapping would collide with it. The image upload endpoint's
+    multipart limits live on PetResource's @Consumes(MULTIPART_FORM_DATA) method instead of here,
+    because naming the servlet in this file - even with no class and no mapping, purely to add
+    <multipart-config> - makes RESTEasy conclude the application is configured by hand and skip
+    registering it. On WildFly that produced a deployment that started cleanly and answered 404 to
+    every /api path.
   * The <error-page> entries below are T-33's, and cover the JSF tier only. REST error handling
     stays in T-19's exception mappers: a request to /api never reaches these pages, because a
     mapper answers it with an ErrorDTO before the container's error machinery is involved.

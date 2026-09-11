@@ -1,7 +1,6 @@
 package com.petlee.web.bean;
 
 import com.petlee.dto.PetDetailDTO;
-import com.petlee.dto.PetImageDTO;
 import com.petlee.exception.NotFoundException;
 import com.petlee.exception.PetLeeException;
 import com.petlee.service.PetService;
@@ -15,7 +14,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.List;
 
 /**
  * One listing in full — {@code #{petDetailBean}}.
@@ -44,9 +42,6 @@ public class PetDetailBean implements Serializable {
     private Long petId;
     private PetDetailDTO pet;
 
-    /** Which photograph the large frame is showing. Zero is the main one. */
-    private int selectedImage;
-
     /**
      * Fetches the listing, or sends the visitor to the not-found page.
      *
@@ -63,7 +58,6 @@ public class PetDetailBean implements Serializable {
         }
         try {
             pet = petService.findDetail(petId, userBean.getCurrentUserId());
-            selectedImage = 0;
             return null;
 
         } catch (NotFoundException noSuchPet) {
@@ -97,38 +91,10 @@ public class PetDetailBean implements Serializable {
         return null;
     }
 
-    /**
-     * Puts a thumbnail in the large frame.
-     *
-     * @param index the photograph to show
-     */
-    public void select(int index) {
-        if (pet != null && index >= 0 && index < images().size()) {
-            selectedImage = index;
-        }
-    }
-
-    /** @return the photograph currently in the large frame, or {@code null} when there are none */
-    public PetImageDTO getSelectedImage() {
-        List<PetImageDTO> images = images();
-        return images.isEmpty() ? null : images.get(Math.min(selectedImage, images.size() - 1));
-    }
-
-    public int getSelectedImageIndex() {
-        return selectedImage;
-    }
-
-    /** @return every photograph; never {@code null} */
-    public List<PetImageDTO> getImages() {
-        return images();
-    }
-
-    /**
-     * @return whether there is more than one photograph. A single-image listing renders no
-     *         thumbnail strip at all.
-     */
-    public boolean isHasThumbnails() {
-        return images().size() > 1;
+    /** @return the listing's photograph, or the bundled placeholder when it has none */
+    public String getImageUrl() {
+        String url = pet == null ? null : pet.getImageUrl();
+        return url == null || url.isBlank() ? PetBean.PLACEHOLDER_IMAGE : url;
     }
 
     /** @return whether the listing is no longer available, so the page can say so plainly */
@@ -143,10 +109,6 @@ public class PetDetailBean implements Serializable {
      */
     public boolean isContactAvailable() {
         return pet != null && pet.getOwnerEmail() != null;
-    }
-
-    private List<PetImageDTO> images() {
-        return pet == null || pet.getImages() == null ? List.of() : pet.getImages();
     }
 
     public Long getPetId() {

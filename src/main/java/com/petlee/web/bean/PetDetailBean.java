@@ -2,8 +2,9 @@ package com.petlee.web.bean;
 
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetImageDTO;
-import com.petlee.web.client.ApiClient;
-import com.petlee.web.client.ApiException;
+import com.petlee.exception.NotFoundException;
+import com.petlee.exception.PetLeeException;
+import com.petlee.service.PetService;
 
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
@@ -15,22 +16,19 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * One listing in full — {@code #{petDetailBean}}.
  *
  * <h2>Loaded once, by a view action</h2>
  * The id arrives as a view parameter and {@link #load()} runs as an {@code <f:viewAction>}.
- * Fetching in a getter instead would be a fresh API call for every EL evaluation on the page —
- * a dozen HTTP round trips to render one pet, and the number would grow with the markup.
+ * Fetching in a getter instead would call the service once per EL evaluation on the page.
  *
  * <h2>Contact details are the server's decision</h2>
- * This bean never redacts anything. {@code GET /api/pets/{id}} returns {@code ownerFullName},
- * {@code ownerEmail} and {@code ownerPhone} as {@code null} for a caller with no session (T-15,
- * T-22), which is the contract's {@code open*} footnote and specification §6's privacy rule. The
- * page's {@code rendered} check is a second layer on top of that, not a substitute for it.
+ * This bean never redacts anything. {@link PetService#findDetail(Long, Long)} returns
+ * {@code ownerFullName}, {@code ownerEmail} and {@code ownerPhone} as {@code null} for a guest
+ * caller — specification §6's privacy rule. The page's {@code rendered} check is a second layer on
+ * top of that, not a substitute for it.
  */
 @Named("petDetailBean")
 @ViewScoped
@@ -38,10 +36,10 @@ public class PetDetailBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private static final Logger LOGGER = Logger.getLogger(PetDetailBean.class.getName());
+    @Inject private transient PetService petService;
 
-    @Inject
-    private ApiClient api;
+    /** Not {@code transient}: see {@link UserBean}'s own field for why. */
+    @Inject private UserBean userBean;
 
     private Long petId;
     private PetDetailDTO pet;
@@ -64,18 +62,15 @@ public class PetDetailBean implements Serializable {
             return notFound();
         }
         try {
-            pet = api.getPet(petId);
+            pet = petService.findDetail(petId, userBean.getCurrentUserId());
             selectedImage = 0;
             return null;
 
-        } catch (ApiException failure) {
-            if (failure.isNotFound()) {
-                LOGGER.log(Level.FINE, () -> "no listing " + petId);
-                return notFound();
-            }
-            // Anything else - the API unreachable, a 500 - is worth telling the user about on a
-            // page they can read, rather than turning into a not-found that would send them
-            // looking for a listing that does exist.
+        } catch (NotFoundException noSuchPet) {
+            return notFound();
+        } catch (PetLeeException failure) {
+            // Anything else is worth telling the user about on a page they can read, rather than
+            // turning into a not-found that would send them looking for a listing that does exist.
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_ERROR, failure.getMessage(), null));
             return null;
@@ -83,15 +78,11 @@ public class PetDetailBean implements Serializable {
     }
 
     /**
-     * Answers 404, and lets the container put T-33's not-found page in the body.
+     * Answers 404, and lets the container put the not-found page in the body.
      *
      * <p>Not a navigation outcome. An {@code <f:viewAction>} that returns one is redirected by
      * Faces, so the browser would be sent to {@code /error/404.xhtml} and receive <strong>302 then
      * 200</strong> — a page that says "not found" over a response that says everything is fine.
-     * Crawlers, monitoring and T-39's tests all read the status, not the prose.
-     *
-     * <p>{@code responseSendError} hands the request to the container's error machinery, which
-     * web.xml already maps to the same page, with the status intact and the URL unchanged.
      *
      * @return {@code null}: the response is already complete
      */
@@ -101,7 +92,6 @@ public class PetDetailBean implements Serializable {
             context.getExternalContext().responseSendError(HttpServletResponse.SC_NOT_FOUND, null);
         } catch (IOException connectionGone) {
             // The client hung up mid-response. Nothing useful can be sent and nothing is broken.
-            LOGGER.log(Level.FINE, "could not send 404", connectionGone);
         }
         context.responseComplete();
         return null;
@@ -109,9 +99,6 @@ public class PetDetailBean implements Serializable {
 
     /**
      * Puts a thumbnail in the large frame.
-     *
-     * <p>Plain JSF: an AJAX action that re-renders the frame. No image-gallery library, nothing to
-     * keep up to date, and it works with JavaScript disabled as a full postback.
      *
      * @param index the photograph to show
      */
@@ -131,14 +118,14 @@ public class PetDetailBean implements Serializable {
         return selectedImage;
     }
 
-    /** @return every photograph, newest ordering as the API returned it; never {@code null} */
+    /** @return every photograph; never {@code null} */
     public List<PetImageDTO> getImages() {
         return images();
     }
 
     /**
      * @return whether there is more than one photograph. A single-image listing renders no
-     *         thumbnail strip at all — a strip of one is a row of nothing useful.
+     *         thumbnail strip at all.
      */
     public boolean isHasThumbnails() {
         return images().size() > 1;
@@ -151,10 +138,8 @@ public class PetDetailBean implements Serializable {
 
     /**
      * @return whether the owner's contact details are present.
-     *         <p><strong>This is the second layer, not the only one.</strong> The server has
-     *         already replaced these fields with {@code null} for a caller with no session, so a
-     *         guest's response never contains them. Removing either check leaves the other doing
-     *         the whole job, and the one that matters is the server's.
+     *         <p><strong>This is the second layer, not the only one.</strong> The service has
+     *         already replaced these fields with {@code null} for a caller with no session.
      */
     public boolean isContactAvailable() {
         return pet != null && pet.getOwnerEmail() != null;

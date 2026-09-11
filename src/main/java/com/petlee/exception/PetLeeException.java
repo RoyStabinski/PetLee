@@ -35,9 +35,9 @@ package com.petlee.exception;
  *
  * <h2>No transport imports</h2>
  * This package imports nothing from Jakarta REST, Servlet or JPA, and must not start to. These
- * types are thrown by the service tier and also caught by T-24's {@code ApiClient} in the web
- * tier; a dependency on either transport would make the hierarchy unusable on one side of
- * ADR-001's boundary.
+ * types are thrown by the service tier and also caught directly by the JSF beans that call it;
+ * a dependency on either transport would make the hierarchy unusable on one side of that
+ * boundary.
  */
 public abstract class PetLeeException extends RuntimeException {
 

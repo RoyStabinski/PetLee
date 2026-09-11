@@ -1,6 +1,6 @@
 package com.petlee.web.filter;
 
-import com.petlee.web.bean.UserManagedBean;
+import com.petlee.web.bean.UserBean;
 
 import jakarta.inject.Inject;
 import jakarta.servlet.Filter;
@@ -39,7 +39,7 @@ import java.util.logging.Logger;
  * the person who notices is usually not on the team.
  *
  * <h2>Where "who is signed in" comes from</h2>
- * {@link UserManagedBean}, the web tier's own bean. Not the REST tier's session attribute: reading
+ * {@link UserBean}, the web tier's own bean. Not the REST tier's session attribute: reading
  * that from here would be {@code com.petlee.web} reaching into {@code com.petlee.rest}, which
  * inverts the layering ADR-001 exists to protect. The bean is only touched for a page that is not
  * public, so a guest browsing the gallery is never given a session on this filter's account.
@@ -69,7 +69,7 @@ public class PageAccessFilter implements Filter {
     private static final String FORBIDDEN_VIEW = "/error/403.xhtml";
 
     @Inject
-    private UserManagedBean userBean;
+    private UserBean userBean;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)

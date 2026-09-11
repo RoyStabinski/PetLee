@@ -33,7 +33,7 @@
 
         <h2>#{msg['profile.listings']}</h2>
 
-        <ui:fragment rendered="#{myListingsBean.noListings}">
+        <ui:fragment rendered="#{petBean.noListings}">
             <div class="empty-state">
                 <p>#{msg['profile.empty']}</p>
                 <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
@@ -42,7 +42,7 @@
             </div>
         </ui:fragment>
 
-        <ui:fragment rendered="#{not myListingsBean.noListings}">
+        <ui:fragment rendered="#{not petBean.noListings}">
             <h:form id="listingsForm">
                 <div class="table-scroll">
                     <table class="table">
@@ -56,23 +56,23 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <ui:repeat id="rows" value="#{myListingsBean.listings}" var="pet">
+                            <ui:repeat id="rows" value="#{petBean.myListings}" var="pet">
                                 <tr>
                                     <td class="cell-thumb">
-                                        <h:graphicImage value="#{myListingsBean.thumbnailOf(pet)}"
+                                        <h:graphicImage value="#{petBean.thumbnailOf(pet)}"
                                                         alt="#{pet.name}"/>
                                     </td>
                                     <td>#{pet.name}</td>
                                     <td>#{pet.categoryName}</td>
                                     <td>
-                                        <span class="#{myListingsBean.statusStyle(pet)}">
+                                        <span class="#{petBean.statusStyle(pet)}">
                                             #{msg['status.'.concat(pet.status)]}
                                         </span>
                                     </td>
                                     <td>
                                         <div class="actions">
                                             <h:commandLink id="edit"
-                                                           action="#{myListingsBean.edit(pet.id)}"
+                                                           action="#{petBean.edit(pet.id)}"
                                                            styleClass="button-secondary"
                                                            value="#{msg['form.edit']}"/>
                                             <!--
@@ -81,7 +81,7 @@
                                                 mis-click must not be able to reach the server.
                                             -->
                                             <h:commandLink id="delete"
-                                                           action="#{myListingsBean.delete(pet.id)}"
+                                                           action="#{petBean.delete(pet.id)}"
                                                            styleClass="button button-danger"
                                                            value="#{msg['form.delete']}"
                                                            onclick="return confirm('#{msg['form.confirmDelete']}');"/>

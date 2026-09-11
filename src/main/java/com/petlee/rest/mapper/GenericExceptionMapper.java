@@ -12,8 +12,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * The last mapper standing: everything that is not a {@code PetLeeException} and not a JSON-B
- * parse failure ends here.
+ * The last mapper standing: everything that is not an {@link com.petlee.service.AppException} and
+ * not a JSON-B parse failure ends here.
  *
  * <h2>Nothing about the failure reaches the client</h2>
  * A stack trace names the framework and its version, the class layout, and often the SQL that
@@ -30,10 +30,10 @@ import java.util.logging.Logger;
  *       from a wrong content type. The status it already carries is the right answer; turning
  *       those into 500s would report the server's own routing as broken. T-19 criterion 6 and
  *       requirement 7.</li>
- *   <li>{@link OptimisticLockException} — the safety net for requirement 8. T-15 converts these
- *       into a {@code ConflictException} where it can, but one escaping from a flush at commit
- *       time, after the service method has returned, has nowhere to be caught. It is still a
- *       concurrent edit and still a 409.</li>
+ *   <li>{@link OptimisticLockException} — the safety net for requirement 8. The service layer
+ *       converts these into an {@code AppException} carrying 409 where it can, but one escaping
+ *       from a flush at commit time, after the service method has returned, has nowhere to be
+ *       caught. It is still a concurrent edit and still a 409.</li>
  *   <li>A JSON parse failure that reached here wrapped in something else — see
  *       {@link JsonbParseExceptionMapper}, which handles the unwrapped case.</li>
  * </ul>

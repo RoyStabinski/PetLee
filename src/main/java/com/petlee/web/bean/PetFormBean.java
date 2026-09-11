@@ -1,8 +1,5 @@
 package com.petlee.web.bean;
 
-import com.petlee.exception.ConflictException;
-import com.petlee.exception.NotFoundException;
-import com.petlee.exception.PetLeeException;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.service.AppException;
@@ -18,6 +15,8 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -94,7 +93,7 @@ public class PetFormBean implements Serializable {
     void init() {
         try {
             categories = categoryService.findAll();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             report(failure);
         }
     }
@@ -131,9 +130,10 @@ public class PetFormBean implements Serializable {
             categoryId = pet.getCategory() == null ? null : pet.getCategory().getCategoryId();
             return null;
 
-        } catch (NotFoundException noSuchPet) {
-            return fail(HttpServletResponse.SC_NOT_FOUND);
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
+            if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
+                return fail(HttpServletResponse.SC_NOT_FOUND);
+            }
             return reportAndStay(failure);
         }
     }
@@ -152,7 +152,9 @@ public class PetFormBean implements Serializable {
         try {
             created = petService.create(name, breed, age, size, gender, shortDesc, longDesc,
                     categoryId, userBean.getCurrentUserId());
-        } catch (PetLeeException failure) {
+        } catch (ConstraintViolationException invalid) {
+            return reportAndStay(invalid);
+        } catch (AppException failure) {
             return reportAndStay(failure);
         }
 
@@ -164,13 +166,13 @@ public class PetFormBean implements Serializable {
             petService.attachImage(created.getPetId(), uploadedFile, userBean.getCurrentUserId());
             return done("Your listing and its photograph have been added.");
 
-        } catch (PetLeeException | AppException photographFailed) {
+        } catch (AppException photographFailed) {
             // The listing exists. Saying "that failed" would be a lie the user would act on by
             // filling the whole form in again, and creating a duplicate. Saying "that worked"
             // would leave them wondering where the photograph went. So: what worked, what did
             // not, and where to go to try again.
             warn("Your listing was added, but the photograph could not be stored. You can add it from"
-                    + " here. " + reasonOf(photographFailed));
+                    + " here. " + photographFailed.getMessage());
             return keepingMessages(DASHBOARD);
         }
     }
@@ -181,12 +183,15 @@ public class PetFormBean implements Serializable {
                     categoryId, userBean.getCurrentUserId());
             return done("Your listing has been updated.");
 
-        } catch (ConflictException staleEdit) {
-            // The user-visible face of specification §4's concurrency control. A generic error
-            // here would leave them with no idea what to do; this says exactly what.
-            error("This listing was changed by someone else. Reload it and try again.");
-            return null;
-        } catch (PetLeeException failure) {
+        } catch (ConstraintViolationException invalid) {
+            return reportAndStay(invalid);
+        } catch (AppException failure) {
+            if (failure.getStatus() == 409) {
+                // The user-visible face of specification §4's concurrency control. A generic
+                // error here would leave them with no idea what to do; this says exactly what.
+                error("This listing was changed by someone else. Reload it and try again.");
+                return null;
+            }
             return reportAndStay(failure);
         }
     }
@@ -238,16 +243,6 @@ public class PetFormBean implements Serializable {
                 && userBean.getCurrentUserId().equals(pet.getOwner().getUserId());
     }
 
-    private static String reasonOf(RuntimeException failure) {
-        if (failure instanceof PetLeeException business) {
-            return business.getMessage();
-        }
-        if (failure instanceof AppException business) {
-            return business.getMessage();
-        }
-        return "";
-    }
-
     private String fail(int status) {
         FacesContext context = FacesContext.getCurrentInstance();
         try {
@@ -259,13 +254,30 @@ public class PetFormBean implements Serializable {
         return null;
     }
 
-    private String reportAndStay(PetLeeException failure) {
+    private String reportAndStay(AppException failure) {
         report(failure);
         return null;
     }
 
-    private void report(PetLeeException failure) {
+    private String reportAndStay(ConstraintViolationException invalid) {
+        error(firstMessage(invalid));
+        return null;
+    }
+
+    private void report(AppException failure) {
         error(failure.getMessage());
+    }
+
+    /**
+     * The message of one violation out of a {@link ConstraintViolationException}'s set, for a
+     * form that shows one error at a time. Bean Validation does not order violations, so this is
+     * simply the first the set yields.
+     */
+    private static String firstMessage(ConstraintViolationException invalid) {
+        for (ConstraintViolation<?> violation : invalid.getConstraintViolations()) {
+            return violation.getMessage();
+        }
+        return "That listing could not be saved.";
     }
 
     private static List<SelectItem> options(String[] values) {

@@ -1,8 +1,7 @@
 package com.petlee.web.bean;
 
-import com.petlee.exception.NotFoundException;
-import com.petlee.exception.PetLeeException;
 import com.petlee.model.Pet;
+import com.petlee.service.AppException;
 import com.petlee.service.PetService;
 
 import jakarta.faces.application.FacesMessage;
@@ -64,9 +63,10 @@ public class PetDetailBean implements Serializable {
             pet = petService.findDetail(petId);
             return null;
 
-        } catch (NotFoundException noSuchPet) {
-            return notFound();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
+            if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
+                return notFound();
+            }
             // Anything else is worth telling the user about on a page they can read, rather than
             // turning into a not-found that would send them looking for a listing that does exist.
             FacesContext.getCurrentInstance().addMessage(null,

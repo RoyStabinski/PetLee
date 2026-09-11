@@ -1,8 +1,8 @@
 package com.petlee.rest;
 
 import com.petlee.dto.CategoryDTO;
-import com.petlee.exception.ValidationException;
 import com.petlee.rest.security.AdminOnly;
+import com.petlee.service.AppException;
 import com.petlee.service.CategoryService;
 
 import jakarta.enterprise.context.RequestScoped;
@@ -88,7 +88,7 @@ public class CategoryResource {
     @Produces(MediaType.APPLICATION_JSON)
     public CategoryDTO create(CategoryDTO body) {
         if (body == null) {
-            throw new ValidationException("name", "NAME_INVALID", "A category name is required");
+            throw new AppException(400, "A category name is required");
         }
         return CategoryDTO.of(categories.create(body.name()));
     }

@@ -1,9 +1,9 @@
 package com.petlee.web.bean;
 
-import com.petlee.exception.PetLeeException;
 import com.petlee.model.User;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.SessionUser;
+import com.petlee.service.AppException;
 import com.petlee.service.UserService;
 
 import jakarta.enterprise.context.SessionScoped;
@@ -12,6 +12,8 @@ import jakarta.faces.context.FacesContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 
 import java.io.Serializable;
 
@@ -90,7 +92,7 @@ public class UserBean implements Serializable {
             currentUser = user;
             return destinationAfterLogin();
 
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             error(failure.getMessage());
             return null;
 
@@ -120,13 +122,29 @@ public class UserBean implements Serializable {
             info("Your account has been created. Please log in.");
             return keepingMessages(LOGIN);
 
-        } catch (PetLeeException failure) {
+        } catch (ConstraintViolationException invalid) {
+            error(firstMessage(invalid));
+            return null;
+
+        } catch (AppException failure) {
             error(failure.getMessage());
             return null;
 
         } finally {
             clearPasswords();
         }
+    }
+
+    /**
+     * The message of one violation out of a {@link ConstraintViolationException}'s set, for a
+     * form that shows one error at a time. Bean Validation does not order violations, so this is
+     * simply the first the set yields.
+     */
+    private static String firstMessage(ConstraintViolationException invalid) {
+        for (ConstraintViolation<?> violation : invalid.getConstraintViolations()) {
+            return violation.getMessage();
+        }
+        return "That registration could not be accepted.";
     }
 
     /**

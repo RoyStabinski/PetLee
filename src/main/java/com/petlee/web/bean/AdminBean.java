@@ -1,8 +1,8 @@
 package com.petlee.web.bean;
 
-import com.petlee.exception.PetLeeException;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
+import com.petlee.service.AppException;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
 
@@ -131,7 +131,7 @@ public class AdminBean implements Serializable {
             petService.changeStatus(petId, status);
             info(successMessage);
             load();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             report(failure);
         }
         return null;
@@ -148,7 +148,7 @@ public class AdminBean implements Serializable {
             petService.delete(petId, userBean.getCurrentUserId(), userBean.isAdmin());
             info("The listing has been deleted permanently.");
             load();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             report(failure);
         }
         return null;
@@ -167,7 +167,7 @@ public class AdminBean implements Serializable {
             info("Category added: " + created.getCategoryName());
             newCategoryName = null;
             load();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             report(failure);
         }
         return null;
@@ -185,7 +185,7 @@ public class AdminBean implements Serializable {
             categoryService.delete(categoryId);
             info("The category has been deleted.");
             load();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             report(failure);
         }
         return null;
@@ -221,7 +221,7 @@ public class AdminBean implements Serializable {
                     .collect(Collectors.groupingBy(pet -> pet.getCategory().getCategoryName(),
                             Collectors.counting()));
             categories = categoryService.findAll();
-        } catch (PetLeeException failure) {
+        } catch (AppException failure) {
             report(failure);
         }
     }
@@ -342,7 +342,7 @@ public class AdminBean implements Serializable {
         return items;
     }
 
-    private void report(PetLeeException failure) {
+    private void report(AppException failure) {
         error(failure.getMessage());
     }
 

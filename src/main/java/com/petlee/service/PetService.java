@@ -1,11 +1,6 @@
 package com.petlee.service;
 
 import com.petlee.dto.PetForm;
-import com.petlee.exception.ConflictException;
-import com.petlee.exception.ForbiddenException;
-import com.petlee.exception.NotFoundException;
-import com.petlee.exception.UnauthorizedException;
-import com.petlee.exception.ValidationException;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.model.User;
@@ -17,11 +12,10 @@ import jakarta.inject.Inject;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.Part;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Listings, ownership rules and concurrency — every business rule in specification §5 and the
@@ -30,9 +24,18 @@ import java.util.logging.Logger;
  * <h2>Where authorisation happens</h2>
  * Every decision in this class is made against the <strong>caller id passed in by the REST tier
  * from the session</strong>. This class reads no {@code HttpSession}, no {@code SecurityContext}
- * and no thread-local. That is not a style preference: it is what lets these rules be tested
+ * and no thread-local. That is not a style preference: it is what lets these rules be exercised
  * without a container, and what stops the same rule being re-derived in a resource class or a
  * managed bean, where a second copy would eventually disagree with this one.
+ *
+ * <h2>Where validation happens now</h2>
+ * {@link #create(PetForm, Long)} and {@link #update(Long, PetForm, Long)} take a {@code @Valid}
+ * form, enforced by the container's Bean Validation provider through a CDI interceptor bound to
+ * this {@code @ApplicationScoped} bean. The field-length, range and pattern checks that used to
+ * be hand-written here now live as annotations on {@link PetForm}. The scalar overloads used by
+ * the JSF tier delegate through the injected {@link #self} reference, not {@code this} — a
+ * same-instance call would bypass the proxy the interceptor is woven onto, and validation would
+ * silently stop running for every form submission.
  *
  * <h2>The privacy rule</h2>
  * {@link #findDetail(Long)} returns the full entity, owner attached; specification §6 —
@@ -43,18 +46,10 @@ import java.util.logging.Logger;
  *
  * <h2>Statuses</h2>
  * Nothing here moves a pet to {@code ADOPTED}. Specification §3 does not ask for it, so it is not
- * invented. {@code REMOVED} exists for T-34's admin soft-hiding; {@link #delete} is a hard delete.
+ * invented. {@code REMOVED} exists for the admin's soft-hiding; {@link #delete} is a hard delete.
  */
 @ApplicationScoped
 public class PetService {
-
-    private static final Logger LOGGER = Logger.getLogger(PetService.class.getName());
-
-    private static final int NAME_MAX = 100;
-    private static final int BREED_MAX = 100;
-    private static final int SHORT_DESC_MAX = 255;
-    private static final int AGE_MIN = 0;
-    private static final int AGE_MAX = 50;
 
     private PetRepository pets;
     private UserRepository users;
@@ -65,6 +60,13 @@ public class PetService {
      * {@link #attachImage} and, for cleanup, by {@link #delete}.
      */
     private ImageStore images;
+
+    /**
+     * A self-reference, injected so the scalar overloads can call the {@code @Valid}-annotated
+     * methods through the proxy instead of through {@code this}. See the class documentation.
+     */
+    @Inject
+    private PetService self;
 
     /** For CDI only — an {@code @ApplicationScoped} proxy needs a no-argument constructor. */
     protected PetService() {
@@ -82,8 +84,9 @@ public class PetService {
     /**
      * The public catalogue — {@code GET /api/pets}.
      *
-     * <p>{@code AVAILABLE} only and newest first, both enforced by T-08's query rather than here,
-     * so no caller can widen them by passing a different filter. Open to everyone, guests included.
+     * <p>{@code AVAILABLE} only and newest first, both enforced by the repository's query rather
+     * than here, so no caller can widen them by passing a different filter. Open to everyone,
+     * guests included.
      *
      * @param categoryId the category to restrict to, or {@code null} for any category
      * @param size       the size to restrict to, or {@code null} for any size
@@ -96,7 +99,7 @@ public class PetService {
     }
 
     /**
-     * The moderation listing — {@code GET /api/admin/pets} (T-34).
+     * The moderation listing — {@code GET /api/admin/pets}.
      *
      * <p>The same filters as the gallery, without the status restriction: {@code ADOPTED} and
      * {@code REMOVED} listings are included, which is the whole point of the endpoint. Nothing
@@ -114,7 +117,7 @@ public class PetService {
     }
 
     /**
-     * Hides or restores a listing — {@code PUT /api/admin/pets/{id}/status} (T-34).
+     * Hides or restores a listing — {@code PUT /api/admin/pets/{id}/status}.
      *
      * <p>Specification §2 asks an administrator to prevent offensive listings. {@link #delete} is
      * the irreversible answer; this is the recoverable one, so only the two statuses that move a
@@ -124,18 +127,14 @@ public class PetService {
      * @param petId  the listing to hide or restore
      * @param status {@code REMOVED} or {@code AVAILABLE}, in any case
      * @return the listing in its new state
-     * @throws NotFoundException <strong>404</strong> — no pet has that id
-     * @throws ValidationException <strong>400</strong> — {@code status} is missing or is any other
-     *         value
+     * @throws AppException <strong>404</strong> — no pet has that id
+     * @throws AppException <strong>400</strong> — {@code status} is missing or is any other value
      */
     @Transactional
     public Pet changeStatus(Long petId, String status) {
         Pet pet = requireById(petId);
         pet.setStatus(moderationStatus(status));
-        Pet saved = pets.save(pet);
-
-        LOGGER.log(Level.INFO, () -> "Admin set pet " + petId + " to " + saved.getStatus());
-        return saved;
+        return pets.save(pet);
     }
 
     private static Pet.PetStatus moderationStatus(String status) {
@@ -146,8 +145,7 @@ public class PetService {
         if (Pet.PetStatus.AVAILABLE.name().equals(value)) {
             return Pet.PetStatus.AVAILABLE;
         }
-        throw new ValidationException("status", "INVALID_STATUS",
-                "status must be REMOVED or AVAILABLE");
+        throw new AppException(400, "status must be REMOVED or AVAILABLE");
     }
 
     /**
@@ -160,7 +158,7 @@ public class PetService {
      *
      * @param id the pet's id
      * @return the managed pet, with its category and owner loaded
-     * @throws NotFoundException <strong>404</strong> — no pet has that id
+     * @throws AppException <strong>404</strong> — no pet has that id
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public Pet findDetail(Long id) {
@@ -175,42 +173,37 @@ public class PetService {
      * listing has one, and only one, owner", and an owner that can be named in the request body is
      * an owner an attacker can choose.
      *
-     * @param form        the request body
+     * @param form        the request body; validated by the container before this body runs
      * @param ownerUserId the session user's id; must not be {@code null}
      * @return the created listing
-     * @throws IllegalStateException if {@code ownerUserId} is {@code null}. Not a 401: T-18 has
-     *         already rejected anonymous callers before this method is reachable, so a null here
-     *         means a resource method is missing its {@code @Secured} annotation — a bug to fix,
-     *         not a client error to report.
-     * @throws UnauthorizedException <strong>401</strong> if the session user no longer exists. That
-     *         one <em>is</em> a client condition — the account was deleted while the session lived
-     *         — and the honest answer is "log in again".
-     * @throws ValidationException <strong>400</strong> — a field is missing, too long, out of
-     *         range, or not one of the contract's enum strings; {@code getField()} names which
-     * @throws NotFoundException <strong>404</strong> — unknown {@code categoryId}; specification
-     *         §5, "Every posted pet must belong to a predefined category"
+     * @throws IllegalStateException if {@code ownerUserId} is {@code null}. Not a 401: the REST
+     *         tier has already rejected anonymous callers before this method is reachable, so a
+     *         null here means a resource method is missing its {@code @Secured} annotation — a
+     *         bug to fix, not a client error to report.
+     * @throws AppException <strong>401</strong> if the session user no longer exists. That one
+     *         <em>is</em> a client condition — the account was deleted while the session lived —
+     *         and the honest answer is "log in again".
+     * @throws jakarta.validation.ConstraintViolationException a field is missing, too long, out
+     *         of range, or not one of the contract's enum strings
+     * @throws AppException <strong>404</strong> — unknown {@code categoryId}; specification §5,
+     *         "Every posted pet must belong to a predefined category"
      */
     @Transactional
-    public Pet create(PetForm form, Long ownerUserId) {
+    public Pet create(@Valid PetForm form, Long ownerUserId) {
         if (ownerUserId == null) {
             throw new IllegalStateException(
-                    "create requires an authenticated caller; T-18 should have rejected this request");
-        }
-        if (form == null) {
-            throw new ValidationException("EMPTY_BODY", "A pet body is required");
+                    "create requires an authenticated caller; the REST tier should have rejected this request");
         }
 
-        User owner = users.findById(ownerUserId).orElseThrow(() -> new UnauthorizedException(
-                "SESSION_USER_GONE", "Your account is no longer available; please log in again"));
+        User owner = users.findById(ownerUserId).orElseThrow(() -> new AppException(401,
+                "Your account is no longer available; please log in again"));
 
         Pet pet = new Pet();
         applyForm(form, pet);
         pet.setOwner(owner);
         pet.setStatus(Pet.PetStatus.AVAILABLE);
 
-        Pet saved = pets.save(pet);
-        LOGGER.log(Level.INFO, () -> "User " + ownerUserId + " created pet " + saved.getPetId());
-        return saved;
+        return pets.save(pet);
     }
 
     /**
@@ -219,15 +212,15 @@ public class PetService {
      * <p>The web tier's package may not import the DTO package at all — a record cannot be
      * bound into a Facelets view, so nothing in that package should have a reason to reach for
      * one. {@code PetFormBean} holds its fields individually instead and calls this overload,
-     * which is the one place a {@link PetForm} is assembled from them before delegating to the
-     * canonical method that {@link com.petlee.rest.PetResource} calls directly with the record
-     * JSON-B already built.
+     * which is the one place a {@link PetForm} is assembled from them before delegating — through
+     * {@link #self}, not {@code this} — to the canonical, validated method that
+     * {@link com.petlee.rest.PetResource} calls directly with the record JSON-B already built.
      *
      * @see #create(PetForm, Long)
      */
     public Pet create(String name, String breed, Integer age, String size, String gender,
                       String shortDesc, String longDesc, Integer categoryId, Long ownerUserId) {
-        return create(new PetForm(name, breed, age, size, gender, shortDesc, longDesc, categoryId),
+        return self.create(new PetForm(name, breed, age, size, gender, shortDesc, longDesc, categoryId),
                 ownerUserId);
     }
 
@@ -243,27 +236,23 @@ public class PetService {
      * satisfied by construction rather than by a filter that could be forgotten.
      *
      * @param petId        the pet's id
-     * @param form         the request body
+     * @param form         the request body; validated by the container before this body runs
      * @param callerUserId the session user's id
      * @return the updated listing
-     * @throws NotFoundException <strong>404</strong> — no pet has that id
-     * @throws ForbiddenException <strong>403</strong> — {@code api-contract.md}: "403 if not the
-     *         owner"
-     * @throws ValidationException <strong>400</strong> — as {@link #create}
-     * @throws ConflictException <strong>409</strong>, code {@code STALE_PET} — {@code
-     *         api-contract.md}: "409 if a concurrent edit happened (optimistic lock)". This is
-     *         specification §4's concurrency control — "prevent situations where two users update
-     *         the same pet listing simultaneously and overwrite data" — made visible to the client.
+     * @throws AppException <strong>404</strong> — no pet has that id
+     * @throws AppException <strong>403</strong> — {@code api-contract.md}: "403 if not the owner"
+     * @throws jakarta.validation.ConstraintViolationException as {@link #create}
+     * @throws AppException <strong>409</strong> — {@code api-contract.md}: "409 if a concurrent
+     *         edit happened (optimistic lock)". This is specification §4's concurrency control —
+     *         "prevent situations where two users update the same pet listing simultaneously and
+     *         overwrite data" — made visible to the client.
      */
     @Transactional
-    public Pet update(Long petId, PetForm form, Long callerUserId) {
+    public Pet update(Long petId, @Valid PetForm form, Long callerUserId) {
         Pet pet = requireById(petId);
 
         if (!isSameUser(pet.getOwner(), callerUserId)) {
-            throw new ForbiddenException("NOT_OWNER", "Only the owner of a listing can edit it");
-        }
-        if (form == null) {
-            throw new ValidationException("EMPTY_BODY", "A pet body is required");
+            throw new AppException(403, "Only the owner of a listing can edit it");
         }
 
         applyForm(form, pet);
@@ -271,10 +260,9 @@ public class PetService {
         try {
             return pets.save(pet);
         } catch (OptimisticLockException e) {
-            // @Version caught a concurrent edit. PetRepository.save flushes, so it arrives
-            // here rather than at commit, where the transaction manager would have wrapped it.
-            LOGGER.log(Level.FINE, e, () -> "Stale update of pet " + petId + " by user " + callerUserId);
-            throw new ConflictException("STALE_PET",
+            // @Version caught a concurrent edit. save() flushes, so it arrives here rather than
+            // at commit, where the transaction manager would have wrapped it.
+            throw new AppException(409,
                     "This listing was changed by someone else; reload it and try again", e);
         }
     }
@@ -282,14 +270,14 @@ public class PetService {
     /**
      * The JSF tier's entry point into {@link #update(Long, PetForm, Long)}. See
      * {@link #create(String, String, Integer, String, String, String, String, Integer, Long)} for
-     * why this overload exists.
+     * why this overload exists and why it delegates through {@link #self}.
      *
      * @see #update(Long, PetForm, Long)
      */
     public Pet update(Long petId, String name, String breed, Integer age, String size,
                       String gender, String shortDesc, String longDesc, Integer categoryId,
                       Long callerUserId) {
-        return update(petId, new PetForm(name, breed, age, size, gender, shortDesc, longDesc,
+        return self.update(petId, new PetForm(name, breed, age, size, gender, shortDesc, longDesc,
                 categoryId), callerUserId);
     }
 
@@ -297,23 +285,23 @@ public class PetService {
      * Removes a listing — {@code DELETE /api/pets/{id}}.
      *
      * <p>Specification §5: "Only the original poster of a pet listing can remove it (or an
-     * administrator)." A <strong>hard</strong> delete; the images cascade with the row (T-03,
-     * T-09). {@code REMOVED} is T-34's soft-hide and is not used here.
+     * administrator)." A <strong>hard</strong> delete; the photograph cascades with the row.
+     * {@code REMOVED} is the admin's soft-hide and is not used here.
      *
      * @param petId         the pet's id
      * @param callerUserId  the session user's id
      * @param callerIsAdmin whether that user's role is {@code ADMIN}, decided by the REST tier from
      *                      the session — never read from the request
-     * @throws NotFoundException <strong>404</strong> — no pet has that id
-     * @throws ForbiddenException <strong>403</strong> — {@code api-contract.md}: "403 if not owner
-     *         and not admin"
+     * @throws AppException <strong>404</strong> — no pet has that id
+     * @throws AppException <strong>403</strong> — {@code api-contract.md}: "403 if not owner and
+     *         not admin"
      */
     @Transactional
     public void delete(Long petId, Long callerUserId, boolean callerIsAdmin) {
         Pet pet = requireById(petId);
 
         if (!callerIsAdmin && !isSameUser(pet.getOwner(), callerUserId)) {
-            throw new ForbiddenException("NOT_OWNER_OR_ADMIN",
+            throw new AppException(403,
                     "Only the owner of a listing, or an administrator, can remove it");
         }
 
@@ -325,24 +313,20 @@ public class PetService {
         // The database cascade takes the row; nothing took the file. Deleting a withdrawn
         // listing has to mean its photograph is gone, not merely unlisted.
         images.delete(photograph);
-
-        LOGGER.log(Level.INFO, () -> "User " + callerUserId + (callerIsAdmin ? " (admin)" : "")
-                + " deleted pet " + petId);
     }
 
     /**
      * Replaces a listing's photograph — {@code POST /api/pets/{id}/image}.
      *
-     * <p>Deviates from {@code api-contract.md}'s {@code POST /api/pets/{id}/images}: a pet now
-     * carries one photograph, not a gallery, so there is nothing left to be "main" among. The
-     * previous file, if there was one, is deleted only after the new one is safely attached — so
-     * a failed upload never loses a listing's existing photograph.
+     * <p>A pet carries one photograph, not a gallery. The previous file, if there was one, is
+     * deleted only after the new one is safely attached — so a failed upload never loses a
+     * listing's existing photograph.
      *
      * @param petId        the pet's id
      * @param file         the uploaded file
      * @param callerUserId the session user's id
      * @return the pet, with its new photograph
-     * @throws NotFoundException  <strong>404</strong> — no pet has that id
+     * @throws AppException <strong>404</strong> — no pet has that id
      * @throws AppException <strong>403</strong> — only the owner of a listing may change its photo
      */
     @Transactional
@@ -361,7 +345,7 @@ public class PetService {
     }
 
     /**
-     * Everything one user has ever listed — the T-32 dashboard feed.
+     * Everything one user has ever listed — the dashboard feed.
      *
      * <p><strong>All statuses</strong>, {@code REMOVED} included: an owner has to see the listings
      * that left the gallery, or a disappeared advert looks like data loss.
@@ -379,7 +363,7 @@ public class PetService {
 
     /**
      * Whether a user owns a listing — so the JSF tier can decide whether to draw an Edit button,
-     * and T-16 can authorise an upload, without either of them re-deriving the rule.
+     * without re-deriving the rule.
      *
      * <p>A UI that hides a button is a convenience, not a boundary: {@link #update} and
      * {@link #delete} check again regardless of what the caller was shown.
@@ -407,8 +391,7 @@ public class PetService {
      *
      * <p>Every method here that names a pet by id goes through it, so "unknown id is a 404" is
      * written once. {@link #attachImage} also calls it, to set the entity's photograph after
-     * authorising the caller — routing it through this method keeps the 404 rule from being
-     * duplicated in {@link PetRepository}.
+     * authorising the caller.
      *
      * <p>Like {@code CategoryService.requireById}, it is <strong>package-private</strong>, and the
      * visibility is the enforcement: REST resources are not in {@code com.petlee.service}, so no
@@ -416,92 +399,36 @@ public class PetService {
      *
      * @param petId the pet's id, may be {@code null}
      * @return the managed pet
-     * @throws NotFoundException <strong>404</strong>, code {@code PET_NOT_FOUND}
+     * @throws AppException <strong>404</strong>
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     Pet requireById(Long petId) {
         return pets.findById(petId)
-                .orElseThrow(() -> new NotFoundException("PET_NOT_FOUND", "No such pet: " + petId));
+                .orElseThrow(() -> new AppException(404, "No such pet: " + petId));
     }
 
     /**
-     * Copies the editable fields of a form onto a pet, validating as it goes.
+     * Copies the editable fields of a form onto a pet.
      *
-     * <p>Shared by {@link #create} and {@link #update} so the two cannot validate differently —
-     * a listing that could be created but not re-saved unchanged would be the result.
+     * <p>Shared by {@link #create} and {@link #update} so the two cannot disagree. The field
+     * bounds — name length, breed length, age range, short-description length — are enforced
+     * before this method runs, by {@code @Valid} on the caller and the constraints on
+     * {@link PetForm} itself; only what those annotations cannot express is left here: parsing the
+     * enum strings and resolving the category.
      */
     private void applyForm(PetForm form, Pet pet) {
-        String name = trimToNull(form.name());
-        if (name == null || name.length() > NAME_MAX) {
-            throw new ValidationException("name", "NAME_INVALID",
-                    "A name is required, of at most " + NAME_MAX + " characters");
-        }
-
-        String breed = trimToNull(form.breed());
-        // Not in the task file's list, but breed is VARCHAR(100): without this bound an over-long
-        // value fails at the INSERT as a 500 the caller cannot act on. Same reasoning as T-13's
-        // phone bound.
-        if (breed != null && breed.length() > BREED_MAX) {
-            throw new ValidationException("breed", "BREED_TOO_LONG",
-                    "Breed must be at most " + BREED_MAX + " characters");
-        }
-
-        Integer age = form.age();
-        if (age != null && (age < AGE_MIN || age > AGE_MAX)) {
-            throw new ValidationException("age", "AGE_OUT_OF_RANGE",
-                    "Age must be between " + AGE_MIN + " and " + AGE_MAX + " years");
-        }
-
-        String shortDesc = trimToNull(form.shortDesc());
-        if (shortDesc != null && shortDesc.length() > SHORT_DESC_MAX) {
-            throw new ValidationException("shortDesc", "SHORT_DESC_TOO_LONG",
-                    "The short description must be at most " + SHORT_DESC_MAX + " characters");
-        }
-
-        Pet.PetSize size = parseEnum(Pet.PetSize.class, form.size(), "size",
-                "SMALL, MEDIUM or LARGE");
-        Pet.PetGender gender = parseEnum(Pet.PetGender.class, form.gender(), "gender",
-                "MALE or FEMALE");
-
-        if (form.categoryId() == null) {
-            throw new ValidationException("categoryId", "CATEGORY_REQUIRED",
-                    "A category is required");
-        }
+        pet.setPetName(form.name().trim());
+        pet.setBreed(trimToNull(form.breed()));
+        pet.setAge(form.age());
+        // valueOf is safe here because @Pattern(regexp = "SMALL|MEDIUM|LARGE"/"MALE|FEMALE") has
+        // already rejected anything else.
+        pet.setSize(Pet.PetSize.valueOf(form.size()));
+        pet.setGender(Pet.PetGender.valueOf(form.gender()));
+        pet.setShortDesc(trimToNull(form.shortDesc()));
+        pet.setLongDesc(trimToNull(form.longDesc()));
         // Specification §5: every posted pet must belong to a predefined category. Resolving it
         // through CategoryService means an unknown id is a 404 here, not a foreign-key 500 later.
-        Category category = categories.requireById(form.categoryId());
-
-        pet.setPetName(name);
-        pet.setBreed(breed);
-        pet.setAge(age);
-        pet.setSize(size);
-        pet.setGender(gender);
-        pet.setShortDesc(shortDesc);
-        pet.setLongDesc(trimToNull(form.longDesc()));
-        pet.setCategory(category);
-    }
-
-    /**
-     * Parses one of the contract's enum strings.
-     *
-     * <p>Trimmed and upper-cased first, so {@code "medium"} is accepted: the contract fixes the
-     * strings the server <em>emits</em>, and being lenient about what it accepts costs nothing and
-     * cannot be ambiguous. Anything else is a 400 naming the field and listing the legal values,
-     * rather than a deserialisation failure the caller cannot read — which is why {@link PetForm}
-     * holds these as {@code String}.
-     */
-    private static <E extends Enum<E>> E parseEnum(Class<E> type, String raw, String field,
-                                                   String legalValues) {
-        String value = trimToNull(raw);
-        if (value != null) {
-            try {
-                return Enum.valueOf(type, value.toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException ignored) {
-                // Fall through to the one throw site below, so the message is written once.
-            }
-        }
-        throw new ValidationException(field, field.toUpperCase(Locale.ROOT) + "_INVALID",
-                "The " + field + " must be one of: " + legalValues);
+        pet.setCategory(categories.requireById(form.categoryId()));
     }
 
     /** Identity by id, never by reference: a detached copy and a managed one are the same user. */

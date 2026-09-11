@@ -1,9 +1,8 @@
 package com.petlee.web.bean;
 
-import com.petlee.exception.ForbiddenException;
-import com.petlee.exception.PetLeeException;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
+import com.petlee.service.AppException;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
 
@@ -84,7 +83,7 @@ public class PetBean implements Serializable {
             pets = petService.findGallery(selectedCategoryId,
                     selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
                     selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
-        } catch (PetLeeException e) {
+        } catch (AppException e) {
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_ERROR, e.getMessage(), null));
         }
@@ -142,14 +141,16 @@ public class PetBean implements Serializable {
             petService.delete(petId, userBean.getCurrentUserId(), userBean.isAdmin());
             myListings = null;
             return null;
-        } catch (ForbiddenException noLongerAllowed) {
-            // On this page these are the caller's own listings; a refusal here means the session
-            // ended underneath them, and the honest answer is that they need to sign in again.
-            FacesContext.getCurrentInstance().addMessage(null,
-                    new FacesMessage(FacesMessage.SEVERITY_ERROR, noLongerAllowed.getMessage(), null));
-            FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
-            return LOGIN;
-        } catch (PetLeeException e) {
+        } catch (AppException e) {
+            if (e.getStatus() == 403) {
+                // On this page these are the caller's own listings; a refusal here means the
+                // session ended underneath them, and the honest answer is that they need to sign
+                // in again.
+                FacesContext.getCurrentInstance().addMessage(null,
+                        new FacesMessage(FacesMessage.SEVERITY_ERROR, e.getMessage(), null));
+                FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
+                return LOGIN;
+            }
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_ERROR, e.getMessage(), null));
             return null;

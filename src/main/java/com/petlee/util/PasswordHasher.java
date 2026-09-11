@@ -1,4 +1,4 @@
-package com.petlee.utilities;
+package com.petlee.util;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;

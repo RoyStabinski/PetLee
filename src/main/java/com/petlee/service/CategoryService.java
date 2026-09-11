@@ -1,8 +1,5 @@
 package com.petlee.service;
 
-import com.petlee.exception.ConflictException;
-import com.petlee.exception.NotFoundException;
-import com.petlee.exception.ValidationException;
 import com.petlee.model.Category;
 import com.petlee.repository.CategoryRepository;
 
@@ -62,20 +59,19 @@ public class CategoryService {
      *
      * @param name the new category's name
      * @return the created category
-     * @throws ValidationException <strong>400</strong> — the name is blank or over 50 characters,
-     *         which is the column's width
-     * @throws ConflictException <strong>409</strong>, code {@code CATEGORY_EXISTS}
+     * @throws AppException <strong>400</strong> — the name is blank or over 50 characters, which
+     *         is the column's width
+     * @throws AppException <strong>409</strong>
      */
     @Transactional
     public Category create(String name) {
         String trimmed = name == null ? null : name.trim();
         if (trimmed == null || trimmed.isEmpty() || trimmed.length() > NAME_MAX) {
-            throw new ValidationException("name", "NAME_INVALID",
+            throw new AppException(400,
                     "A category name is required, of at most " + NAME_MAX + " characters");
         }
         if (categories.existsByName(trimmed)) {
-            throw new ConflictException("CATEGORY_EXISTS", "A category named " + trimmed
-                    + " already exists");
+            throw new AppException(409, "A category named " + trimmed + " already exists");
         }
         return categories.save(new Category(trimmed));
     }
@@ -89,9 +85,9 @@ public class CategoryService {
      * a rule the application knows perfectly well.
      *
      * @param id the category to remove
-     * @throws NotFoundException <strong>404</strong> — no category has that id
-     * @throws ConflictException <strong>409</strong>, code {@code CATEGORY_IN_USE} — listings still
-     *         reference it, {@code REMOVED} ones included: they hold the foreign key too
+     * @throws AppException <strong>404</strong> — no category has that id
+     * @throws AppException <strong>409</strong> — listings still reference it, {@code REMOVED}
+     *         ones included: they hold the foreign key too
      */
     @Transactional
     public void delete(Integer id) {
@@ -99,7 +95,7 @@ public class CategoryService {
 
         long listings = categories.countPetsInCategory(id);
         if (listings > 0) {
-            throw new ConflictException("CATEGORY_IN_USE", "The category " + category.getCategoryName()
+            throw new AppException(409, "The category " + category.getCategoryName()
                     + " still holds " + listings + " listing(s), so it cannot be deleted");
         }
         categories.delete(category);
@@ -123,13 +119,12 @@ public class CategoryService {
      *
      * @param id the category id, may be {@code null}
      * @return the managed category, ready to be set on a {@code Pet}
-     * @throws NotFoundException <strong>404</strong>, code {@code CATEGORY_NOT_FOUND} — specification
-     *         §5: "Every posted pet must belong to a predefined category"
+     * @throws AppException <strong>404</strong> — specification §5: "Every posted pet must belong
+     *         to a predefined category"
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     Category requireById(Integer id) {
         return categories.findById(id)
-                .orElseThrow(() -> new NotFoundException("CATEGORY_NOT_FOUND",
-                        "No such category: " + id));
+                .orElseThrow(() -> new AppException(404, "No such category: " + id));
     }
 }

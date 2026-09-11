@@ -4,7 +4,6 @@ import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.CategoryDTO;
 import com.petlee.exception.PetLeeException;
 import com.petlee.model.Pet;
-import com.petlee.repository.PetFilter;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
 
@@ -210,11 +209,9 @@ public class AdminBean implements Serializable {
 
     private void load() {
         try {
-            List<AdminPetDTO> all = petService.findAllForAdmin(PetFilter.builder()
-                    .categoryId(selectedCategoryId)
-                    .size(selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize))
-                    .gender(selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender))
-                    .build());
+            List<AdminPetDTO> all = petService.findAllForAdmin(selectedCategoryId,
+                    selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
+                    selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
             listings = all.stream().filter(this::matchesStatus).toList();
             listingsPerCategory = all.stream()
                     .filter(pet -> pet.getCategoryName() != null)

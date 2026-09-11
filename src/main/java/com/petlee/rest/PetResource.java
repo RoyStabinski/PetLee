@@ -4,7 +4,6 @@ import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
 import com.petlee.model.Pet;
-import com.petlee.repository.PetFilter;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
 import com.petlee.rest.security.SessionUser;
@@ -39,7 +38,7 @@ import java.util.List;
  * Ownership, the privacy of contact details, the category check, the optimistic-lock conflict:
  * all of them are {@code PetService}'s, and every status other than 200/204 arrives through T-19
  * from an exception it threw. What this class does is decide <em>who is asking</em> — from the
- * session, never from the body — and turn three query strings into a {@link PetFilter}.
+ * session, never from the body — and turn three query strings into typed values.
  *
  * <h2>Where the caller comes from</h2>
  * The session, in every case. {@link PetForm} has no owner field and must not gain one:
@@ -92,11 +91,9 @@ public class PetResource {
     public List<PetDTO> findGallery(@QueryParam("categoryId") String categoryId,
                                     @QueryParam("size") String size,
                                     @QueryParam("gender") String gender) {
-        return pets.findGallery(PetFilter.builder()
-                .categoryId(RestParams.categoryId(categoryId))
-                .size(RestParams.enumValue(Pet.PetSize.class, size, "size"))
-                .gender(RestParams.enumValue(Pet.PetGender.class, gender, "gender"))
-                .build());
+        return pets.findGallery(RestParams.categoryId(categoryId),
+                RestParams.enumValue(Pet.PetSize.class, size, "size"),
+                RestParams.enumValue(Pet.PetGender.class, gender, "gender"));
     }
 
     /**

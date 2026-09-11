@@ -51,7 +51,7 @@ public class CategoryService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<CategoryDTO> findAll() {
-        return CategoryMapper.toDtoList(categories.findAllOrderedByName());
+        return CategoryMapper.toDtoList(categories.findAll());
     }
 
     /**

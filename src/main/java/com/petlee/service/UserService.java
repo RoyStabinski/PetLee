@@ -139,7 +139,7 @@ public class UserService {
             LOGGER.log(Level.INFO, () -> "Registered user " + saved.getUserName());
             return UserMapper.toDto(saved);
         } catch (PersistenceException e) {
-            // AbstractRepository.save flushes, so a unique-index violation arrives here rather
+            // UserRepository.save flushes, so a unique-index violation arrives here rather
             // than at commit, where it would already be wrapped as a rollback and be unreadable.
             // The cause is kept for the log only; T-19 puts none of it in the response.
             LOGGER.log(Level.FINE, e, () -> "Registration lost a race for " + username);

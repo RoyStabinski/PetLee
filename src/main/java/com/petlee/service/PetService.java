@@ -13,7 +13,6 @@ import com.petlee.mapper.PetMapper;
 import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.model.User;
-import com.petlee.repository.PetFilter;
 import com.petlee.repository.PetRepository;
 import com.petlee.repository.UserRepository;
 
@@ -89,12 +88,14 @@ public class PetService {
      * <p>{@code AVAILABLE} only and newest first, both enforced by T-08's query rather than here,
      * so no caller can widen them by passing a different filter. Open to everyone, guests included.
      *
-     * @param filter the contract's three optional criteria; {@code null} means no filter
+     * @param categoryId the category to restrict to, or {@code null} for any category
+     * @param size       the size to restrict to, or {@code null} for any size
+     * @param gender     the gender to restrict to, or {@code null} for any gender
      * @return the matching pets in gallery shape; empty when none match, never {@code null}
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<PetDTO> findGallery(PetFilter filter) {
-        return pets.findByFilter(filter).stream().map(PetMapper::toDto).toList();
+    public List<PetDTO> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
+        return pets.find(categoryId, size, gender, null, true).stream().map(PetMapper::toDto).toList();
     }
 
     /**
@@ -105,12 +106,15 @@ public class PetService {
      * here checks the caller's role — {@code @AdminOnly} on the resource has already done it, and
      * a second check that could disagree is worse than none.
      *
-     * @param filter the criteria; {@code null} means no filter
+     * @param categoryId the category to restrict to, or {@code null} for any category
+     * @param size       the size to restrict to, or {@code null} for any size
+     * @param gender     the gender to restrict to, or {@code null} for any gender
      * @return every matching listing, newest first, in every status
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<AdminPetDTO> findAllForAdmin(PetFilter filter) {
-        return pets.findAllForAdmin(filter).stream().map(PetMapper::toAdminDto).toList();
+    public List<AdminPetDTO> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
+        return pets.find(categoryId, size, gender, null, false).stream()
+                .map(PetMapper::toAdminDto).toList();
     }
 
     /**
@@ -256,7 +260,7 @@ public class PetService {
             Pet saved = pets.save(pet);
             return PetMapper.toDto(saved);
         } catch (OptimisticLockException e) {
-            // @Version caught a concurrent edit. AbstractRepository.save flushes, so it arrives
+            // @Version caught a concurrent edit. PetRepository.save flushes, so it arrives
             // here rather than at commit, where the transaction manager would have wrapped it.
             LOGGER.log(Level.FINE, e, () -> "Stale update of pet " + petId + " by user " + callerUserId);
             throw new ConflictException("STALE_PET",
@@ -342,7 +346,10 @@ public class PetService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<PetDTO> findByOwner(Long ownerUserId) {
-        return pets.findByOwnerId(ownerUserId).stream().map(PetMapper::toDto).toList();
+        if (ownerUserId == null) {
+            return List.of();
+        }
+        return pets.find(null, null, null, ownerUserId, false).stream().map(PetMapper::toDto).toList();
     }
 
     /**
@@ -363,9 +370,9 @@ public class PetService {
         if (petId == null || userId == null) {
             return false;
         }
-        // findDetailById rather than findById: it fetch-joins the owner, so this works under
-        // TxType.SUPPORTS, where a lazy owner proxy on a detached pet would not.
-        return pets.findDetailById(petId)
+        // findById fetch-joins the owner, so this works under TxType.SUPPORTS, where a lazy
+        // owner proxy on a detached pet would not.
+        return pets.findById(petId)
                 .map(pet -> isSameUser(pet.getOwner(), userId))
                 .orElse(false);
     }
@@ -388,7 +395,7 @@ public class PetService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     Pet requireById(Long petId) {
-        return pets.findDetailById(petId)
+        return pets.findById(petId)
                 .orElseThrow(() -> new NotFoundException("PET_NOT_FOUND", "No such pet: " + petId));
     }
 

@@ -5,7 +5,6 @@ import com.petlee.dto.PetDTO;
 import com.petlee.dto.StatusForm;
 import com.petlee.exception.ValidationException;
 import com.petlee.model.Pet;
-import com.petlee.repository.PetFilter;
 import com.petlee.rest.security.AdminOnly;
 import com.petlee.service.PetService;
 
@@ -77,11 +76,9 @@ public class AdminResource {
     public List<AdminPetDTO> findAll(@QueryParam("categoryId") String categoryId,
                                      @QueryParam("size") String size,
                                      @QueryParam("gender") String gender) {
-        return pets.findAllForAdmin(PetFilter.builder()
-                .categoryId(RestParams.categoryId(categoryId))
-                .size(RestParams.enumValue(Pet.PetSize.class, size, "size"))
-                .gender(RestParams.enumValue(Pet.PetGender.class, gender, "gender"))
-                .build());
+        return pets.findAllForAdmin(RestParams.categoryId(categoryId),
+                RestParams.enumValue(Pet.PetSize.class, size, "size"),
+                RestParams.enumValue(Pet.PetGender.class, gender, "gender"));
     }
 
     /**

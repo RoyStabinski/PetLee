@@ -5,7 +5,6 @@ import com.petlee.dto.PetDTO;
 import com.petlee.exception.ForbiddenException;
 import com.petlee.exception.PetLeeException;
 import com.petlee.model.Pet;
-import com.petlee.repository.PetFilter;
 import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
 
@@ -31,8 +30,9 @@ import java.util.List;
  * following a link from an email, with no visible reason why the catalogue looked almost empty.
  *
  * <h2>Filtering happens on the server</h2>
- * {@link #applyFilter()} re-queries {@link PetService#findGallery(PetFilter)} directly. There is
- * deliberately no code here that walks {@link #pets} and removes entries.
+ * {@link #applyFilter()} re-queries {@link PetService#findGallery(Integer, Pet.PetSize,
+ * Pet.PetGender)} directly. There is deliberately no code here that walks {@link #pets} and
+ * removes entries.
  */
 @Named("petBean")
 @ViewScoped
@@ -82,11 +82,9 @@ public class PetBean implements Serializable {
 
     private void load() {
         try {
-            pets = petService.findGallery(PetFilter.builder()
-                    .categoryId(selectedCategoryId)
-                    .size(selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize))
-                    .gender(selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender))
-                    .build());
+            pets = petService.findGallery(selectedCategoryId,
+                    selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
+                    selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
         } catch (PetLeeException e) {
             FacesContext.getCurrentInstance().addMessage(null,
                     new FacesMessage(FacesMessage.SEVERITY_ERROR, e.getMessage(), null));

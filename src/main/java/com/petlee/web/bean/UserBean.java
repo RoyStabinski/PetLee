@@ -109,7 +109,7 @@ public class UserBean implements Serializable {
     public String register() {
         try {
             if (password == null || !password.equals(confirmPassword)) {
-                fieldError(CONFIRM_PASSWORD_CLIENT_ID, message("auth.register.passwordMismatch"));
+                fieldError(CONFIRM_PASSWORD_CLIENT_ID, "The two passwords do not match.");
                 return null;
             }
 
@@ -123,7 +123,7 @@ public class UserBean implements Serializable {
 
             userService.register(form);
 
-            info(message("auth.register.success"));
+            info("Your account has been created. Please log in.");
             return keepingMessages(LOGIN);
 
         } catch (PetLeeException failure) {
@@ -246,13 +246,6 @@ public class UserBean implements Serializable {
     private static String keepingMessages(String outcome) {
         FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
         return outcome;
-    }
-
-    /** @return the bundle string for {@code key}, so no wording is written in Java either */
-    private static String message(String key) {
-        FacesContext context = FacesContext.getCurrentInstance();
-        return context.getApplication()
-                .evaluateExpressionGet(context, "#{msg['" + key + "']}", String.class);
     }
 
     private static void error(String text) {

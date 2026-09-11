@@ -23,6 +23,7 @@ import jakarta.servlet.http.Part;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -139,21 +140,22 @@ public class PetFormBean implements Serializable {
         }
 
         if (!hasFile()) {
-            return done("pet.saved.created");
+            return done("Your listing has been added.");
         }
 
         try {
             imageStorageService.store(created.getId(), uploadedFile.getInputStream(),
                     uploadedFile.getSubmittedFileName(), uploadedFile.getContentType(),
                     uploadedFile.getSize(), true, userBean.getCurrentUserId());
-            return done("pet.saved.createdWithPhoto");
+            return done("Your listing and its photograph have been added.");
 
-        } catch (PetLeeException | IOException photographFailed) {
+        } catch (PetLeeException | IOException | UncheckedIOException photographFailed) {
             // The listing exists. Saying "that failed" would be a lie the user would act on by
             // filling the whole form in again, and creating a duplicate. Saying "that worked"
             // would leave them wondering where the photograph went. So: what worked, what did
             // not, and where to go to try again.
-            warn(message("pet.saved.createdWithoutPhoto") + " " + reasonOf(photographFailed));
+            warn("Your listing was added, but the photograph could not be stored. You can add it from"
+                    + " here. " + reasonOf(photographFailed));
             return keepingMessages(DASHBOARD);
         }
     }
@@ -161,20 +163,20 @@ public class PetFormBean implements Serializable {
     private String update() {
         try {
             petService.update(petId, form, userBean.getCurrentUserId());
-            return done("pet.saved.updated");
+            return done("Your listing has been updated.");
 
         } catch (ConflictException staleEdit) {
             // The user-visible face of specification §4's concurrency control. A generic error
             // here would leave them with no idea what to do; this says exactly what.
-            error(message("pet.saved.conflict"));
+            error("This listing was changed by someone else. Reload it and try again.");
             return null;
         } catch (PetLeeException failure) {
             return reportAndStay(failure);
         }
     }
 
-    private String done(String messageKey) {
-        info(message(messageKey));
+    private String done(String text) {
+        info(text);
         // A redirect, not a forward: a refresh on a forwarded POST re-submits it, and the user
         // ends up with two identical listings and no idea which one is theirs.
         return keepingMessages(DASHBOARD);
@@ -187,11 +189,11 @@ public class PetFormBean implements Serializable {
     }
 
     public List<SelectItem> getSizeOptions() {
-        return options(SIZES, "size.");
+        return options(SIZES);
     }
 
     public List<SelectItem> getGenderOptions() {
-        return options(GENDERS, "gender.");
+        return options(GENDERS);
     }
 
     /** @return whether the form is editing an existing listing rather than creating one */
@@ -201,7 +203,7 @@ public class PetFormBean implements Serializable {
 
     /** @return the upload limits, so the user reads them before choosing a file rather than after */
     public String getUploadLimits() {
-        return message("pet.photo.limits");
+        return "JPEG, PNG, WebP or GIF, up to 5 MB.";
     }
 
     // ------------------------------------------------------------------------------- internals
@@ -254,10 +256,10 @@ public class PetFormBean implements Serializable {
         error(failure.getMessage());
     }
 
-    private static List<SelectItem> options(String[] values, String keyPrefix) {
+    private static List<SelectItem> options(String[] values) {
         List<SelectItem> items = new ArrayList<>(values.length);
         for (String value : values) {
-            items.add(new SelectItem(value, message(keyPrefix + value)));
+            items.add(new SelectItem(value, value.charAt(0) + value.substring(1).toLowerCase()));
         }
         return items;
     }
@@ -265,12 +267,6 @@ public class PetFormBean implements Serializable {
     private static String keepingMessages(String outcome) {
         FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
         return outcome;
-    }
-
-    private static String message(String key) {
-        FacesContext context = FacesContext.getCurrentInstance();
-        return context.getApplication()
-                .evaluateExpressionGet(context, "#{msg['" + key + "']}", String.class);
     }
 
     private static void error(String text) {

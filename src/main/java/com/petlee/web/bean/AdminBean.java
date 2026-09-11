@@ -48,10 +48,13 @@ public class AdminBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** The contract's enum strings. Only the labels are localised. */
+    /** The contract's enum strings, paired with the labels a moderator reads. */
     private static final String[] SIZES = {"SMALL", "MEDIUM", "LARGE"};
+    private static final String[] SIZE_LABELS = {"Small", "Medium", "Large"};
     private static final String[] GENDERS = {"MALE", "FEMALE"};
+    private static final String[] GENDER_LABELS = {"Male", "Female"};
     private static final String[] STATUSES = {"AVAILABLE", "ADOPTED", "REMOVED"};
+    private static final String[] STATUS_LABELS = {"Available", "Adopted", "Withdrawn"};
 
     @Inject private transient PetService petService;
     @Inject private transient CategoryService categoryService;
@@ -108,7 +111,7 @@ public class AdminBean implements Serializable {
      * @return {@code null}
      */
     public String hide(Long petId) {
-        return changeStatus(petId, "REMOVED", "admin.hidden");
+        return changeStatus(petId, "REMOVED", "The listing is hidden from the gallery. Restore puts it back.");
     }
 
     /**
@@ -118,13 +121,13 @@ public class AdminBean implements Serializable {
      * @return {@code null}
      */
     public String restore(Long petId) {
-        return changeStatus(petId, "AVAILABLE", "admin.restored");
+        return changeStatus(petId, "AVAILABLE", "The listing is public again.");
     }
 
-    private String changeStatus(Long petId, String status, String messageKey) {
+    private String changeStatus(Long petId, String status, String successMessage) {
         try {
             petService.changeStatus(petId, status);
-            info(message(messageKey));
+            info(successMessage);
             load();
         } catch (PetLeeException failure) {
             report(failure);
@@ -141,7 +144,7 @@ public class AdminBean implements Serializable {
     public String deletePet(Long petId) {
         try {
             petService.delete(petId, userBean.getCurrentUserId(), userBean.isAdmin());
-            info(message("admin.deleted"));
+            info("The listing has been deleted permanently.");
             load();
         } catch (PetLeeException failure) {
             report(failure);
@@ -159,7 +162,7 @@ public class AdminBean implements Serializable {
     public String addCategory() {
         try {
             CategoryDTO created = categoryService.create(newCategoryName);
-            info(message("admin.categoryAdded") + " " + created.getName());
+            info("Category added: " + created.getName());
             newCategoryName = null;
             load();
         } catch (PetLeeException failure) {
@@ -178,7 +181,7 @@ public class AdminBean implements Serializable {
     public String deleteCategory(Integer categoryId) {
         try {
             categoryService.delete(categoryId);
-            info(message("admin.categoryDeleted"));
+            info("The category has been deleted.");
             load();
         } catch (PetLeeException failure) {
             report(failure);
@@ -296,7 +299,8 @@ public class AdminBean implements Serializable {
      */
     public String confirmDelete(AdminPetDTO pet) {
         String name = pet == null || pet.getName() == null ? "" : pet.getName();
-        return MessageFormat.format(bundle("admin.confirmDelete"), name)
+        return MessageFormat.format(
+                        "Delete {0} permanently? The listing and its photographs cannot be recovered.", name)
                 .replace("\\", "\\\\")
                 .replace("'", "\\'");
     }
@@ -304,7 +308,7 @@ public class AdminBean implements Serializable {
     /** @return the category menu: "Any" plus every category */
     public List<SelectItem> getCategoryOptions() {
         List<SelectItem> items = new ArrayList<>(categories.size() + 1);
-        items.add(new SelectItem(null, bundle("gallery.filter.any")));
+        items.add(new SelectItem(null, "Any"));
         for (CategoryDTO category : categories) {
             items.add(new SelectItem(category.getId(), category.getName()));
         }
@@ -313,44 +317,34 @@ public class AdminBean implements Serializable {
 
     /** @return the size menu: "Any" plus the contract's three values */
     public List<SelectItem> getSizeOptions() {
-        return options(SIZES, "size.");
+        return options(SIZES, SIZE_LABELS);
     }
 
     /** @return the gender menu: "Any" plus the contract's two values */
     public List<SelectItem> getGenderOptions() {
-        return options(GENDERS, "gender.");
+        return options(GENDERS, GENDER_LABELS);
     }
 
     /** @return the status menu: "Any" plus the contract's three values */
     public List<SelectItem> getStatusOptions() {
-        return options(STATUSES, "status.");
+        return options(STATUSES, STATUS_LABELS);
     }
 
     /**
      * Builds a filter menu whose item values are the raw values the service takes and whose labels
-     * are localised.
+     * are the ones a moderator reads.
      */
-    private static List<SelectItem> options(String[] values, String keyPrefix) {
+    private static List<SelectItem> options(String[] values, String[] labels) {
         List<SelectItem> items = new ArrayList<>(values.length + 1);
-        items.add(new SelectItem(null, bundle("gallery.filter.any")));
-        for (String value : values) {
-            items.add(new SelectItem(value, bundle(keyPrefix + value)));
+        items.add(new SelectItem(null, "Any"));
+        for (int i = 0; i < values.length; i++) {
+            items.add(new SelectItem(values[i], labels[i]));
         }
         return items;
     }
 
     private void report(PetLeeException failure) {
         error(failure.getMessage());
-    }
-
-    private static String message(String key) {
-        return bundle(key);
-    }
-
-    private static String bundle(String key) {
-        FacesContext context = FacesContext.getCurrentInstance();
-        return context.getApplication()
-                .evaluateExpressionGet(context, "#{msg['" + key + "']}", String.class);
     }
 
     private static void error(String text) {

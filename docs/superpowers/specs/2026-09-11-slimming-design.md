@@ -67,12 +67,32 @@ filters, and is still independently demonstrable.
 
 ### What each tier may import
 
-- `com.petlee.web` (JSF) may import `service`, `dto` and `model`. It must not import `repository`.
-- `com.petlee.rest` may import `service` and `dto`. It must not import `repository` or `model`
-  beyond the two enums it parses (`Pet.PetSize`, `Pet.PetGender`).
-- `com.petlee.service` may import `repository`, `model` and `dto`. It must not import
-  anything from `web` or `rest`.
+- `com.petlee.web` (JSF) may import `service` and `model`. It must not import `repository`
+  or `dto`.
+- `com.petlee.rest` may import `service`, `model` and `dto`. It must not import `repository`.
+- `com.petlee.service` may import `repository` and `model`. It must not import `dto`,
+  `web` or `rest`.
 - Entities never cross the REST boundary. DTO records only. (Retained from the old ADR-001.)
+
+### Where the mapping happens, and why
+
+**Services return entities. REST resources map them to records. JSF binds to entities.**
+
+This is not the obvious arrangement, and it is chosen for one concrete reason: Jakarta
+Expression Language resolves properties through `java.beans.Introspector`, which requires
+JavaBean getters. A record's accessor is `name()`, not `getName()`, so `#{pet.name}` in a
+Facelets view bound to a record is at best server-dependent. Payara 6 is not installed in
+this environment, so that cannot be tested here — and a design whose correctness we cannot
+check is not one to ship. Entities have real getters and work on every server.
+
+The arrangement pays for itself twice over: the service layer stops knowing about DTOs at
+all, and there is exactly one mapping site (the resource method) rather than two.
+
+**The consequence is a rule, not a suggestion:** every repository query whose result reaches
+a JSF view must `LEFT JOIN FETCH` the associations that view touches. Entities returned from
+a `@Transactional` service method are detached, and a lazy association touched after that
+throws `LazyInitializationException`. In practice this means `category` and `owner` on every
+`Pet` query — which is what the existing code already does, and which §5.2 preserves.
 
 ### Package layout after the change
 
@@ -188,6 +208,10 @@ business logic and are not negotiable:
 - Authorisation decisions stay **in the service layer**, taking a caller id as a parameter.
   A service never reads a session or a thread-local. (Retained from the old standing rules.)
 
+**Every service method returns an entity or a list of entities, never a DTO** (see §3). This
+is a change from the current code, where `PetService.findGallery` returns `List<PetDTO>`.
+The DTO imports disappear from the whole tier.
+
 What goes:
 
 - All `Logger` fields and every `LOGGER.log(...)` call (~40 lines across the tier).
@@ -204,6 +228,9 @@ write the `Part` under a UUID filename, delete a stored file. No main-image flag
 per-pet collection management, no partial unique index to maintain.
 
 ### 5.4 DTOs (595 → 85)
+
+**These exist only at the REST boundary.** Nothing in `service` or `web` imports this
+package; a resource method is the only place a record is constructed. See §3 for why.
 
 Every DTO becomes a record with a static factory. `PetDTO` in full:
 
@@ -224,6 +251,13 @@ That is 10 lines replacing 70 lines of `PetDTO` plus its share of `PetMapper`. T
 `PetDetailDTO.of(Pet, boolean callerIsAuthenticated)` keeps the **guest contact-gating
 rule**: owner name, phone and email are populated only when the caller is authenticated.
 This is a §6 requirement and gets one of the four surviving unit tests (§8).
+
+The rule is enforced **twice, deliberately**, because the two tiers reach it by different
+routes: `PetDetailDTO.of` gates the JSON, and `petDetails.xhtml` wraps the contact block in
+`rendered="#{userBean.loggedIn}"`. These are not redundant — the REST gate is the security
+boundary and the view gate is presentation. Removing the REST gate would leak contact
+details to any unauthenticated `GET /api/pets/{id}`; removing the view gate would render an
+empty contact panel to guests.
 
 `AdminPetDTO`, `PetImageDTO` and `StatusForm` are deleted — the admin list uses `PetDTO`
 plus an owner name, images are a single URL on `PetDTO`, and the status change takes a
@@ -386,24 +420,32 @@ signatures, as ADR-003 already requires in place of Mockito.
 
 ## 10. Execution order
 
-Bottom-up, building after each step, so a break is always attributable to the step that
-caused it:
+**Every step must leave the tree compiling.** A naive bottom-up order (model, then
+repository, then service, …) does not: deleting `PetImage` breaks four higher tiers at
+once, and the tree stays broken for six consecutive steps, so a failure at step 8 cannot
+be attributed to anything. The order below is therefore by **vertical slice** — each step
+is one complete semantic change through however many tiers it touches, and
+`petlee-winmvn.sh clean compile` must pass before it is committed.
 
-1. Tests — delete first. They reference everything else and would otherwise block every
-   later step. Restore `pom.xml` to three dependencies in the same commit.
-2. Schema — the `pet.image_url` migration.
-3. Model — delete `PetImage`, slim the three entities, add Bean Validation annotations.
-4. Repository — delete `AbstractRepository` and `PetFilter`, rewrite the three repositories.
-5. DTOs — records with factories; delete the `mapper` package.
-6. Service — slim the three services, replace `ImageStorageService` with `ImageStore`,
-   collapse the exception hierarchy.
-7. REST — resources, merged security filter, single error mapper.
-8. JSF — delete `ApiClient`, rewrite the five beans, delete `messages.properties`.
-9. Views and CSS — inline the text, cut the unused rules.
-10. Docs — ADR-006, the two ADR amendments, the new `README.md`.
-11. Final count and a full manual pass through the four §10 scenarios.
+| # | Step | Why here |
+|---|---|---|
+| 1 | Tests deleted; `pom.xml` back to three dependencies | They reference everything and would block every later step |
+| 2 | Loopback removed — delete `ApiClient`/`ApiException`, beans inject services | Taking `ApiClient` out first removes it as a complication from every step after |
+| 3 | One photo per pet — schema migration, `PetImage` gone, `ImageStore`, `/image` endpoint | Self-contained vertical slice |
+| 4 | Repositories — delete `AbstractRepository` and `PetFilter`, JPQL queries | Nothing above depends on their internals |
+| 5 | Entity/record boundary — services return entities, DTOs become records, resources map, beans and views bind entities | One atomic change; splitting it breaks compilation either side |
+| 6 | Services slimmed — Bean Validation, logging removed, exceptions collapsed | Needs the boundary from step 5 settled |
+| 7 | REST — merged `SecurityFilter`, single `ErrorMapper` | |
+| 8 | Entities slimmed — `equals`/`hashCode`/`toString` removed, constraints added | Last, so earlier steps aren't chasing entity churn |
+| 9 | Views and CSS — text inlined, `messages.properties` deleted, unused rules cut | |
+| 10 | The four unit tests | Written against the final shape, not a moving one |
+| 11 | Docs — ADR-006, the ADR-002 and ADR-003 amendments, new `README.md`; final count | |
 
-Each step is one commit on a branch off `master`.
+Step 5 is deliberately the largest. It is the one change that cannot be decomposed without
+leaving the tree broken between commits: the moment a service returns `Pet` instead of
+`PetDTO`, its resource, its bean and its view must all move with it.
+
+Each step is one commit on `refactor/slim-to-assignment-size`.
 
 ## 11. Risks
 
@@ -427,7 +469,16 @@ form submits an invalid value and no message appears, this is the cause.
 
 **Records in JSON-B.** Yasson 3 handles records in both directions, but if the target
 server ships an older provider, `PetForm` deserialisation would fail at runtime rather
-than at compile time. Verified by the first `POST /api/pets` in step 11.
+than at compile time. Verified by the first `POST /api/pets` in step 11. This risk is
+confined to the REST tier: §3 keeps records out of the JSF tier entirely, where the
+equivalent failure — Jakarta EL not resolving a record accessor — would break every page
+rather than one endpoint.
+
+**Detached entities in the view.** Because services now return entities (§3), a lazy
+association touched inside a Facelets page throws `LazyInitializationException` — after
+the response has already begun, so it surfaces as a half-rendered page rather than a clean
+error. The guard is the `LEFT JOIN FETCH` rule in §3, and the symptom to watch for during
+step 11 is a pet card rendering its name but not its category.
 
 ## 12. Out of scope
 

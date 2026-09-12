@@ -1,14 +1,13 @@
 package com.petlee.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-
+// Validation lives on the form records in com.petlee.dto and is enforced by @Valid on the
+// service methods; persistence.xml sets jakarta.persistence.validation.mode=NONE, so
+// constraints declared here would never actually run.
 @Entity
 @Table(name = "users")
 public class User {
@@ -24,8 +23,6 @@ public class User {
     @Column(name = "user_id")
     private Long userId;
 
-    @NotBlank
-    @Size(max = 20)
     @Column(name = "user_name", nullable = false, unique = true, length = 20)
     private String userName;
 
@@ -34,29 +31,22 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String password;
 
-    @NotBlank
-    @Size(max = 50)
     @Column(name = "full_name", nullable = false, length = 50)
     private String fullName;
 
     // unique = true is documentation only (schema generation is off). The real constraint is
     // ux_users_email_lower, a unique index on LOWER(email): one mailbox, one account, whatever
     // case it is typed in.
-    @NotBlank
-    @Email
-    @Size(max = 100)
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 
     // 20 to match schema.sql: the contract's example "050-1234567" is 11 characters. ADR-002 #9.
-    @Size(max = 20)
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
     // POST /api/users/register sends "region" and the contract is frozen, so the entity
     // carries it. Deliberately absent from UserDTO — the contract's response has no such key.
     // ADR-002 #1.
-    @Size(max = 100)
     @Column(name = "region", length = 100)
     private String region;
 

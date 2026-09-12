@@ -1,7 +1,5 @@
 package com.petlee.model;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,8 +16,6 @@ public class Category {
     // unique = true is documentation only (schema generation is off). The real constraint is
     // ux_category_name_lower, a unique index on LOWER(category_name): one label, one category,
     // whatever case it is typed in.
-    @NotBlank
-    @Size(max = 50)
     @Column(name = "category_name", nullable = false, unique = true, length = 50)
     private String categoryName;
 

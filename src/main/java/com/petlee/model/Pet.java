@@ -1,13 +1,11 @@
 package com.petlee.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
+// Validation lives on the form records in com.petlee.dto and is enforced by @Valid on the
+// service methods; persistence.xml sets jakarta.persistence.validation.mode=NONE, so
+// constraints declared here would never actually run.
 @Entity
 @Table(name = "pet")
 public class Pet {
@@ -29,48 +27,37 @@ public class Pet {
     @Column(name = "pet_id")
     private Long petId;
 
-    @NotBlank
-    @Size(max = 100)
     @Column(name = "pet_name", nullable = false, length = 100)
     private String petName;
 
-    @Size(max = 100)
     @Column(name = "breed", length = 100)
     private String breed;
 
-    @Min(0)
-    @Max(50)
     @Column(name = "age")
     private Integer age;
 
-    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "gender",nullable = false)
     private PetGender gender;
 
-    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "size", nullable = false)
     private PetSize size;
 
-    @Size(max = 255)
     @Column(name = "short_desc", length = 255)
     private String shortDesc;
 
     @Column(name = "long_desc", columnDefinition = "TEXT")
     private String longDesc;
 
-    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private PetStatus status;
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;

@@ -5,11 +5,11 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">#{msg['profile.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">My profile - Pet-Lee</ui:define>
 
     <ui:define name="content">
 
-        <h1>#{msg['profile.title']}</h1>
+        <h1>My profile</h1>
 
         <!--
             The user's own details, so no privacy gate applies here - specification section 6 is
@@ -18,26 +18,26 @@
         -->
         <div class="panel">
             <dl class="detail-facts">
-                <dt>#{msg['auth.fullName']}</dt>
+                <dt>Full name</dt>
                 <dd>#{userBean.currentUser.fullName}</dd>
-                <dt>#{msg['auth.username']}</dt>
+                <dt>Username</dt>
                 <dd>#{userBean.currentUser.userName}</dd>
-                <dt>#{msg['auth.email']}</dt>
+                <dt>Email</dt>
                 <dd>#{userBean.currentUser.email}</dd>
-                <dt>#{msg['auth.phone']}</dt>
+                <dt>Telephone</dt>
                 <dd>#{userBean.currentUser.phoneNumber}</dd>
-                <dt>#{msg['pet.status']}</dt>
-                <dd>#{msg['role.'.concat(userBean.currentUser.role)]}</dd>
+                <dt>Status</dt>
+                <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
             </dl>
         </div>
 
-        <h2>#{msg['profile.listings']}</h2>
+        <h2>My listings</h2>
 
         <ui:fragment rendered="#{petBean.noListings}">
             <div class="empty-state">
-                <p>#{msg['profile.empty']}</p>
+                <p>You have not posted any listings yet.</p>
                 <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
-                    #{msg['profile.addFirst']}
+                    Add your first pet
                 </h:outputLink>
             </div>
         </ui:fragment>
@@ -48,11 +48,11 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th scope="col">#{msg['profile.column.photo']}</th>
-                                <th scope="col">#{msg['profile.column.name']}</th>
-                                <th scope="col">#{msg['profile.column.category']}</th>
-                                <th scope="col">#{msg['profile.column.status']}</th>
-                                <th scope="col">#{msg['profile.column.actions']}</th>
+                                <th scope="col">Photograph</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Category</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -66,7 +66,7 @@
                                     <td>#{pet.category.categoryName}</td>
                                     <td>
                                         <span class="#{petBean.statusStyle(pet)}">
-                                            #{msg['status.'.concat(pet.status)]}
+                                            #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
                                         </span>
                                     </td>
                                     <td>
@@ -74,7 +74,7 @@
                                             <h:commandLink id="edit"
                                                            action="#{petBean.edit(pet.petId)}"
                                                            styleClass="button-secondary"
-                                                           value="#{msg['form.edit']}"/>
+                                                           value="Edit"/>
                                             <!--
                                                 A confirmation before the call, because deletion is
                                                 permanent and takes the photographs with it. A
@@ -83,8 +83,8 @@
                                             <h:commandLink id="delete"
                                                            action="#{petBean.delete(pet.petId)}"
                                                            styleClass="button button-danger"
-                                                           value="#{msg['form.delete']}"
-                                                           onclick="return confirm('#{msg['form.confirmDelete']}');"/>
+                                                           value="Delete"
+                                                           onclick="return confirm('Delete this listing permanently? Its photographs go with it.');"/>
                                         </div>
                                     </td>
                                 </tr>

@@ -18,35 +18,35 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">#{msg['admin.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">Admin panel - Pet-Lee</ui:define>
 
     <ui:define name="content">
 
-        <h1>#{msg['admin.title']}</h1>
+        <h1>Admin panel</h1>
 
         <!-- ============================================================ listing management -->
-        <h2>#{msg['admin.listings']}</h2>
+        <h2>Listing management</h2>
 
         <h:form id="adminFilterForm" styleClass="panel filter-panel">
             <fieldset>
-                <legend>#{msg['gallery.filter.legend']}</legend>
+                <legend>Narrow the list</legend>
 
                 <div class="field">
-                    <h:outputLabel for="category" value="#{msg['gallery.filter.category']}"/>
+                    <h:outputLabel for="category" value="Category"/>
                     <h:selectOneMenu id="category" value="#{adminBean.selectedCategoryId}">
                         <f:selectItems value="#{adminBean.categoryOptions}"/>
                     </h:selectOneMenu>
                 </div>
 
                 <div class="field">
-                    <h:outputLabel for="size" value="#{msg['gallery.filter.size']}"/>
+                    <h:outputLabel for="size" value="Size"/>
                     <h:selectOneMenu id="size" value="#{adminBean.selectedSize}">
                         <f:selectItems value="#{adminBean.sizeOptions}"/>
                     </h:selectOneMenu>
                 </div>
 
                 <div class="field">
-                    <h:outputLabel for="gender" value="#{msg['gallery.filter.gender']}"/>
+                    <h:outputLabel for="gender" value="Gender"/>
                     <h:selectOneMenu id="gender" value="#{adminBean.selectedGender}">
                         <f:selectItems value="#{adminBean.genderOptions}"/>
                     </h:selectOneMenu>
@@ -58,16 +58,16 @@
                     way to ask.
                 -->
                 <div class="field">
-                    <h:outputLabel for="status" value="#{msg['admin.filter.status']}"/>
+                    <h:outputLabel for="status" value="Status"/>
                     <h:selectOneMenu id="status" value="#{adminBean.selectedStatus}">
                         <f:selectItems value="#{adminBean.statusOptions}"/>
                     </h:selectOneMenu>
                 </div>
 
                 <div class="actions">
-                    <h:commandButton id="apply" value="#{msg['gallery.filter.apply']}"
+                    <h:commandButton id="apply" value="Apply"
                                      action="#{adminBean.applyFilter}"/>
-                    <h:commandButton id="clear" value="#{msg['gallery.filter.clear']}"
+                    <h:commandButton id="clear" value="Clear"
                                      action="#{adminBean.clearFilters}"
                                      styleClass="button-secondary"/>
                 </div>
@@ -76,7 +76,7 @@
 
         <ui:fragment rendered="#{adminBean.noListings}">
             <div class="empty-state">
-                <p>#{msg['admin.listings.empty']}</p>
+                <p>No listing matches these filters.</p>
             </div>
         </ui:fragment>
 
@@ -86,13 +86,13 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th scope="col">#{msg['profile.column.photo']}</th>
-                                <th scope="col">#{msg['profile.column.name']}</th>
-                                <th scope="col">#{msg['admin.column.owner']}</th>
-                                <th scope="col">#{msg['profile.column.category']}</th>
-                                <th scope="col">#{msg['profile.column.status']}</th>
-                                <th scope="col">#{msg['admin.column.created']}</th>
-                                <th scope="col">#{msg['profile.column.actions']}</th>
+                                <th scope="col">Photograph</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Posted by</th>
+                                <th scope="col">Category</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Created</th>
+                                <th scope="col">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -107,7 +107,7 @@
                                     <td>#{pet.category.categoryName}</td>
                                     <td>
                                         <span class="#{adminBean.statusStyle(pet)}">
-                                            #{msg['status.'.concat(pet.status)]}
+                                            #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
                                         </span>
                                     </td>
                                     <td>#{adminBean.createdOn(pet)}</td>
@@ -117,16 +117,16 @@
                                                            rendered="#{not adminBean.isHidden(pet)}"
                                                            action="#{adminBean.hide(pet.petId)}"
                                                            styleClass="button-secondary"
-                                                           value="#{msg['admin.hide']}"/>
+                                                           value="Hide"/>
                                             <h:commandLink id="restore"
                                                            rendered="#{adminBean.isHidden(pet)}"
                                                            action="#{adminBean.restore(pet.petId)}"
                                                            styleClass="button-secondary"
-                                                           value="#{msg['admin.restore']}"/>
+                                                           value="Restore"/>
                                             <h:commandLink id="delete"
                                                            action="#{adminBean.deletePet(pet.petId)}"
                                                            styleClass="button button-danger"
-                                                           value="#{msg['form.delete']}"
+                                                           value="Delete"
                                                            onclick="return confirm('#{adminBean.confirmDelete(pet)}');"/>
                                         </div>
                                     </td>
@@ -139,17 +139,17 @@
         </ui:fragment>
 
         <!-- =========================================================== category management -->
-        <h2>#{msg['admin.categories']}</h2>
+        <h2>Category management</h2>
 
         <h:form id="categoryForm">
             <div class="panel">
                 <div class="field">
-                    <h:outputLabel for="newCategory" value="#{msg['admin.category.name']}"/>
+                    <h:outputLabel for="newCategory" value="New category"/>
                     <h:inputText id="newCategory" value="#{adminBean.newCategoryName}"
                                  maxlength="50"/>
                 </div>
                 <div class="actions">
-                    <h:commandButton id="addCategory" value="#{msg['admin.category.add']}"
+                    <h:commandButton id="addCategory" value="Add category"
                                      action="#{adminBean.addCategory}"/>
                 </div>
             </div>
@@ -158,9 +158,9 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th scope="col">#{msg['profile.column.name']}</th>
-                            <th scope="col">#{msg['admin.column.count']}</th>
-                            <th scope="col">#{msg['profile.column.actions']}</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Listings</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -178,9 +178,9 @@
                                     <h:commandLink id="deleteCategory"
                                                    action="#{adminBean.deleteCategory(category.categoryId)}"
                                                    styleClass="button button-danger"
-                                                   value="#{msg['form.delete']}"
+                                                   value="Delete"
                                                    disabled="#{adminBean.isInUse(category)}"
-                                                   title="#{adminBean.isInUse(category) ? msg['admin.category.inUse'] : ''}"/>
+                                                   title="#{adminBean.isInUse(category) ? 'A category that still holds listings cannot be deleted.' : ''}"/>
                                 </td>
                             </tr>
                         </ui:repeat>

@@ -9,45 +9,45 @@
         <f:viewAction action="#{userBean.redirectHome}" if="#{userBean.loggedIn}"/>
     </f:metadata>
 
-    <ui:define name="title">#{msg['auth.login.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">Log in - Pet-Lee</ui:define>
 
     <ui:define name="content">
 
         <div class="panel panel-narrow">
-            <h1>#{msg['auth.login.title']}</h1>
+            <h1>Log in</h1>
 
             <h:form id="loginForm">
 
                 <div class="field">
-                    <h:outputLabel for="username" value="#{msg['auth.username']}"/>
+                    <h:outputLabel for="username" value="Username"/>
                     <h:inputText id="username"
                                  value="#{userBean.username}"
                                  required="true"
-                                 requiredMessage="#{msg['form.required']}"
+                                 requiredMessage="Required"
                                  autocomplete="username"/>
                     <h:message for="username" styleClass="field-error"/>
                 </div>
 
                 <div class="field">
-                    <h:outputLabel for="password" value="#{msg['auth.password']}"/>
+                    <h:outputLabel for="password" value="Password"/>
                     <h:inputSecret id="password"
                                    value="#{userBean.password}"
                                    required="true"
-                                   requiredMessage="#{msg['form.required']}"
+                                   requiredMessage="Required"
                                    redisplay="false"
                                    autocomplete="current-password"/>
                     <h:message for="password" styleClass="field-error"/>
                 </div>
 
                 <div class="actions">
-                    <h:commandButton id="submit" value="#{msg['auth.login.submit']}" action="#{userBean.login}"/>
+                    <h:commandButton id="submit" value="Log in" action="#{userBean.login}"/>
                 </div>
 
             </h:form>
 
             <p>
-                #{msg['auth.login.noAccount']}
-                <h:outputLink value="#{request.contextPath}/register.xhtml">#{msg['nav.register']}</h:outputLink>
+                No account yet?
+                <h:outputLink value="#{request.contextPath}/register.xhtml">Register</h:outputLink>
             </p>
         </div>
 

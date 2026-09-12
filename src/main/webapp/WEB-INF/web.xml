@@ -8,15 +8,10 @@
     Faces artifacts are present, mapped to *.xhtml among others. Declaring it by hand risks a
     duplicate mapping, and on some servers a deployment failure. (T-17 criterion 6.)
   * No <servlet> for Jakarta REST. @ApplicationPath("/api") on JakartaRestApplication is the
-    declaration; a hand-written mapping would collide with it. The image upload endpoint's
-    multipart limits live on PetResource's @Consumes(MULTIPART_FORM_DATA) method instead of here,
-    because naming the servlet in this file - even with no class and no mapping, purely to add
-    <multipart-config> - makes RESTEasy conclude the application is configured by hand and skip
-    registering it. On WildFly that produced a deployment that started cleanly and answered 404 to
-    every /api path.
-  * The <error-page> entries below are T-33's, and cover the JSF tier only. REST error handling
-    stays in T-19's exception mappers: a request to /api never reaches these pages, because a
-    mapper answers it with an ErrorDTO before the container's error machinery is involved.
+    declaration; a hand-written mapping would collide with it.
+  * The <error-page> entries below cover the JSF tier only. REST error handling stays in T-19's
+    exception mappers: a request to /api never reaches these pages, because a mapper answers it
+    with an ErrorDTO before the container's error machinery is involved.
   * metadata-complete is left at its default of false: the annotations above are only found if the
     server scans the classes.
 -->
@@ -31,9 +26,7 @@
     <!--
       Faces project stage. 'Development' adds validation warnings to the rendered page and shows
       the exception detail on the error view - useful locally, and an information leak in front of
-      real users. Every deployed environment sets 'Production' here; T-42's runbook makes that a
-      step of the deployment rather than a code change, which is why the value lives in a context
-      parameter and is not hard-coded anywhere in Java.
+      real users. Every deployed environment sets 'Production' here.
     -->
     <context-param>
         <param-name>jakarta.faces.PROJECT_STAGE</param-name>
@@ -41,28 +34,12 @@
     </context-param>
 
     <!--
-      The Secure flag on the session cookie. Read by SessionCookieConfigurator, which applies it at
-      start-up; <cookie-config> below cannot be parameterised, and this flag has to differ between
-      environments. 'false' locally, because a Secure cookie is never sent over plain HTTP and
-      login would appear to succeed and then silently forget itself. T-42 sets it to 'true' the
-      moment the deployment is behind TLS.
-    -->
-    <context-param>
-        <param-name>petlee.session.cookie.secure</param-name>
-        <param-value>false</param-value>
-    </context-param>
-
-    <!--
       Strip XML comments from the rendered page.
 
-      Two reasons, and the first one bites immediately. Facelets does not treat a comment as inert:
-      by default it copies it into the response and evaluates any EL inside it, so a comment
-      explaining that "all text comes from #{msg.*}" is not documentation, it is an expression -
-      and that one fails to parse, replacing the whole page with a Facelets error. Every comment in
-      every view is a live expression until this is set.
-
-      The second reason is that implementation notes written for the next engineer are not written
-      for the user, and there is no reason to ship them to a browser.
+      Facelets does not treat a comment as inert: by default it copies it into the response and
+      evaluates any EL inside it, so a comment mentioning an expression is not documentation, it is
+      an expression - and one that fails to parse replaces the whole page with a Facelets error.
+      This is load-bearing, not tidiness.
     -->
     <context-param>
         <param-name>jakarta.faces.FACELETS_SKIP_COMMENTS</param-name>
@@ -70,20 +47,12 @@
     </context-param>
 
     <!--
-      Sessions are the whole authentication model: T-20 stores the logged-in user in one, T-18's
-      filter reads it on every modifying request, and T-24 forwards the browser's JSESSIONID from
-      the JSF tier to the REST tier over loopback (ADR-001).
-
-      30 minutes is the specification's idle window.
+      Sessions are the whole authentication model: the logged-in user lives in one, and every
+      modifying request is checked against it.
 
       http-only keeps JavaScript away from document.cookie's JSESSIONID. Since the cookie IS the
       credential here - there is no bearer token to steal instead - an injected script that could
-      read it would own the account. This is the one line of web.xml with a direct security
-      consequence, and T-17 criterion 3 asserts on the Set-Cookie header it produces.
-
-      secure is set programmatically from the context parameter above, so it is deliberately
-      absent here: a value in this element would be applied first and then overwritten, which
-      reads as though it were in force when it is not.
+      read it would own the account.
     -->
     <session-config>
         <session-timeout>30</session-timeout>
@@ -93,26 +62,16 @@
     </session-config>
 
     <!--
-      The landing page. index.xhtml is replaced by the real gallery in T-29; until then it proves
-      Faces, EL and CDI are wired (T-17 criteria 4 and 5).
-    -->
-    <!--
-      T-33's error pages. Four entries, and each exists because the alternative is a container
-      page: a Payara or WildFly stack trace, which tells a user nothing and an attacker rather a
-      lot.
+      Two error pages, not four. error.xhtml covers 403, 500 and an expired view alike, on the
+      view that none of the three benefit from a user being told which HTTP code fired; 404 keeps
+      its own page because "not found" is the one case worth naming.
 
       The status code is preserved by the container on this path - it sets the status before
-      forwarding - so an error page answers 403, 404 or 500 rather than a cheerful 200. That
-      matters to crawlers, to monitoring and to T-39's tests, all of which read the status and not
-      the prose.
-
-      ViewExpiredException gets its own page. After the 30-minute timeout above, a user who
-      submits a form they left open otherwise meets a raw exception name; expired.xhtml explains
-      what happened in a sentence and offers the login page.
+      forwarding - so an error page answers 403, 404 or 500 rather than a cheerful 200.
     -->
     <error-page>
         <error-code>403</error-code>
-        <location>/error/403.xhtml</location>
+        <location>/error/error.xhtml</location>
     </error-page>
     <error-page>
         <error-code>404</error-code>
@@ -120,11 +79,11 @@
     </error-page>
     <error-page>
         <error-code>500</error-code>
-        <location>/error/500.xhtml</location>
+        <location>/error/error.xhtml</location>
     </error-page>
     <error-page>
         <exception-type>jakarta.faces.application.ViewExpiredException</exception-type>
-        <location>/error/expired.xhtml</location>
+        <location>/error/error.xhtml</location>
     </error-page>
 
     <welcome-file-list>

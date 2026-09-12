@@ -5,47 +5,47 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">#{msg['gallery.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">Pets looking for a home - Pet-Lee</ui:define>
 
     <ui:define name="content">
 
-        <h1>#{msg['gallery.title']}</h1>
+        <h1>Pets looking for a home</h1>
 
         <div class="gallery-layout">
 
             <h:form id="filterForm" styleClass="panel filter-panel">
                 <fieldset>
-                    <legend>#{msg['gallery.filter.legend']}</legend>
+                    <legend>Narrow the list</legend>
 
                     <div class="field">
-                        <h:outputLabel for="category" value="#{msg['gallery.filter.category']}"/>
+                        <h:outputLabel for="category" value="Category"/>
                         <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
-                            <f:selectItem itemValue="#{null}" itemLabel="#{msg['gallery.filter.any']}"/>
+                            <f:selectItem itemValue="#{null}" itemLabel="Any"/>
                             <f:selectItems value="#{petBean.categories}" var="c"
                                            itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
                         </h:selectOneMenu>
                     </div>
 
                     <div class="field">
-                        <h:outputLabel for="size" value="#{msg['gallery.filter.size']}"/>
+                        <h:outputLabel for="size" value="Size"/>
                         <h:selectOneMenu id="size" value="#{petBean.selectedSize}">
                             <f:selectItems value="#{petBean.sizeOptions}"/>
                         </h:selectOneMenu>
                     </div>
 
                     <div class="field">
-                        <h:outputLabel for="gender" value="#{msg['gallery.filter.gender']}"/>
+                        <h:outputLabel for="gender" value="Gender"/>
                         <h:selectOneMenu id="gender" value="#{petBean.selectedGender}">
                             <f:selectItems value="#{petBean.genderOptions}"/>
                         </h:selectOneMenu>
                     </div>
 
                     <div class="actions">
-                        <h:commandButton id="apply" value="#{msg['gallery.filter.apply']}"
+                        <h:commandButton id="apply" value="Apply"
                                          action="#{petBean.applyFilter}">
                             <f:ajax execute="@form" render=":globalMessages :galleryGrid"/>
                         </h:commandButton>
-                        <h:commandButton id="clear" value="#{msg['gallery.filter.clear']}"
+                        <h:commandButton id="clear" value="Clear"
                                          action="#{petBean.clearFilters}"
                                          styleClass="button-secondary">
                             <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
@@ -63,9 +63,9 @@
                 -->
                 <ui:fragment rendered="#{petBean['empty']}">
                     <div class="empty-state">
-                        <p>#{msg['gallery.empty']}</p>
+                        <p>No pets match your search just yet.</p>
                         <h:form>
-                            <h:commandButton id="clearEmpty" value="#{msg['gallery.filter.clear']}"
+                            <h:commandButton id="clearEmpty" value="Clear"
                                              action="#{petBean.clearFilters}"
                                              styleClass="button-secondary"/>
                         </h:form>
@@ -92,8 +92,8 @@
                                     <p class="card-desc">#{pet.shortDesc}</p>
 
                                     <ul class="tags">
-                                        <li class="tag">#{msg['size.'.concat(pet.size)]}</li>
-                                        <li class="tag">#{msg['gender.'.concat(pet.gender)]}</li>
+                                        <li class="tag">#{pet.size == 'SMALL' ? 'Small' : (pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</li>
+                                        <li class="tag">#{pet.gender == 'MALE' ? 'Male' : 'Female'}</li>
                                         <li class="tag">#{pet.category.categoryName}</li>
                                     </ul>
 
@@ -101,7 +101,7 @@
                                         <h:form>
                                             <h:commandLink action="#{petBean.viewDetails(pet.petId)}"
                                                            styleClass="button"
-                                                           value="#{msg['gallery.card.details']}"/>
+                                                           value="See details"/>
                                         </h:form>
                                     </div>
                                 </div>

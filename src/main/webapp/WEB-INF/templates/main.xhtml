@@ -26,45 +26,45 @@
 <h:head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title><ui:insert name="title">#{msg['app.name']}</ui:insert></title>
+    <title><ui:insert name="title">Pet-Lee</ui:insert></title>
     <h:outputStylesheet library="css" name="petlee.css"/>
 </h:head>
 
 <h:body styleClass="page">
 
     <!-- First stop for a keyboard or screen-reader user; visible only once focused. -->
-    <a class="skip-link" href="#content">#{msg['app.skipToContent']}</a>
+    <a class="skip-link" href="#content">Skip to content</a>
 
     <header class="site-header">
         <div class="container">
 
             <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="brand">
-                <span class="brand-name">#{msg['app.name']}</span>
-                <span class="brand-tagline">#{msg['app.tagline']}</span>
+                <span class="brand-name">Pet-Lee</span>
+                <span class="brand-tagline">Find a companion, give a home</span>
             </h:outputLink>
 
-            <nav class="nav" aria-label="#{msg['nav.label']}">
+            <nav class="nav" aria-label="Main navigation">
 
-                <h:outputLink value="#{request.contextPath}/index.xhtml">#{msg['nav.home']}</h:outputLink>
+                <h:outputLink value="#{request.contextPath}/index.xhtml">Home</h:outputLink>
 
                 <!-- Guest -->
                 <ui:fragment rendered="#{not userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/login.xhtml">#{msg['nav.login']}</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/register.xhtml">#{msg['nav.register']}</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/login.xhtml">Log in</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/register.xhtml">Register</h:outputLink>
                 </ui:fragment>
 
                 <!-- Member -->
                 <ui:fragment rendered="#{userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/addPet.xhtml">#{msg['nav.addPet']}</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/profile.xhtml">#{msg['nav.myListings']}</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/addPet.xhtml">Add a pet</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml">My listings</h:outputLink>
 
                     <!-- Administrator: the member links plus this one. -->
                     <ui:fragment rendered="#{userBean.admin}">
-                        <h:outputLink value="#{request.contextPath}/admin.xhtml">#{msg['nav.admin']}</h:outputLink>
+                        <h:outputLink value="#{request.contextPath}/admin.xhtml">Admin panel</h:outputLink>
                     </ui:fragment>
 
                     <span class="nav-user">
-                        <h:outputFormat value="#{msg['nav.signedInAs']}">
+                        <h:outputFormat value="Signed in as {0}">
                             <f:param value="#{userBean.displayName}"/>
                         </h:outputFormat>
                     </span>
@@ -74,7 +74,7 @@
                         so can be triggered by any image tag on any page the user visits.
                     -->
                     <h:form id="logoutForm">
-                        <h:commandButton id="logout" value="#{msg['nav.logout']}"
+                        <h:commandButton id="logout" value="Log out"
                                          action="#{userBean.logout}"
                                          styleClass="button-secondary"/>
                     </h:form>
@@ -111,7 +111,7 @@
 
     <footer class="site-footer">
         <div class="container">
-            <ui:insert name="footer">#{msg['app.footer']}</ui:insert>
+            <ui:insert name="footer">Pet-Lee - a not-for-profit pet adoption exchange</ui:insert>
         </div>
     </footer>
 

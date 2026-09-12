@@ -551,23 +551,6 @@ span.button-danger {
     margin: 0;
 }
 
-.thumbs {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 0.6rem;
-    list-style: none;
-    margin: 0.75rem 0 0;
-    padding: 0;
-}
-
-.thumbs img {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    border-radius: var(--radius);
-    border: 1px solid var(--line);
-}
-
 /* --- tables (listings and admin) ------------------------------------------------------------------
  * Wrapped in .table-scroll so a wide table scrolls inside its own box instead of making the whole
  * page scroll sideways on a phone.

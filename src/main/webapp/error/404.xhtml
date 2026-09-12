@@ -4,16 +4,16 @@
                 xmlns:h="jakarta.faces.html"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">#{msg['error.404.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">We could not find that page - Pet-Lee</ui:define>
 
     <ui:define name="content">
         <div class="panel panel-narrow">
-            <h1>#{msg['error.404.title']}</h1>
-            <p>#{msg['error.404.body']}</p>
+            <h1>We could not find that page</h1>
+            <p>The page or listing you asked for does not exist, or has been withdrawn.</p>
 
             <div class="actions">
                 <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button">
-                    #{msg['error.backHome']}
+                    Back to the gallery
                 </h:outputLink>
             </div>
         </div>

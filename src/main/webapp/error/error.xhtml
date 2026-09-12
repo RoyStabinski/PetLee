@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The general error page - covers 403, 500 and a expired view (ViewExpiredException) alike.
+
+    One page and deliberately generic wording, rather than three near-identical pages each naming
+    its own status: none of the three benefit from a user being told which HTTP code fired, and a
+    single page is one less place for the same sentence to drift.
+-->
 <ui:composition template="/WEB-INF/templates/main.xhtml"
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">#{msg['error.500.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">Something went wrong - Pet-Lee</ui:define>
 
     <ui:define name="content">
         <div class="panel panel-narrow">
-            <h1>#{msg['error.500.title']}</h1>
-            <p>#{msg['error.500.body']}</p>
+            <h1>Something went wrong</h1>
+            <p>We could not complete that request. Please try again.</p>
 
             <!--
                 What is deliberately not here: the exception, its class, its message, its stack
@@ -23,13 +30,13 @@
             -->
             <ui:fragment rendered="#{not empty requestScope['petlee.correlationId']}">
                 <p class="field-hint">
-                    #{msg['error.reference']}: #{requestScope['petlee.correlationId']}
+                    Reference: #{requestScope['petlee.correlationId']}
                 </p>
             </ui:fragment>
 
             <div class="actions">
                 <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button">
-                    #{msg['error.backHome']}
+                    Back to the gallery
                 </h:outputLink>
             </div>
         </div>

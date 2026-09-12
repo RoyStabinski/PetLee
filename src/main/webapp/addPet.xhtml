@@ -5,11 +5,11 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">#{msg['pet.add.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">Add a pet - Pet-Lee</ui:define>
 
     <ui:define name="content">
         <div class="panel">
-            <h1>#{msg['pet.add.title']}</h1>
+            <h1>Add a pet</h1>
 
             <!--
                 enctype is not optional. Without it the browser posts the form as
@@ -20,16 +20,16 @@
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
                 <div class="field field-wide">
-                    <h:outputLabel for="photo" value="#{msg['pet.photo']}"/>
+                    <h:outputLabel for="photo" value="Photograph"/>
                     <h:inputFile id="photo" value="#{petFormBean.uploadedFile}" accept="image/*"/>
                     <h:message for="photo" styleClass="field-error"/>
                     <span class="field-hint">#{petFormBean.uploadLimits}</span>
                 </div>
 
                 <div class="actions">
-                    <h:commandButton id="save" value="#{msg['form.save']}" action="#{petFormBean.save}"/>
+                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
                     <h:outputLink value="#{request.contextPath}/profile.xhtml"
-                                  styleClass="button-secondary">#{msg['form.cancel']}</h:outputLink>
+                                  styleClass="button-secondary">Cancel</h:outputLink>
                 </div>
             </h:form>
         </div>

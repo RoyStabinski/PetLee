@@ -10,11 +10,11 @@
         <f:viewAction action="#{petFormBean.load}"/>
     </f:metadata>
 
-    <ui:define name="title">#{msg['pet.edit.title']} - #{msg['app.name']}</ui:define>
+    <ui:define name="title">Edit your listing - Pet-Lee</ui:define>
 
     <ui:define name="content">
         <div class="panel">
-            <h1>#{msg['pet.edit.title']}</h1>
+            <h1>Edit your listing</h1>
 
             <!--
                 No file input here. A listing gains photographs one at a time from the dashboard;
@@ -24,9 +24,9 @@
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
                 <div class="actions">
-                    <h:commandButton id="save" value="#{msg['form.save']}" action="#{petFormBean.save}"/>
+                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
                     <h:outputLink value="#{request.contextPath}/profile.xhtml"
-                                  styleClass="button-secondary">#{msg['form.cancel']}</h:outputLink>
+                                  styleClass="button-secondary">Cancel</h:outputLink>
                 </div>
             </h:form>
         </div>

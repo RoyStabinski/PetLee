@@ -1,6 +1,11 @@
 package com.petlee.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,37 +29,48 @@ public class Pet {
     @Column(name = "pet_id")
     private Long petId;
 
+    @NotBlank
+    @Size(max = 100)
     @Column(name = "pet_name", nullable = false, length = 100)
     private String petName;
 
+    @Size(max = 100)
     @Column(name = "breed", length = 100)
     private String breed;
 
+    @Min(0)
+    @Max(50)
     @Column(name = "age")
     private Integer age;
 
+    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "gender",nullable = false)
     private PetGender gender;
 
+    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "size", nullable = false)
     private PetSize size;
 
+    @Size(max = 255)
     @Column(name = "short_desc", length = 255)
     private String shortDesc;
 
     @Column(name = "long_desc", columnDefinition = "TEXT")
     private String longDesc;
 
+    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private PetStatus status;
 
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
@@ -192,30 +208,5 @@ public class Pet {
     // No setter — the persistence provider owns this field.
     public Long getVersion(){
         return version;
-    }
-
-    // Identity comparison on the id alone. Two unpersisted pets are never equal, even when
-    // every other field matches — they are two distinct rows waiting to be written.
-    @Override
-    public boolean equals(Object o){
-        if(this == o){
-            return true;
-        }
-        if(!(o instanceof Pet other)){
-            return false;
-        }
-        return petId != null && petId.equals(other.petId);
-    }
-
-    // Constant, deliberately. A hash derived from the id would change when the provider
-    // assigns one on persist, and an entity already inside a HashSet would become unfindable.
-    @Override
-    public int hashCode(){
-        return Pet.class.hashCode();
-    }
-
-    @Override
-    public String toString(){
-        return "Pet{petId=" + petId + ", petName='" + petName + "'}";
     }
 }

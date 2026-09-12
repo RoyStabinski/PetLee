@@ -1,6 +1,9 @@
 package com.petlee.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,13 +17,15 @@ public class User {
         USER, ADMIN
     }
 
-    // Long, not long: an unpersisted User must report a null id so equals() below can tell
-    // "not saved yet" from "saved with id 0". ADR-002 #8.
+    // Long, not long: an unpersisted User must report a null id, not "saved with id 0".
+    // ADR-002 #8.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
     private Long userId;
 
+    @NotBlank
+    @Size(max = 20)
     @Column(name = "user_name", nullable = false, unique = true, length = 20)
     private String userName;
 
@@ -29,22 +34,29 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String password;
 
+    @NotBlank
+    @Size(max = 50)
     @Column(name = "full_name", nullable = false, length = 50)
     private String fullName;
 
     // unique = true is documentation only (schema generation is off). The real constraint is
     // ux_users_email_lower, a unique index on LOWER(email): one mailbox, one account, whatever
     // case it is typed in.
+    @NotBlank
+    @Email
+    @Size(max = 100)
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 
     // 20 to match schema.sql: the contract's example "050-1234567" is 11 characters. ADR-002 #9.
+    @Size(max = 20)
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
     // POST /api/users/register sends "region" and the contract is frozen, so the entity
     // carries it. Deliberately absent from UserDTO — the contract's response has no such key.
     // ADR-002 #1.
+    @Size(max = 100)
     @Column(name = "region", length = 100)
     private String region;
 
@@ -147,31 +159,5 @@ public class User {
     public boolean isAdmin() {
         return role == Role.ADMIN;
 
-    }
-
-    // Identity comparison on the id alone. Two unpersisted users are never equal, even when
-    // every other field matches — they are two distinct rows waiting to be written.
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof User other)) {
-            return false;
-        }
-        return userId != null && userId.equals(other.userId);
-    }
-
-    // Constant, deliberately. A hash derived from the id would change when the provider
-    // assigns one on persist, and an entity already inside a HashSet would become unfindable.
-    @Override
-    public int hashCode() {
-        return User.class.hashCode();
-    }
-
-    // Never print password: toString() output reaches logs and exception messages.
-    @Override
-    public String toString() {
-        return "User{userId=" + userId + ", userName='" + userName + "'}";
     }
 }

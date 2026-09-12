@@ -52,8 +52,10 @@ import java.util.Optional;
  *
  * <h2>401 before 403</h2>
  * A guest hitting an {@code @AdminOnly} endpoint is told "you must log in", not "you are not an
- * administrator". Answering "who are you" before "are you allowed" means an anonymous caller is
- * never told that admin endpoints exist at all.
+ * administrator" — {@link #filter} checks authentication first and only asks about the admin flag
+ * once a session is confirmed. That ordering is what this class controls; it says nothing about
+ * whether an endpoint's existence is otherwise discoverable (an {@code OPTIONS} request, for
+ * instance, is answered by the container's own routing before this filter ever runs).
  *
  * <h2>Order</h2>
  * {@code Priorities.AUTHENTICATION} is the lowest-numbered standard priority, so this runs before

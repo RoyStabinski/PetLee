@@ -31,7 +31,7 @@ import java.util.Locale;
 
 /**
  * {@code /api/pets} — the five endpoints at the centre of {@code api-contract.md}, plus
- * {@code GET /api/pets/mine} (ADR-002 deviation #11), which T-32's dashboard needs and the frozen
+ * {@code GET /api/pets/mine} (ADR-002 deviation #13), which T-32's dashboard needs and the frozen
  * contract has no equivalent of.
  *
  * <h2>No rule is decided here</h2>
@@ -124,7 +124,7 @@ public class PetResource {
      * {@code GET /api/pets/mine} — auth. The caller's own listings, every status included.
      *
      * <p><strong>This endpoint is not in {@code api-contract.md}.</strong> It extends the frozen
-     * contract and is recorded as deviation #11 in ADR-002; T-41 adds it to the contract document.
+     * contract and is recorded as deviation #13 in ADR-002.
      * T-32's dashboard needs it and nothing else can supply it: {@code GET /api/pets} is the public
      * gallery, which hides {@code ADOPTED} and {@code REMOVED} listings and returns a
      * {@link PetDTO} with no owner field, so a client could neither see its own hidden listings nor
@@ -186,8 +186,10 @@ public class PetResource {
     /**
      * {@code DELETE /api/pets/{id}} — owner or admin.
      *
-     * <p>The contract: <em>"Response 204: no body. All images cascade-deleted."</em>,
-     * <em>"Errors: 403 if not owner and not admin."</em>
+     * <p>The contract's original wording — <em>"Response 204: no body. All images
+     * cascade-deleted."</em> — assumed the image gallery this project no longer has; a pet now
+     * carries one photograph, and {@code PetService.delete} removes its file along with the row.
+     * <em>"Errors: 403 if not owner and not admin"</em> still holds.
      *
      * <p>The admin flag is passed in rather than read inside the service, which is the standing
      * rule: authorisation decisions belong to the service layer, made on arguments, never on a

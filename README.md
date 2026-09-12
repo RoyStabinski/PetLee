@@ -64,7 +64,6 @@ inside the deployment itself, since a redeploy would wipe them.
 | Username | Password | Role | Source |
 |---|---|---|---|
 | `admin` | `Admin123!` | ADMIN | `seed.sql` — created by the script above on any fresh database |
-| `demo_owner`, `demo_admin`, `demo_adopter` | `Demo123!` | USER / ADMIN / USER | Pre-existing rows in this project's own development database, used for the manual scenario walkthroughs in `docs/testing/e2e-scenarios.md`; not created by `seed.sql` |
 
 Register a new account through `/register.xhtml` to try the flow as a first-time user.
 
@@ -90,8 +89,8 @@ JSF views, where every deviation from the frozen `api-contract.md` came from —
   configuration on the JAX-RS servlet) are both closed off by
   `docs/decisions/ADR-003-technology-constraint.md`. Uploading a photo works through
   `addPet.xhtml`'s `<h:inputFile>`, posted to the Faces servlet. See ADR-002, deviation #10.
-- **There is no container-level cap on upload size.** An earlier `MultipartConfigurator` that set
-  one on the servlet was removed along with the REST upload endpoint. A too-large file is still
-  spooled to disk by the container before `ImageStore` rejects it — on `part.getSize()` — once the
-  request reaches application code, so an oversized upload costs the disk I/O of receiving it
-  before it is turned down.
+- **The container-level cap lives in `web.xml`, not in a servlet declaration.** The surviving
+  upload path is the Faces servlet, so `jakarta.faces.UPLOADER_MAX_FILE_SIZE` (5 MB, matching
+  `ImageStore.MAX_BYTES`) and `jakarta.faces.UPLOADER_MAX_REQUEST_SIZE` (6 MB) are plain
+  context-params — no `@MultipartConfig`, no RESTEasy risk, because the JAX-RS upload endpoint
+  that made multipart configuration look expensive was removed entirely (ADR-002 #10).

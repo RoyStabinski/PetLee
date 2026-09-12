@@ -27,7 +27,7 @@ public class ImageStore {
 
     private final Path root = Path.of(Optional.ofNullable(System.getProperty("petlee.upload.dir"))
             .or(() -> Optional.ofNullable(System.getenv("PETLEE_UPLOAD_DIR")))
-            .orElse(System.getProperty("user.home") + "/petlee-uploads"));
+            .orElse(System.getProperty("user.home") + "/petlee-uploads")).normalize();
 
     public String store(Part part) {
         if (part == null || part.getSize() == 0) {

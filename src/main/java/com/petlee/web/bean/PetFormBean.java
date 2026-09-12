@@ -19,7 +19,6 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,7 +45,8 @@ import java.util.List;
  * {@link PetService#attachImage}. The interesting case is the one in the middle:
  * <strong>the pet was created and the photograph was not</strong>. {@link #save()} does not
  * pretend either that everything worked or that nothing did. It says what happened and lands the
- * user on their dashboard, where the listing is waiting and the photograph can be added again.
+ * user on their dashboard, where the listing is waiting — without its photograph, and with no way
+ * to add one afterwards: {@code editPet.xhtml} has no upload control, by design.
  *
  * <h2>Client-side validation is a courtesy</h2>
  * The page repeats the service's rules so a typo costs no round trip. The server remains the
@@ -170,9 +170,10 @@ public class PetFormBean implements Serializable {
             // The listing exists. Saying "that failed" would be a lie the user would act on by
             // filling the whole form in again, and creating a duplicate. Saying "that worked"
             // would leave them wondering where the photograph went. So: what worked, what did
-            // not, and where to go to try again.
-            warn("Your listing was added, but the photograph could not be stored. You can add it from"
-                    + " here. " + photographFailed.getMessage());
+            // not, and that there is no second chance at the photograph — editPet.xhtml has no
+            // upload control, so nothing after this point can add one.
+            warn("Your listing was added without its photograph, which could not be stored. "
+                    + "A photograph cannot be added to a listing afterwards. " + photographFailed.getMessage());
             return keepingMessages(DASHBOARD);
         }
     }
@@ -389,10 +390,5 @@ public class PetFormBean implements Serializable {
 
     public void setUploadedFile(Part uploadedFile) {
         this.uploadedFile = uploadedFile;
-    }
-
-    /** @return the chosen file's bytes; package-visible so tests can stand in for a {@link Part} */
-    InputStream fileStream() throws IOException {
-        return uploadedFile.getInputStream();
     }
 }

@@ -1,7 +1,6 @@
 package com.petlee.service;
 
 import com.petlee.dto.PetForm;
-import com.petlee.model.Category;
 import com.petlee.model.Pet;
 import com.petlee.model.User;
 import com.petlee.repository.PetRepository;
@@ -316,7 +315,10 @@ public class PetService {
     }
 
     /**
-     * Replaces a listing's photograph — {@code POST /api/pets/{id}/image}.
+     * Replaces a listing's photograph — reachable only from the JSF form, via
+     * {@code PetFormBean.save()}. There is no REST endpoint for this any more: the equivalent
+     * {@code POST /api/pets/{id}/image} was removed entirely (ADR-002 #10) because Jersey cannot
+     * inject a Servlet {@code Part} as a {@code @FormParam}.
      *
      * <p>A pet carries one photograph, not a gallery. The previous file, if there was one, is
      * deleted only after the new one is safely attached — so a failed upload never loses a

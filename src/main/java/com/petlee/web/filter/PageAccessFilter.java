@@ -14,8 +14,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,10 +37,10 @@ import java.util.logging.Logger;
  * the person who notices is usually not on the team.
  *
  * <h2>Where "who is signed in" comes from</h2>
- * {@link UserBean}, the web tier's own bean. Not the REST tier's session attribute: reading
- * that from here would be {@code com.petlee.web} reaching into {@code com.petlee.rest}, which
- * inverts the layering ADR-001 exists to protect. The bean is only touched for a page that is not
- * public, so a guest browsing the gallery is never given a session on this filter's account.
+ * {@link UserBean}, the web tier's own bean, which is what this filter already has injected and
+ * what every other page-facing decision in {@code com.petlee.web} reads. The bean is only touched
+ * for a page that is not public, so a guest browsing the gallery is never given a session on this
+ * filter's account.
  */
 @WebFilter(urlPatterns = "*.xhtml")
 public class PageAccessFilter implements Filter {
@@ -66,7 +64,7 @@ public class PageAccessFilter implements Filter {
     private static final Set<String> ADMIN_VIEWS = Set.of("/admin.xhtml");
 
     private static final String LOGIN_VIEW = "/login.xhtml";
-    private static final String FORBIDDEN_VIEW = "/error/403.xhtml";
+    private static final String FORBIDDEN_VIEW = "/error/error.xhtml";
 
     @Inject
     private UserBean userBean;
@@ -94,11 +92,8 @@ public class PageAccessFilter implements Filter {
         }
 
         if (!userBean.isLoggedIn()) {
-            // With the destination attached, so T-26's login() can put them where they were going.
-            // Losing it makes the user navigate back by hand after authenticating.
             LOGGER.log(Level.FINE, () -> "guest redirected from " + view + " to the login page");
-            httpResponse.sendRedirect(http.getContextPath() + LOGIN_VIEW
-                    + "?returnUrl=" + URLEncoder.encode(view, StandardCharsets.UTF_8));
+            httpResponse.sendRedirect(http.getContextPath() + LOGIN_VIEW);
             return;
         }
 

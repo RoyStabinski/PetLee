@@ -30,7 +30,23 @@
     -->
     <context-param>
         <param-name>jakarta.faces.PROJECT_STAGE</param-name>
-        <param-value>Development</param-value>
+        <param-value>Production</param-value>
+    </context-param>
+
+    <!--
+      Faces' own upload cap, on the servlet the surviving upload path actually uses. The JAX-RS
+      upload endpoint that once made multipart configuration look expensive (ADR-002 #10) is gone;
+      this is a context-param on the Faces servlet, no servlet declaration and none of that risk.
+      5 MB matches ImageStore.MAX_BYTES; the request cap allows a little room for the rest of the
+      multipart form around the file part.
+    -->
+    <context-param>
+        <param-name>jakarta.faces.UPLOADER_MAX_FILE_SIZE</param-name>
+        <param-value>5242880</param-value>
+    </context-param>
+    <context-param>
+        <param-name>jakarta.faces.UPLOADER_MAX_REQUEST_SIZE</param-name>
+        <param-value>6291456</param-value>
     </context-param>
 
     <!--

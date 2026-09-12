@@ -90,7 +90,7 @@ public class UserBean implements Serializable {
             CurrentUser.establish(request, SessionUser.of(user));
 
             currentUser = user;
-            return destinationAfterLogin();
+            return HOME;
 
         } catch (AppException failure) {
             error(failure.getMessage());
@@ -207,38 +207,6 @@ public class UserBean implements Serializable {
     }
 
     // ------------------------------------------------------------------------------- internals
-
-    /**
-     * Where to go after signing in: back to whatever the user was trying to reach, or home.
-     *
-     * @return a Faces outcome, always ending in a redirect
-     */
-    private String destinationAfterLogin() {
-        String requested = FacesContext.getCurrentInstance()
-                .getExternalContext()
-                .getRequestParameterMap()
-                .get("returnUrl");
-
-        return isLocalView(requested) ? requested + "?faces-redirect=true" : HOME;
-    }
-
-    /**
-     * Whether a {@code returnUrl} names a view inside this application and nowhere else.
-     *
-     * @param path the requested destination
-     * @return whether it is safe to navigate to
-     */
-    static boolean isLocalView(String path) {
-        return path != null
-                && path.startsWith("/")
-                // "//host" and "/\host" are protocol-relative: a browser reads them as absolute.
-                && !path.startsWith("//")
-                && !path.startsWith("/\\")
-                && path.endsWith(".xhtml")
-                // A backslash or a colon is an attempt to smuggle in a scheme or a host.
-                && path.indexOf('\\') < 0
-                && path.indexOf(':') < 0;
-    }
 
     /**
      * Wipes both password fields. Called from a {@code finally} on every submission, successful or

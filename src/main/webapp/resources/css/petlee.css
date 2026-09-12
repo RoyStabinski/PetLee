@@ -308,6 +308,11 @@ img {
     color: var(--danger);
 }
 
+.tag-adopted {
+    background: var(--brand-dark);
+    color: var(--surface);
+}
+
 /* --- panels and forms --------------------------------------------------------------------------- */
 .panel {
     background: var(--surface);

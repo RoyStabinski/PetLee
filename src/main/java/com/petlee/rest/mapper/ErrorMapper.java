@@ -42,6 +42,9 @@ import java.util.logging.Logger;
  *   <li>{@link WebApplicationException} — the status it already carries (a 404 from routing, a 405
  *       from a wrong method, a 415 from a wrong content type). Rewriting those to 500 would report
  *       the server's own routing as broken.</li>
+ *   <li>A {@code jakarta.json.bind.JsonbException} or {@code jakarta.json.JsonException}, anywhere
+ *       in the cause chain — a request body JSON-B could not parse into the target record. 400,
+ *       not 500: the caller sent bad input, the server did nothing wrong.</li>
  *   <li>Everything else — 500, with no detail in the body. This is the only place an unexpected
  *       failure is recorded; the response carries no stack trace, class name or SQL fragment,
  *       because any of those tells an attacker the framework, its version and the call path.</li>
@@ -60,11 +63,31 @@ public class ErrorMapper implements ExceptionMapper<Throwable> {
         if (failure instanceof WebApplicationException web) {
             return json(web.getResponse().getStatus(), "ERROR", web.getMessage());
         }
+        if (isMalformedJson(failure)) {
+            // A body that JSON-B cannot parse into the target record is the caller's mistake, not
+            // the server's — 400, not 500, and no parser internals in the message.
+            return json(400, "MALFORMED_JSON", "The request body is not valid JSON.");
+        }
         // The only place an unexpected failure is recorded. The response carries no detail:
         // a stack trace in an HTTP body tells an attacker the framework, the version and the
         // call path.
         LOGGER.log(Level.SEVERE, "Unhandled failure", failure);
         return json(500, "INTERNAL_ERROR", "Something went wrong. Please try again.");
+    }
+
+    /**
+     * Whether {@code failure} or anything in its cause chain is a JSON-B or JSON-P parse failure —
+     * a malformed request body, walking up through however many wrapper exceptions the container's
+     * message-body-reader machinery adds on top of it.
+     */
+    private static boolean isMalformedJson(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof jakarta.json.bind.JsonbException
+                    || cause instanceof jakarta.json.JsonException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Response json(int status, String code, String message) {

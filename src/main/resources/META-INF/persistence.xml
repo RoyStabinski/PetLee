@@ -70,9 +70,10 @@
           (Hibernate's hbm2ddl.auto=validate has no portable equivalent), so a mismatch
           between an entity mapping and the real table is NOT caught at deployment any more.
 
-          That safety net moved to T-38: the repository integration tests run against the real
-          PostgreSQL schema and fail on any entity/table mismatch. If you change an entity or
-          schema.sql, T-38 is the check that catches you — run it.
+          There is no automated safety net for this any more, either: the repository integration
+          tests that once covered it (T-38) were deleted in the 2026-09-11 slimming refactor. If
+          you change an entity or schema.sql, check the other by hand — a mismatch surfaces as a
+          runtime failure the first time the affected column is touched, not before.
         -->
     </persistence-unit>
 </persistence>

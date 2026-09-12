@@ -303,11 +303,6 @@ img {
     padding: 0.15rem 0.6rem;
 }
 
-.tag-adopted {
-    background: var(--ok-tint);
-    color: var(--ok);
-}
-
 .tag-removed {
     background: var(--danger-tint);
     color: var(--danger);

@@ -81,9 +81,11 @@ filters, and is still independently demonstrable.
 This is not the obvious arrangement, and it is chosen for one concrete reason: Jakarta
 Expression Language resolves properties through `java.beans.Introspector`, which requires
 JavaBean getters. A record's accessor is `name()`, not `getName()`, so `#{pet.name}` in a
-Facelets view bound to a record is at best server-dependent. Payara 6 is not installed in
-this environment, so that cannot be tested here — and a design whose correctness we cannot
-check is not one to ship. Entities have real getters and work on every server.
+Facelets view bound to a record is at best server-dependent. Payara 6 was not installed when
+this design was written, so that could not be tested at the time — and a design whose
+correctness could not be checked was not one to ship on faith. It is installed now (see
+`/home/RoyStabinski/petlee-handoff.md`) and this arrangement has since been verified against
+it. Entities have real getters and work on every server.
 
 The arrangement pays for itself twice over: the service layer stops knowing about DTOs at
 all, and there is exactly one mapping site (the resource method) rather than two.
@@ -455,11 +457,11 @@ the submission. It is a real reduction in safety, accepted deliberately: the sui
 4,800 lines against a 2,500-line target, and the scenarios take about ten minutes to walk
 through in a browser.
 
-**Payara 6 is not installed in this environment** (per the project handoff notes), so
-criteria 4 and 5 cannot be checked here. They must be run on the Windows-side installation
-before submission. The build itself runs through `~/petlee-winbuild.sh`, which mirrors
-sources to a native Windows path — `maven-war-plugin` fails over the `\\wsl.localhost`
-mount.
+**Payara 6 was not installed when this risk was written** (per the project handoff notes at
+the time). It has since been installed at `/mnt/c/Users/royst/payara6` and criteria 4 and 5,
+along with the four specification §10 scenarios, have been run against it in Task 11. The
+build itself runs through `~/petlee-winbuild.sh`, which mirrors sources to a native Windows
+path — `maven-war-plugin` fails over the `\\wsl.localhost` mount.
 
 **Bean Validation must be triggered, not merely declared.** Annotations on an entity do
 nothing unless the bean is validated. `@Valid` goes on the REST resource method parameters

@@ -69,12 +69,16 @@ Response 200 (List<PetDTO> — gallery view, main image only, newest first):
 "gender": "MALE",
 "status": "AVAILABLE",
 "categoryName": "Dogs",
-"mainImageUrl": "/images/rex-main.jpg"
+"imageUrl": "/images/rex-main.jpg"
 }
 ]
 
+### GET /api/pets/mine   — auth   (extension — ADR-002 #13)
+Every listing the caller owns, in every status (not just AVAILABLE). Same shape as GET /api/pets.
+Response 200 (List<PetDTO>). Errors: 401 if not logged in.
+
 ### GET /api/pets/{id}   — open*
-Response 200 (PetDetailDTO — full info + all images).
+Response 200 (PetDetailDTO — full info, one photograph).
 *Owner contact fields are filled ONLY if the caller is logged in; otherwise null.
 {
 "id": 10,
@@ -87,11 +91,8 @@ Response 200 (PetDetailDTO — full info + all images).
 "longDesc": "Full description here...",
 "status": "AVAILABLE",
 "categoryName": "Dogs",
-"images": [
-{ "id": 100, "imageUrl": "/images/rex-main.jpg", "isMain": true },
-{ "id": 101, "imageUrl": "/images/rex-2.jpg", "isMain": false }
-],
-"ownerFullName": "Roy Stein",
+"imageUrl": "/images/rex-main.jpg",
+"ownerName": "Roy Stein",
 "ownerEmail": "roy@example.com",
 "ownerPhone": "050-1234567"
 }
@@ -116,13 +117,13 @@ Response 200: updated PetDTO.
 Errors: 403 if not the owner. 409 if a concurrent edit happened (optimistic lock).
 
 ### DELETE /api/pets/{id}   — owner or admin
-Response 204: no body. All images cascade-deleted.
+Response 204: no body. Its photograph is deleted with it.
 Errors: 403 if not owner and not admin.
 
-### POST /api/pets/{id}/images   — auth + owner
-Request: multipart/form-data — file + boolean "isMain".
-Response 200 (PetImageDTO):
-{ "id": 102, "imageUrl": "/images/rex-3.jpg", "isMain": false }
+Photo upload is **not** available over `/api`. See ADR-002 #10: Jersey cannot inject a Servlet
+`Part` as a `@FormParam`, and the two ways to fix that are both closed by ADR-003. Uploading a
+photo is a JSF-only action — `addPet.xhtml`'s `<h:inputFile>` posts straight to the Faces servlet,
+never to this API.
 
 ---
 
@@ -134,7 +135,8 @@ allows the owner or an admin.
 
 ### GET /api/admin/pets   — admin
 Optional filter params: ?categoryId=1&size=SMALL&gender=MALE  (same as GET /api/pets)
-Response 200 (List<AdminPetDTO> — every status, newest first; PetDTO plus two moderation fields):
+Response 200 (List<PetDTO> — every status, newest first; see ADR-002 #12 — no owner name or
+creation date, since nothing reads this endpoint from outside the admin service layer):
 [
 {
 "id": 10,
@@ -145,15 +147,12 @@ Response 200 (List<AdminPetDTO> — every status, newest first; PetDTO plus two 
 "gender": "MALE",
 "status": "REMOVED",
 "categoryName": "Dogs",
-"mainImageUrl": "/images/rex-main.jpg",
-"ownerName": "Donald Trump",
-"createdAt": "2026-09-08T10:15:30"
+"imageUrl": "/images/rex-main.jpg"
 }
 ]
 
-### PUT /api/admin/pets/{id}/status   — admin
-Request:
-{ "status": "REMOVED" }
+### PUT /api/admin/pets/{id}/status   — admin   (ADR-002 #11: query param, not a JSON body)
+Request: ?status=REMOVED
 Response 200: the updated PetDTO.
 Errors: 400 if status is anything but REMOVED or AVAILABLE. 404 if no such pet.
 

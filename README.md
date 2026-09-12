@@ -1,44 +1,97 @@
-# 🐾 Pet-Lee - Pet Adoption & Rehoming Platform
+# Pet-Lee
 
-**Pet-Lee** is a modern full-stack web application designed to connect pets in need with loving families. Whether you're looking to adopt your next best friend or need to find a safe new home for a pet, Pet-Lee makes the process simple, transparent, and secure.
+Pet-Lee is a pet adoption and rehoming platform: guests browse a public gallery of listings,
+registered users post pets for adoption and inquire about others' listings, and an administrator
+moderates the catalogue. It is a coursework-scale Jakarta EE application built to a fixed
+specification (three tiers — presentation, business logic, persistence — talking to one
+PostgreSQL database).
 
-## 🌟 Overview
-The name **Pet-Lee** (a play on "Petly" or "My Pet" in Hebrew) represents a personal, caring community for animal lovers. This platform streamlines the adoption workflow, replacing messy social media posts with a dedicated, searchable database.
+## Stack
 
-## ✨ Key Features
-*   **Smart Search & Filters:** Find pets by species, breed, age, and location.
-*   **Pet Profiles:** Detailed descriptions, medical history, and high-quality photo galleries.
-*   **Rehoming Portal:** A dedicated flow for users to create adoption listings with ease.
-*   **User Dashboard:** Manage your listings and keep track of favorite pets.
-*   **Responsive Design:** A seamless experience across mobile, tablet, and desktop.
+- **Presentation:** Jakarta Server Faces (JSF) / Facelets
+- **Business logic:** Jakarta RESTful Web Services (Jakarta REST / Jersey), plus CDI services the
+  JSF tier calls directly (see `docs/decisions/ADR-006-direct-service-calls.md`)
+- **Persistence:** Jakarta Persistence (JPA)
+- **Database:** PostgreSQL 18
+- **Runtime:** a Jakarta EE 10 application server — the reference target is **Payara 6**;
+  GlassFish 7 and WildFly 31 are drop-in alternatives (`docs/decisions/ADR-003-technology-constraint.md`)
 
-## 🛠️ Tech Stack
-*   **Frontend:** React.js (with Tailwind CSS for styling)
-*   **Backend:** Node.js & Express
-*   **Database:** MongoDB / PostgreSQL
-*   **Authentication:** Firebase Auth / JWT
-*   **Image Hosting:** Cloudinary
+The build adds no runtime libraries of its own: `pom.xml` has exactly three dependencies (the
+Jakarta EE 10 platform API, the PostgreSQL JDBC driver, and JUnit 5 for tests), and the packaged
+WAR's `WEB-INF/lib` is empty. Everything JSF, JPA and Jakarta REST need is supplied by the server.
 
-## 🚀 Installation & Setup
-1. **Clone the repo:**
-   ```bash
-   git clone https://github.com
-   ```
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-3. **Environment Variables:**
-   Create a `.env` file and add your credentials (DB URI, API Keys).
-4. **Run the app:**
-   ```bash
-   npm start
-   ```
+## Building
 
-## 📈 Future Roadmap
-- [ ] Integration of a real-time chat between adopters and owners.
-- [ ] AI-based matching system based on user lifestyle.
-- [ ] Integration with local animal shelter APIs.
+Requires Java 17 and Maven.
 
----
-Developed with ❤️ by [Elad Harel](https://github.com) and Roy Stabinski.
+```bash
+mvn clean package
+```
+
+This produces `target/pet-lee.war`.
+
+## Database setup
+
+Create an empty `petlee` database, then apply the two scripts in order:
+
+```bash
+createdb -U postgres petlee
+psql -U postgres -d petlee -f src/main/resources/db/schema.sql
+psql -U postgres -d petlee -f src/main/resources/db/seed.sql
+```
+
+`schema.sql` creates the `users`, `category` and `pet` tables, their constraints and indexes.
+`seed.sql` inserts the six categories from the specification and one administrator account
+(`admin` / `Admin123!`). Both scripts are idempotent — safe to re-run against an already-migrated
+database. See `src/main/resources/db/README.md` for details, including how to add the
+application's own least-privileged database role (`petlee_app`).
+
+## Deploying
+
+1. Create a JDBC connection pool and resource named `jdbc/petlee` on the server, pointing at the
+   `petlee` database — `docs/deployment/datasource-setup.md` has the exact `asadmin` commands for
+   Payara/GlassFish and the WildFly equivalent. The application never opens its own JDBC
+   connection or names a driver class; it only looks up `jdbc/petlee` by name.
+2. Deploy `target/pet-lee.war` to the server (Payara's autodeploy directory, `asadmin deploy`, or
+   the admin console). The context path is `/pet-lee`.
+3. Open `http://localhost:8080/pet-lee/`.
+
+`docs/deployment/upload-directory.md` covers where uploaded photographs are stored on disk — never
+inside the deployment itself, since a redeploy would wipe them.
+
+## Accounts
+
+| Username | Password | Role | Source |
+|---|---|---|---|
+| `admin` | `Admin123!` | ADMIN | `seed.sql` — created by the script above on any fresh database |
+| `demo_owner`, `demo_admin`, `demo_adopter` | `Demo123!` | USER / ADMIN / USER | Pre-existing rows in this project's own development database, used for the manual scenario walkthroughs in `docs/testing/e2e-scenarios.md`; not created by `seed.sql` |
+
+Register a new account through `/register.xhtml` to try the flow as a first-time user.
+
+## Architecture
+
+The application is one WAR containing all three tiers. JSF managed beans (`com.petlee.web`) inject
+CDI services (`com.petlee.service`) directly rather than calling the REST API over HTTP; the REST
+API at `/api/*` (`com.petlee.rest`) is a complete, independently usable surface documented in
+`api-contract.md`, exercised the same way a non-browser client would (`curl -b cookies.txt
+http://localhost:8080/pet-lee/api/pets`). Both tiers share one `HttpSession`, so a browser login
+also authenticates that session's `/api` calls — see
+`docs/decisions/ADR-006-direct-service-calls.md` for exactly which direction that sharing goes, and
+what it costs in place of a single authorisation chokepoint. The rest of the reasoning behind the
+project's shape — why the dependency list is closed, why entities rather than records cross into
+JSF views, where every deviation from the frozen `api-contract.md` came from — is recorded in
+`docs/decisions/`.
+
+## Known limitations
+
+- **Photo upload is available through the web UI only, not the REST API.** `POST
+  /api/pets/{id}/images` was removed entirely rather than repaired: Jersey cannot inject a Servlet
+  `Part` as a `@FormParam`, and the two ways to fix that (`jersey-media-multipart`, or multipart
+  configuration on the JAX-RS servlet) are both closed off by
+  `docs/decisions/ADR-003-technology-constraint.md`. Uploading a photo works through
+  `addPet.xhtml`'s `<h:inputFile>`, posted to the Faces servlet. See ADR-002, deviation #10.
+- **There is no container-level cap on upload size.** An earlier `MultipartConfigurator` that set
+  one on the servlet was removed along with the REST upload endpoint. A too-large file is still
+  spooled to disk by the container before `ImageStore` rejects it — on `part.getSize()` — once the
+  request reaches application code, so an oversized upload costs the disk I/O of receiving it
+  before it is turned down.

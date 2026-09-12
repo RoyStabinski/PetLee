@@ -81,6 +81,57 @@ runtime libraries at all" — is literally true rather than nearly true. `provid
 driver on the compile and test classpaths, so T-38's tests, which open their own JDBC connection,
 are unaffected. The dependency list is still exactly three entries; nothing was added or removed.
 
+## Amendment, 2026-09-12 — the three-dependency claim is literally true again
+
+ADR-004 and ADR-005 added four `test`-scope dependencies (EclipseLink, `jersey-client`,
+`jersey-hk2`, `parsson`) so the integration test suite could bootstrap a JPA provider and a REST
+client outside a container. Slimming the project deleted that suite. All four dependencies went
+with it — nothing in the surviving four unit tests (`PetServiceTest`, `UserServiceTest`,
+`PetDetailDTOTest`, `PasswordHasherTest`) touches a database or an HTTP client; they run against
+hand-written test doubles.
+
+`grep -c '<scope>' pom.xml` returns **3**. This decision's opening claim — "`pom.xml` contains
+exactly three dependencies" — was true when written, stopped being true for the two ADR-004/005
+amendments, and is true again now that the code that needed them is gone. ADR-004 and ADR-005
+remain accurate historical records of why those four dependencies existed for a time; this
+amendment does not retract them, it records that their subject no longer exists.
+
+**Bean Validation is not a fourth dependency.** `jakarta.validation.constraints.*` — used on
+`RegisterForm`, `PetForm` and the other records in `com.petlee.dto` — comes from
+`jakarta.jakartaee-api`, the same single artifact that already supplies JSF, JPA, Jakarta REST,
+CDI and JTA. It needs no separate line in the dependency list any more than CDI does; it was never
+absent, and was never counted as an addition.
+
+### Where Bean Validation actually runs
+
+Recording this because it is not obvious from the annotations alone. `persistence.xml` sets
+`jakarta.persistence.validation.mode=NONE`:
+
+```
+<property name="jakarta.persistence.validation.mode" value="NONE"/>
+```
+
+which means the JPA provider never validates an entity on `@PrePersist`/`@PreUpdate` — the
+constraints on `User` or `Pet`, if any were placed there, would simply never fire. They are not
+placed there. Validation is declared instead on the form records in `com.petlee.dto`
+(`RegisterForm`, `PetForm`, `LoginForm`) and enforced by `@Valid` on the CDI-managed service
+methods that accept them (`UserService.register(@Valid RegisterForm form, ...)` and the
+equivalent on `PetService`). Bean Validation is a CDI interceptor: it only runs when the call
+arrives through the CDI proxy of the bean, never when a method runs directly on the plain Java
+instance behind it — which is exactly what happens when one method on a bean calls another method
+on `this`.
+
+That is why `UserService` and `PetService` each hold an injected reference to **themselves**
+(commonly named `self`, injected the same way any other collaborator is) and route their
+JSF-facing scalar overloads — the ones that take plain `String`/`Long` parameters rather than a
+`@Valid` form record — back through `self.register(...)` or `self.attachImage(...)` instead of
+calling the validated method directly. Without `self`, a call from `UserBean.register()` to
+`userService.register(username, password, ...)` would run on the raw instance, the validation
+interceptor would never be invoked, and a blank username or an 8-character-short password would
+sail straight through to the database and fail there instead — or not fail at all, if the column
+happens to allow it. The javadoc on each `self` field says this explicitly, so the next reader
+does not delete it as apparent dead code.
+
 ## Standing rule
 **Adding any dependency to `pom.xml` requires a new ADR.** "It would be convenient" is not
 sufficient justification. If a task appears to need a library, the first question is which platform

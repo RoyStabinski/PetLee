@@ -3,7 +3,6 @@ package com.petlee.rest.mapper;
 import com.petlee.dto.ErrorDTO;
 import com.petlee.service.AppException;
 
-import jakarta.validation.ConstraintViolationException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -14,7 +13,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * The one place a failure that escapes a resource method becomes an HTTP response.
+ * The one place a failure that escapes a resource method becomes an HTTP response, for every
+ * {@link Throwable} that is not a {@link jakarta.validation.ConstraintViolationException}.
  *
  * <h2>What it replaces</h2>
  * Four files this task collapses into one: a mapper for the business layer's own exception, a
@@ -25,13 +25,20 @@ import java.util.logging.Logger;
  * mapper by how many exist — it picks the one whose type is nearest the thrown exception, and with
  * only one registered, that one runs every time.
  *
+ * <h2>Why {@code ConstraintViolationException} is not in the table below</h2>
+ * It used to be, but "nearest declared type wins" cuts the other way for that one exception: a
+ * JAX-RS implementation's own built-in bean-validation mapper is a nearer match to
+ * {@code ConstraintViolationException} than {@code ExceptionMapper<Throwable>} is, so it always
+ * won over a branch in here — confirmed live as a bare Payara HTML error page instead of this
+ * application's JSON. {@link ConstraintViolationExceptionMapper} declares the exact generic type
+ * instead, which out-ranks the container's built-in mapper the same way this class out-ranks it
+ * for everything else. Do not re-add a branch for it here: it would be correct code that never
+ * runs.
+ *
  * <h2>The table</h2>
  * <ul>
  *   <li>{@link AppException} — the status it already carries, via {@link AppException#getStatus()}.
  *       A service throws this and names its own status; there is no table to keep in sync here.</li>
- *   <li>{@link ConstraintViolationException} — 400, naming the first offending field. This is the
- *       one this task adds: {@code @Valid} on service methods raises this, and until now nothing
- *       mapped it, so it fell through to the 500 branch below.</li>
  *   <li>{@link WebApplicationException} — the status it already carries (a 404 from routing, a 405
  *       from a wrong method, a 415 from a wrong content type). Rewriting those to 500 would report
  *       the server's own routing as broken.</li>
@@ -49,12 +56,6 @@ public class ErrorMapper implements ExceptionMapper<Throwable> {
     public Response toResponse(Throwable failure) {
         if (failure instanceof AppException app) {
             return json(app.getStatus(), "ERROR", app.getMessage());
-        }
-        if (failure instanceof ConstraintViolationException violations) {
-            String message = violations.getConstraintViolations().stream().findFirst()
-                    .map(v -> v.getPropertyPath() + " " + v.getMessage())
-                    .orElse("The request is not valid");
-            return json(400, "VALIDATION_FAILED", message);
         }
         if (failure instanceof WebApplicationException web) {
             return json(web.getResponse().getStatus(), "ERROR", web.getMessage());

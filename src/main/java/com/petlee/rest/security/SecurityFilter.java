@@ -14,6 +14,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.Optional;
 
 /**
@@ -104,12 +105,21 @@ public class SecurityFilter implements ContainerRequestFilter {
     /**
      * Whether the matched method — or its class — carries {@code annotationType}.
      *
+     * <p>{@code getResourceMethod()}/{@code getResourceClass()} are null for a request that never
+     * matched a resource (a 404), but this filter runs at {@code Priorities.AUTHENTICATION} for
+     * every request regardless, so both are checked for null before use. Live-confirmed on Payara
+     * that post-matching filters are never invoked for an unmatched path, so this is not currently
+     * exploitable — but the most security-critical method in this application should not rest on
+     * an assumption about a particular server's internals.
+     *
      * @param annotationType {@link Secured} or {@link AdminOnly}
      * @return whether the annotation is present on the method or the resource class
      */
     private boolean matched(Class<? extends Annotation> annotationType) {
-        return resourceInfo.getResourceMethod().isAnnotationPresent(annotationType)
-                || resourceInfo.getResourceClass().isAnnotationPresent(annotationType);
+        Method method = resourceInfo.getResourceMethod();
+        Class<?> type = resourceInfo.getResourceClass();
+        return (method != null && method.isAnnotationPresent(annotationType))
+                || (type != null && type.isAnnotationPresent(annotationType));
     }
 
     private static void abort(ContainerRequestContext context, int status, String code,

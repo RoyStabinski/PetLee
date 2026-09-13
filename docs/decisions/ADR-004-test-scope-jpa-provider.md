@@ -1,6 +1,10 @@
 # ADR-004 — A JPA provider on the test classpath
 
-**Status:** Accepted · **Date:** 2026-09-08 · **Amends ADR-003's dependency list**
+**Status:** Superseded · **Date:** 2026-09-08 · **Amends ADR-003's dependency list**
+
+> **This is a historical record, not the current dependency set.** The 2026-09-11 slimming
+> refactor deleted `DatabaseTest`, T-38's repository integration tests, and the EclipseLink
+> dependency this ADR added. See ADR-003's 2026-09-12 amendment.
 
 ## Context
 T-36 requires `DatabaseTest` to build an application-managed `EntityManagerFactory` against a

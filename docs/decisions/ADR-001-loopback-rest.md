@@ -1,6 +1,10 @@
 # ADR-001 — JSF reaches the business layer over loopback HTTP
 
-**Status:** Accepted · **Date:** 2026-09-03
+**Status:** Superseded by [ADR-006](ADR-006-direct-service-calls.md) · **Date:** 2026-09-03
+
+> **This is a historical record, not the current architecture.** The 2026-09-11 slimming refactor
+> deleted `ApiClient` and the loopback HTTP hop this ADR decided on; `com.petlee.web` now injects
+> `com.petlee.service` classes directly. See ADR-006 for the current decision and why.
 
 ## Context
 Specification §4 ("Complete Layer Separation") states: *"Direct access from the presentation

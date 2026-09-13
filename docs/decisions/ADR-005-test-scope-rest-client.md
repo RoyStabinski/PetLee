@@ -1,6 +1,10 @@
 # ADR-005 — A Jakarta REST client and a JSON-P provider on the test classpath
 
-**Status:** Accepted · **Date:** 2026-09-08 · **Extends ADR-004**
+**Status:** Superseded · **Date:** 2026-09-08 · **Extends ADR-004**
+
+> **This is a historical record, not the current dependency set.** The 2026-09-11 slimming
+> refactor deleted T-39's REST API integration test suite and the three test-scope dependencies
+> this ADR added. See ADR-003's 2026-09-12 amendment.
 
 ## Context
 T-39 tests the deployed API over HTTP with the **Jakarta REST Client API**

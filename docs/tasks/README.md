@@ -1,5 +1,15 @@
 # Pet-Lee Implementation Backlog
 
+> **This backlog is a historical record.** It describes how the system was built up to
+> 2026-09-11, task by task, and does **not** describe the current codebase. The 2026-09-11
+> slimming refactor removed code several of these tasks describe — most visibly T-09
+> (`PetImageRepository`), T-23 (multipart image upload as a REST endpoint), T-24 (`ApiClient`,
+> the loopback HTTP hop), T-26 (as `UserManagedBean`, since renamed and rewired), T-38 (repository
+> integration tests) and T-39 (REST API integration tests). Source javadoc still cites these
+> T-numbers for traceability, which is why the files stay rather than being deleted. For what the
+> system looks like now, see `docs/superpowers/specs/2026-09-11-slimming-design.md` and
+> `docs/decisions/ADR-006-direct-service-calls.md`.
+
 42 tasks that take the repository from its current state — four JPA entities and an empty
 `PasswordHasher` — to the complete system described in `pet_lee_system_specification.txt`.
 
@@ -15,8 +25,10 @@
 4. **`api-contract.md` is frozen.** Field names, HTTP status codes and paths are copied from it
    verbatim. A deviation requires a row in `docs/decisions/ADR-002-contract-deviations.md`, agreed
    before the code is written.
-5. **Read `docs/decisions/ADR-001-loopback-rest.md` before touching anything in `com.petlee.web`.**
-   It explains why the JSF tier calls the REST tier over HTTP, and the rule that enforces it.
+5. **`docs/decisions/ADR-001-loopback-rest.md` describes the original design, now superseded.**
+   It explains why the JSF tier once called the REST tier over HTTP; that loopback hop is gone.
+   Read `docs/decisions/ADR-006-direct-service-calls.md` instead for the current rule governing
+   `com.petlee.web`.
 6. **The dependency list is closed — read `docs/decisions/ADR-003-technology-constraint.md`.**
    Only the technologies in specification §7 (JSF, JPA, Jakarta REST) plus PostgreSQL are used.
    `pom.xml` has exactly three entries: `jakarta.jakartaee-api` (provided), the PostgreSQL driver

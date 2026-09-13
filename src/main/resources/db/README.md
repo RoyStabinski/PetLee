@@ -1,12 +1,12 @@
 # Database setup
 
 Two scripts, applied in order, on a database you create first. No migration tool — plain SQL
-(ADR-003); T-42 folds this into the deployment runbook.
+(ADR-003).
 
 | File | What it does | Re-runnable? |
 |---|---|---|
-| `schema.sql` | Creates the four tables, constraints and indexes | Yes — every statement is `IF NOT EXISTS` |
-| `seed.sql` | Inserts the six categories from specification §1 | Yes — `ON CONFLICT DO NOTHING` |
+| `schema.sql` | Creates the three tables (`users`, `category`, `pet`), their constraints and indexes | Yes — every statement is `IF NOT EXISTS` or a guarded migration |
+| `seed.sql` | Inserts the six categories from specification §1 and the `admin` account | Yes — every insert is `ON CONFLICT DO NOTHING` |
 
 The JPA provider never touches the schema: `persistence.xml` sets
 `jakarta.persistence.schema-generation.database.action=none`. What is in these files is what the
@@ -35,20 +35,19 @@ Both scripts are safe to re-run; that is how you apply a change to an existing d
 `CREATE TABLE IF NOT EXISTS` makes re-running safe; it does **not** make the schema correct. On a
 database whose tables were created by something else — for example JPA auto-DDL from an earlier
 draft — every statement in `schema.sql` is skipped and the file reports success while changing
-nothing. The tables keep their old columns, the FKs keep their old (or missing) `ON DELETE`
-actions, and `ux_pet_image_main` never appears.
+nothing. The tables keep their old columns, and the FKs keep their old (or missing) `ON DELETE`
+actions.
 
 Before trusting an existing database, check for the columns and constraints only this schema has:
 
 ```sql
 \d users        -- must show password_hash and region, not password, plus the unique
                 --   index ux_users_email_lower and NO users_email_key constraint
-\d pet_image    -- must show ux_pet_image_main and ON DELETE CASCADE
 \d pet          -- category_id FK must be ON DELETE RESTRICT; version NOT NULL DEFAULT 0
 ```
 
-If any is missing, drop the database and re-apply both scripts. There is no migration path from an
-auto-generated schema, and no migration tool in this project by design (ADR-003).
+If either is missing, drop the database and re-apply both scripts. There is no migration path from
+an auto-generated schema, and no migration tool in this project by design (ADR-003).
 
 One statement in `schema.sql` can fail on a populated database rather than being skipped:
 `ux_users_email_lower` cannot be created if two existing rows hold the same address in different
@@ -82,15 +81,16 @@ repository.
 ## Verifying
 
 ```sql
-\dt                                    -- users, category, pet, pet_image
+\dt                                    -- users, category, pet
 SELECT count(*) FROM category;         -- 6
-\d pet_image                           -- shows partial unique index ux_pet_image_main
+SELECT count(*) FROM users WHERE user_name = 'admin';  -- 1
 \d users                               -- shows unique index ux_users_email_lower
 \d category                            -- shows unique index ux_category_name_lower
 ```
 
 ## Administrator account
 
-`seed.sql` carries the `admin` insert **commented out**. It needs a real PBKDF2 digest from T-10's
-`PasswordHasher`; a placeholder would look like a working credential and would not be one. Enable
-it when T-10 lands.
+`seed.sql` inserts a live `admin` / `Admin123!` account (`ADMIN` role), with a real PBKDF2 digest
+already in the file — not a placeholder and not commented out. It is a known demo credential in a
+seeded reference database, not a secret; change it before deploying anywhere other people can
+reach.

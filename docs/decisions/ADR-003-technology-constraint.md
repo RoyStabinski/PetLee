@@ -124,13 +124,16 @@ on `this`.
 That is why `UserService` and `PetService` each hold an injected reference to **themselves**
 (commonly named `self`, injected the same way any other collaborator is) and route their
 JSF-facing scalar overloads — the ones that take plain `String`/`Long` parameters rather than a
-`@Valid` form record — back through `self.register(...)` or `self.attachImage(...)` instead of
-calling the validated method directly. Without `self`, a call from `UserBean.register()` to
-`userService.register(username, password, ...)` would run on the raw instance, the validation
+`@Valid` form record — back through `self.register(...)` or `self.create(...)`/`self.update(...)`
+instead of calling the validated method directly. Without `self`, a call from `UserBean.register()`
+to `userService.register(username, password, ...)` would run on the raw instance, the validation
 interceptor would never be invoked, and a blank username or an 8-character-short password would
 sail straight through to the database and fail there instead — or not fail at all, if the column
 happens to allow it. The javadoc on each `self` field says this explicitly, so the next reader
 does not delete it as apparent dead code.
+
+`attachImage` is not part of this: it takes a Servlet `Part`, not a `@Valid` form record, so it has
+no scalar overload and nothing to delegate through `self` for — the JSF form calls it directly.
 
 ## Standing rule
 **Adding any dependency to `pom.xml` requires a new ADR.** "It would be convenient" is not

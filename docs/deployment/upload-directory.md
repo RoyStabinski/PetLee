@@ -1,19 +1,19 @@
 # Upload directory
 
 Pet-Lee stores uploaded photographs as files on the server's disk and keeps only a public URL path
-in the database. `com.petlee.config.StorageConfig` decides where those files go; T-23 serves them
-back at `/images/<filename>`.
+in the database. `com.petlee.service.ImageStore` decides where those files go; `ImageServlet`
+serves them back at `/images/<filename>`.
 
 ## Where it must not be
 
 **Never inside the deployment.** A Jakarta EE server explodes a WAR into a work directory and
 deletes that directory on every redeploy. An upload root inside it means each redeploy silently
-destroys the users' photographs — and nothing reports it, because the `pet_image` rows survive and
-every image simply 404s afterwards.
+destroys the users' photographs — and nothing reports it, because the `pet.image_url` column
+survives and every image simply 404s afterwards.
 
 ## Resolution order
 
-`StorageConfig` takes the first of these that is set:
+`ImageStore` takes the first of these that is set:
 
 | # | Source | Example |
 |---|---|---|
@@ -55,14 +55,18 @@ standalone.bat -Dpetlee.upload.dir=D:\petlee-uploads
 
 ## What lands there
 
-Filenames are generated, never taken from the upload: `<petId>_<UUID>.<ext>`, where the extension
-comes from the file's *detected* type. No part of the client's filename survives, which is what
-makes path traversal, embedded null bytes and unicode filename tricks irrelevant in one move. The
-database stores `/images/<filename>` — a URL path, never a filesystem path, so the server's
-directory layout does not leak into the JSON contract.
+Filenames are generated, never taken from the upload: `<UUID>.<ext>`, where the extension is
+looked up from the upload's declared `Content-Type` header at store time (`ImageStore`'s
+`EXTENSIONS` map — JPEG, PNG, GIF or WebP; anything else is rejected). No part of the client's
+filename survives, which is what makes path traversal, embedded null bytes and unicode filename
+tricks irrelevant in one move. The database stores `/images/<filename>` — a URL path, never a
+filesystem path, so the server's directory layout does not leak into the JSON contract.
 
-Limits: 5 MB per file, 8 files per pet, and only JPEG, PNG, WebP and GIF, decided from the file's
-leading bytes rather than the client's `Content-Type` header.
+A pet carries **one** photograph, not a gallery — replacing it deletes the previous file once the
+new one is safely stored. Limit: 5 MB. The declared content type decides the extension at store
+time; a second check at *serve* time (`ImageServlet`) reads the file's leading bytes and refuses to
+serve anything whose signature does not match its extension, so a file that later drifted from
+what its name claims is never handed to a browser as that type.
 
 ## Backup
 

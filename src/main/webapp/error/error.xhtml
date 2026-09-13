@@ -18,21 +18,7 @@
             <h1>Something went wrong</h1>
             <p>We could not complete that request. Please try again.</p>
 
-            <!--
-                What is deliberately not here: the exception, its class, its message, its stack
-                trace, and the SQL underneath it. Not even in Development stage - the project stage
-                is a configuration value, and the one time it is wrong is the one time it matters.
-
-                A correlation id is shown when the request carries one, so a user can quote it and
-                somebody can find the matching line in the server log. T-19 sets it on the REST
-                tier's error responses; a failure that never reached the API has none, and the
-                block simply does not render.
-            -->
-            <ui:fragment rendered="#{not empty requestScope['petlee.correlationId']}">
-                <p class="field-hint">
-                    Reference: #{requestScope['petlee.correlationId']}
-                </p>
-            </ui:fragment>
+            <!-- Deliberately shows no exception, stack trace or SQL — not even in Development stage. -->
 
             <div class="actions">
                 <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button">

@@ -12,6 +12,6 @@ public record PetForm(
         @Min(0) @Max(50) Integer age,
         @NotNull @Pattern(regexp = "SMALL|MEDIUM|LARGE") String size,
         @NotNull @Pattern(regexp = "MALE|FEMALE") String gender,
-        @Size(max = 255) String shortDesc,
+        @NotBlank @Size(max = 255) String shortDesc,
         String longDesc,
         @NotNull Integer categoryId) { }

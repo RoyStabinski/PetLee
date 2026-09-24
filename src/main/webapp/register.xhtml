@@ -24,8 +24,8 @@
                         <h:outputLabel for="username" value="Username"/>
                         <h:inputText id="username" value="#{userBean.username}" required="true"
                                      requiredMessage="Required" autocomplete="username"
-                                     validatorMessage="A username is 3 to 20 characters.">
-                            <f:validateLength minimum="3" maximum="20"/>
+                                     validatorMessage="A username is 3 to 20 characters: letters, digits and underscore.">
+                            <f:validateRegex pattern="^[A-Za-z0-9_]{3,20}$"/>
                         </h:inputText>
                         <h:message for="username" styleClass="field-error"/>
                     </div>
@@ -63,8 +63,9 @@
                         <h:outputLabel for="email" value="Email"/>
                         <h:inputText id="email" value="#{userBean.email}" type="email" required="true"
                                      requiredMessage="Required" autocomplete="email"
-                                     validatorMessage="An email address is at most 100 characters.">
+                                     validatorMessage="Enter a valid email address of at most 100 characters.">
                             <f:validateLength maximum="100"/>
+                            <f:validateRegex pattern="^[^@\s]+@[^@\s]+$"/>
                         </h:inputText>
                         <h:message for="email" styleClass="field-error"/>
                     </div>

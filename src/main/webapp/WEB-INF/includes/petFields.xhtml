@@ -12,15 +12,18 @@
             <h:outputLabel for="name" value="Name"/>
             <h:inputText id="name" value="#{petFormBean.name}"
                          required="true" requiredMessage="Required"
-                         validatorMessage="A name is at most 50 characters.">
-                <f:validateLength maximum="50"/>
+                         validatorMessage="A name is at most 100 characters.">
+                <f:validateLength maximum="100"/>
             </h:inputText>
             <h:message for="name" styleClass="field-error"/>
         </div>
 
         <div class="field">
             <h:outputLabel for="breed" value="Breed"/>
-            <h:inputText id="breed" value="#{petFormBean.breed}"/>
+            <h:inputText id="breed" value="#{petFormBean.breed}"
+                         validatorMessage="A breed is at most 100 characters.">
+                <f:validateLength maximum="100"/>
+            </h:inputText>
             <h:message for="breed" styleClass="field-error"/>
         </div>
 

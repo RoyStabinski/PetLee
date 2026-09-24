@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Pet listings: the catalogue, the ownership rules and optimistic-lock handling.
@@ -69,6 +70,17 @@ public class PetService {
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<Pet> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
         return pets.find(categoryId, size, gender, null, false);
+    }
+
+    /**
+     * Counts every listing per category, in all statuses and regardless of any admin filter,
+     * so the admin panel can tell which categories are still in use.
+     *
+     * @return listing counts keyed by category id; a category with no listings is absent
+     */
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public Map<Integer, Long> countListingsByCategory() {
+        return pets.countByCategory();
     }
 
     /**

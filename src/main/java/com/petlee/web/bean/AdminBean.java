@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Backs {@code admin.xhtml}: the moderation table and the category vocabulary.
@@ -52,8 +51,11 @@ public class AdminBean implements Serializable {
     private List<Pet> listings = Collections.emptyList();
     private List<Category> categories = Collections.emptyList();
 
-    /** How many listings each category holds, keyed by name — the delete guard's evidence. */
-    private Map<String, Long> listingsPerCategory = Map.of();
+    /**
+     * How many listings each category holds, keyed by id — the delete guard's evidence.
+     * Counted over every listing, so the table's filters cannot distort it.
+     */
+    private Map<Integer, Long> listingsPerCategory = Map.of();
 
     private Integer selectedCategoryId;
     private String selectedSize;
@@ -170,10 +172,10 @@ public class AdminBean implements Serializable {
      * @return how many listings reference it, hidden ones included
      */
     public long listingCount(Category category) {
-        if (category == null || category.getCategoryName() == null) {
+        if (category == null || category.getCategoryId() == null) {
             return 0L;
         }
-        return listingsPerCategory.getOrDefault(category.getCategoryName(), 0L);
+        return listingsPerCategory.getOrDefault(category.getCategoryId(), 0L);
     }
 
     /**
@@ -192,10 +194,7 @@ public class AdminBean implements Serializable {
                     selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
                     selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
             listings = all.stream().filter(this::matchesStatus).toList();
-            listingsPerCategory = all.stream()
-                    .filter(pet -> pet.getCategory() != null && pet.getCategory().getCategoryName() != null)
-                    .collect(Collectors.groupingBy(pet -> pet.getCategory().getCategoryName(),
-                            Collectors.counting()));
+            listingsPerCategory = petService.countListingsByCategory();
             categories = categoryService.findAll();
         } catch (AppException failure) {
             Messages.error(failure.getMessage());

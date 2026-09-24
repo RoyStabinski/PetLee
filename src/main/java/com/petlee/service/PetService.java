@@ -145,18 +145,30 @@ public class PetService {
     /**
      * Edits a listing. Only its owner may do so — not an administrator.
      *
-     * @param petId        the pet's id
-     * @param form         the validated form
-     * @param callerUserId the session user's id
+     * <p>Optimistic locking works in two layers. The explicit version check catches a stale
+     * form: one opened before somebody else saved. {@code @Version} on {@link Pet} catches the
+     * narrower race of two saves that both pass the check and reach the database together.
+     *
+     * @param petId           the pet's id
+     * @param form            the validated form
+     * @param expectedVersion the version the caller saw when it loaded the listing
+     * @param callerUserId    the session user's id
      * @return the updated listing
-     * @throws AppException 404 if no such pet, 403 if not the owner, 409 on a concurrent edit
+     * @throws AppException 404 if no such pet, 403 if not the owner, 409 if the listing changed
+     *                      since the caller loaded it
      */
     @Transactional
-    public Pet update(Long petId, @Valid PetForm form, Long callerUserId) {
+    public Pet update(Long petId, @Valid PetForm form, Long expectedVersion, Long callerUserId) {
         Pet pet = requireById(petId);
 
+        // Ownership first: a non-owner learns nothing about the listing's edit history.
         if (!isSameUser(pet.getOwner(), callerUserId)) {
             throw new AppException(403, "Only the owner of a listing can edit it");
+        }
+
+        // Boxed Long values are compared with equals, never with ==, which tests identity.
+        if (expectedVersion == null || !expectedVersion.equals(pet.getVersion())) {
+            throw concurrentEdit(null);
         }
 
         applyForm(form, pet);
@@ -164,17 +176,27 @@ public class PetService {
         try {
             return pets.save(pet);
         } catch (OptimisticLockException e) {
-            throw new AppException(409,
-                    "This listing was changed by someone else; reload it and try again", e);
+            throw concurrentEdit(e);
         }
     }
 
     /** Scalar overload for the JSF tier, which cannot bind a record. */
     public Pet update(Long petId, String name, String breed, Integer age, String size,
                       String gender, String shortDesc, String longDesc, Integer categoryId,
-                      Long callerUserId) {
+                      Long expectedVersion, Long callerUserId) {
         return self.update(petId, new PetForm(name, breed, age, size, gender, shortDesc, longDesc,
-                categoryId), callerUserId);
+                categoryId), expectedVersion, callerUserId);
+    }
+
+    /**
+     * The one 409 for an edit that lost a race with another edit of the same listing.
+     *
+     * @param cause the underlying lock failure, or null when the version check caught it first
+     * @return the exception to throw
+     */
+    private static AppException concurrentEdit(Throwable cause) {
+        return new AppException(409,
+                "This listing was changed by someone else; reload it and try again", cause);
     }
 
     /**

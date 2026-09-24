@@ -39,11 +39,15 @@ public class PetResource {
 
     private PetService pets;
 
-    /** For the session, which Jakarta REST has none of its own. */
+    /**
+     * For the session, which Jakarta REST has none of its own.
+     */
     @Context
     private HttpServletRequest request;
 
-    /** For the container. Public, as Jakarta REST requires of a root resource class. */
+    /**
+     * For the container. Public, as Jakarta REST requires of a root resource class.
+     */
     public PetResource() {
     }
 
@@ -112,10 +116,15 @@ public class PetResource {
     }
 
     /**
-     * {@code PUT /api/pets/{id}} — auth, owner only.
+     * {@code PUT /api/pets/{id}?version=N} — auth, owner only.
      *
-     * @param id   the pet to update
-     * @param form the new values
+     * <p>{@code N} is the {@code version} this client read from {@code GET /api/pets/{id}}.
+     * A stale or missing version is answered 409, so one client cannot silently overwrite
+     * another's change.
+     *
+     * @param id      the pet to update
+     * @param version the version the client last read, as a query parameter
+     * @param form    the new values
      * @return the updated listing
      */
     @PUT
@@ -123,8 +132,28 @@ public class PetResource {
     @Secured
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetDTO update(@PathParam("id") Long id, PetForm form) {
-        return PetDTO.of(pets.update(id, form, caller().userId()));
+    public PetDTO update(@PathParam("id") Long id, @QueryParam("version") String version,
+                         PetForm form) {
+        return PetDTO.of(pets.update(id, form, parseVersion(version), caller().userId()));
+    }
+
+    /**
+     * Parses the version by hand, for the same reason as {@link #parseFilter}: a failed
+     * {@code @QueryParam} conversion is a 404, where a 400 naming the field is what helps.
+     *
+     * @param value the raw query parameter, may be null or blank
+     * @return the version, or null when absent — which the service refuses with 409
+     * @throws AppException 400 if the value is present but not a whole number
+     */
+    private static Long parseVersion(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException notANumber) {
+            throw new AppException(400, "version must be a whole number");
+        }
     }
 
     /**
@@ -143,7 +172,9 @@ public class PetResource {
         return Response.noContent().build();
     }
 
-    /** @return the session user, which {@code @Secured} has already guaranteed exists */
+    /**
+     * @return the session user, which {@code @Secured} has already guaranteed exists
+     */
     private SessionUser caller() {
         return CurrentUser.from(request).orElseThrow(() -> new IllegalStateException(
                 "no session on a @Secured endpoint; the annotation is missing or the filter is not bound"));

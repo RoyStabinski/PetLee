@@ -59,6 +59,9 @@ public class PetFormBean implements Serializable {
     /** Set by the edit page's view parameter; null means "creating". */
     private Long petId;
 
+
+    /** The listing's version when the edit page loaded it; sent back so a stale save is refused. */
+    private Long version;
     private transient Part uploadedFile;
 
     @PostConstruct
@@ -95,6 +98,7 @@ public class PetFormBean implements Serializable {
             shortDesc = pet.getShortDesc();
             longDesc = pet.getLongDesc();
             categoryId = pet.getCategory() == null ? null : pet.getCategory().getCategoryId();
+            version = pet.getVersion();
             return null;
 
         } catch (AppException failure) {
@@ -145,7 +149,7 @@ public class PetFormBean implements Serializable {
     private String update() {
         try {
             petService.update(petId, name, breed, age, size, gender, shortDesc, longDesc,
-                    categoryId, userBean.getCurrentUserId());
+                    categoryId, version, userBean.getCurrentUserId());
             return done("Your listing has been updated.");
 
         } catch (ConstraintViolationException invalid) {

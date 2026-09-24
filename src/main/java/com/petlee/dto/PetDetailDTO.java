@@ -2,11 +2,16 @@ package com.petlee.dto;
 
 import com.petlee.model.Pet;
 
-/** A pet in full. The three owner fields are null for a caller who is not logged in. */
+/**
+ * A pet in full. The three owner fields are null for a caller who is not logged in.
+ * {@code version} is what a client sends back with {@code PUT /api/pets/{id}?version=},
+ * so a save based on stale data is refused rather than silently overwriting a newer one.
+ */
 public record PetDetailDTO(Long id, String name, String breed, Integer age, String size,
                            String gender, String shortDesc, String longDesc, String status,
                            String categoryName, String imageUrl,
-                           String ownerName, String ownerPhone, String ownerEmail) {
+                           String ownerName, String ownerPhone, String ownerEmail,
+                           Long version) {
 
     /**
      * @param p             the pet
@@ -19,6 +24,7 @@ public record PetDetailDTO(Long id, String name, String breed, Integer age, Stri
                 p.getStatus().name(), p.getCategory().getCategoryName(), p.getImageUrl(),
                 authenticated ? p.getOwner().getFullName() : null,
                 authenticated ? p.getOwner().getPhoneNumber() : null,
-                authenticated ? p.getOwner().getEmail() : null);
+                authenticated ? p.getOwner().getEmail() : null,
+                p.getVersion());
     }
 }

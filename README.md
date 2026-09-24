@@ -109,7 +109,7 @@ All bodies are JSON. "auth" means a valid session cookie, created by `POST /api/
 | GET | `/api/pets/{id}` | open — owner contact fields only when logged in |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth |
-| PUT | `/api/pets/{id}` | owner only |
+| PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
 | DELETE | `/api/pets/{id}` | owner or admin |
 | GET | `/api/admin/pets` | admin — every status |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |

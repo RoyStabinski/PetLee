@@ -112,6 +112,9 @@ public class PetResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO create(PetForm form) {
+        if (form == null) {
+            throw new AppException(400, "A request body is required");
+        }
         return PetDTO.of(pets.create(form, caller().userId()));
     }
 
@@ -134,6 +137,9 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public PetDTO update(@PathParam("id") Long id, @QueryParam("version") String version,
                          PetForm form) {
+        if (form == null) {
+            throw new AppException(400, "A request body is required");
+        }
         return PetDTO.of(pets.update(id, form, parseVersion(version), caller().userId()));
     }
 

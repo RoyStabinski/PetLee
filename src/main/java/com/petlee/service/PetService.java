@@ -77,13 +77,18 @@ public class PetService {
      * @param petId  the listing to move
      * @param status REMOVED or AVAILABLE, in any case
      * @return the listing in its new state
-     * @throws AppException 404 if no such pet, 400 if the status is anything else
+     * @throws AppException 404 if no such pet, 400 if the status is anything else, 409 if the
+     *                      listing changed concurrently
      */
     @Transactional
     public Pet changeStatus(Long petId, String status) {
         Pet pet = requireById(petId);
         pet.setStatus(moderationStatus(status));
-        return pets.save(pet);
+        try {
+            return pets.save(pet);
+        } catch (OptimisticLockException e) {
+            throw concurrentEdit(e);
+        }
     }
 
     private static Pet.PetStatus moderationStatus(String status) {
@@ -205,7 +210,8 @@ public class PetService {
      * @param petId         the pet's id
      * @param callerUserId  the session user's id
      * @param callerIsAdmin whether that user is an administrator
-     * @throws AppException 404 if no such pet, 403 if neither owner nor admin
+     * @throws AppException 404 if no such pet, 403 if neither owner nor admin, 409 if the
+     *                      listing changed concurrently
      */
     @Transactional
     public void delete(Long petId, Long callerUserId, boolean callerIsAdmin) {
@@ -218,7 +224,11 @@ public class PetService {
 
         // Read the filename before the row goes; the cascade takes the row, not the file.
         String photograph = pet.getImageUrl();
-        pets.delete(pet);
+        try {
+            pets.delete(pet);
+        } catch (OptimisticLockException e) {
+            throw concurrentEdit(e);
+        }
         images.delete(photograph);
     }
 

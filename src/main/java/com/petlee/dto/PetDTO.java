@@ -6,7 +6,8 @@ import java.io.Serializable;
 
 /**
  * A pet as the gallery lists it: no owner contact details, enums as the contract's strings.
- * {@code version} is what the owner sends back with {@code PUT /api/pets/{id}/status?version=}.
+ * {@code imageUrl} is the main image, or null when the pet has none. {@code version} is what the
+ * owner sends back with {@code PUT /api/pets/{id}/status?version=}.
  */
 public record PetDTO(Long id, String name, String shortDesc, Integer age, String size,
                      String gender, String status, String categoryName, String imageUrl,
@@ -16,6 +17,6 @@ public record PetDTO(Long id, String name, String shortDesc, Integer age, String
     public static PetDTO of(Pet p) {
         return new PetDTO(p.getPetId(), p.getPetName(), p.getShortDesc(), p.getAge(),
                 p.getSize().name(), p.getGender().name(), p.getStatus().name(),
-                p.getCategory().getCategoryName(), p.getImageUrl(), p.getVersion());
+                p.getCategory().getCategoryName(), p.getMainImageUrl(), p.getVersion());
     }
 }

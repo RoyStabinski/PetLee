@@ -28,6 +28,20 @@
                     <h:panelGroup layout="block" styleClass="detail-media">
                         <h:graphicImage value="#{petDetailBean.imageUrl}" alt="#{petDetailBean.pet.name}"/>
                     </h:panelGroup>
+
+                    <!-- The other photographs, each opening full size. -->
+                    <ui:fragment rendered="#{not empty petDetailBean.otherImages}">
+                        <ul class="photo-strip">
+                            <ui:repeat value="#{petDetailBean.otherImages}" var="image">
+                                <li>
+                                    <a href="#{request.contextPath}#{image.url}" target="_blank" rel="noopener">
+                                        <h:graphicImage value="#{image.url}"
+                                                        alt="Another photograph of #{petDetailBean.pet.name}"/>
+                                    </a>
+                                </li>
+                            </ui:repeat>
+                        </ul>
+                    </ui:fragment>
                 </div>
 
                 <div>

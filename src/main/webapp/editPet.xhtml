@@ -16,8 +16,8 @@
         <div class="panel">
             <h1>Edit your listing</h1>
 
-            <!-- No file input: a photograph is chosen when the listing is created, and there
-                 is no path to add or replace one afterwards. -->
+            <!-- The listing's fields. The photographs below have forms of their own, so changing
+                 a photograph neither submits nor validates these fields. -->
             <h:form id="petForm">
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
@@ -27,6 +27,57 @@
                                   styleClass="button-secondary">Cancel</h:outputLink>
                 </div>
             </h:form>
+        </div>
+
+        <div class="panel">
+            <h2>Photographs</h2>
+
+            <ui:fragment rendered="#{empty petFormBean.images}">
+                <p>This listing has no photographs yet.</p>
+            </ui:fragment>
+
+            <h:form id="photosForm" rendered="#{not empty petFormBean.images}">
+                <ul class="photo-grid">
+                    <ui:repeat id="photos" value="#{petFormBean.images}" var="image">
+                        <li class="photo-tile">
+                            <h:graphicImage value="#{image.url}" alt="Photograph of #{petFormBean.name}"/>
+                            <ui:fragment rendered="#{image.main}">
+                                <span class="tag">Main photograph</span>
+                            </ui:fragment>
+                            <div class="actions">
+                                <h:commandLink id="setMain" value="Set as main" styleClass="button-secondary"
+                                               rendered="#{not image.main}"
+                                               action="#{petFormBean.setMainPhoto(image.id)}"/>
+                                <h:commandLink id="deletePhoto" value="Delete" styleClass="button button-danger"
+                                               action="#{petFormBean.deletePhoto(image.id)}"
+                                               onclick="return confirm('Delete this photograph permanently?');"/>
+                            </div>
+                        </li>
+                    </ui:repeat>
+                </ul>
+            </h:form>
+
+            <!-- Its own multipart form: enctype is not optional for h:inputFile. -->
+            <h:form id="uploadForm" enctype="multipart/form-data"
+                    rendered="#{petFormBean.roomForPhotos}">
+                <div class="field field-wide">
+                    <h:outputLabel for="morePhotos" value="Add photographs"/>
+                    <h:inputFile id="morePhotos" value="#{petFormBean.uploadedFiles}" accept="image/*"
+                                 multiple="true"/>
+                    <span class="field-hint">
+                        <h:outputFormat value="You can add {0} more. JPEG, PNG, WebP or GIF, each up to 5 MB.">
+                            <f:param value="#{petFormBean.photoSlotsLeft}"/>
+                        </h:outputFormat>
+                    </span>
+                </div>
+                <div class="actions">
+                    <h:commandButton id="upload" value="Upload" action="#{petFormBean.addPhotos}"/>
+                </div>
+            </h:form>
+
+            <ui:fragment rendered="#{not petFormBean.roomForPhotos}">
+                <p class="field-hint">A listing can have at most 5 photographs. Delete one to add another.</p>
+            </ui:fragment>
         </div>
     </ui:define>
 

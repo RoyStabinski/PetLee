@@ -3,6 +3,7 @@ package com.petlee.rest;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
+import com.petlee.dto.PetImageDTO;
 import com.petlee.model.Pet;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
@@ -254,20 +255,20 @@ public class PetResource {
     }
 
     /**
-     * {@code POST /api/pets/{id}/image} — auth, owner only. Replaces the listing's photograph
-     * with the multipart/form-data part named {@code file}: JPEG, PNG, GIF or WebP, at most
-     * 5 MB. The old file is deleted once the new one is attached.
+     * {@code POST /api/pets/{id}/images} — auth, owner only. Adds one photograph, the
+     * multipart/form-data part named {@code file}: JPEG, PNG, GIF or WebP, at most 5 MB. The
+     * first photograph a listing gets becomes its main image. A listing holds at most five.
      *
      * @param id   the pet
      * @param file the {@code file} part, or null when the request has none
-     * @return the listing, with its new {@code imageUrl}
+     * @return the stored photograph
      */
     @POST
-    @Path("{id: \\d+}/image")
+    @Path("{id: \\d+}/images")
     @Secured
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetDTO uploadImage(@PathParam("id") Long id, @FormParam("file") EntityPart file) {
+    public PetImageDTO addImage(@PathParam("id") Long id, @FormParam("file") EntityPart file) {
         if (file == null) {
             throw new AppException(400, "A photo file is required, as the multipart part \"file\"");
         }
@@ -276,7 +277,7 @@ public class PetResource {
 
         InputStream content = file.getContent();
         try {
-            return PetDTO.of(pets.attachImage(id, content, contentType, caller().userId()));
+            return PetImageDTO.of(pets.addImage(id, content, contentType, caller().userId()));
         } finally {
             try {
                 content.close();
@@ -284,6 +285,40 @@ public class PetResource {
                 // the photograph is stored or refused by now; a failed close changes neither
             }
         }
+    }
+
+    /**
+     * {@code DELETE /api/pets/{id}/images/{imageId}} — auth, owner only. Deletes the photograph
+     * and its file; if it was the main one, the oldest remaining photograph becomes main.
+     *
+     * @param id      the pet
+     * @param imageId the photograph, which must belong to that pet
+     * @return 204 No Content
+     */
+    @DELETE
+    @Path("{id: \\d+}/images/{imageId: \\d+}")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deleteImage(@PathParam("id") Long id, @PathParam("imageId") Long imageId) {
+        pets.deleteImage(id, imageId, caller().userId());
+        return Response.noContent().build();
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/images/{imageId}/main} — auth, owner only. Makes the photograph
+     * the one the gallery shows. Choosing the current main photograph is not an error.
+     *
+     * @param id      the pet
+     * @param imageId the photograph, which must belong to that pet
+     * @return 204 No Content
+     */
+    @PUT
+    @Path("{id: \\d+}/images/{imageId: \\d+}/main")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response setMainImage(@PathParam("id") Long id, @PathParam("imageId") Long imageId) {
+        pets.setMainImage(id, imageId, caller().userId());
+        return Response.noContent().build();
     }
 
     /**

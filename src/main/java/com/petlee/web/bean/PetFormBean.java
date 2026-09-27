@@ -4,6 +4,7 @@ import com.petlee.dto.CategoryDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
+import com.petlee.dto.PetImageDTO;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.CategoryApi;
 import com.petlee.web.client.PetApi;
@@ -41,6 +42,9 @@ public class PetFormBean implements Serializable {
     /** A redirect, so a refresh cannot repeat the submission. */
     private static final String DASHBOARD = "/profile.xhtml?faces-redirect=true";
 
+    /** Matches the API's own limit, so the form can refuse before uploading anything. */
+    private static final int MAX_PHOTOS = 5;
+
     private static final String[] SIZES = {"SMALL", "MEDIUM", "LARGE"};
     private static final String[] GENDERS = {"MALE", "FEMALE"};
 
@@ -65,7 +69,12 @@ public class PetFormBean implements Serializable {
 
     /** The listing's version when the edit page loaded it; sent back so a stale save is refused. */
     private Long version;
-    private transient Part uploadedFile;
+
+    /** The files chosen in either page's {@code <h:inputFile multiple="true">}. */
+    private transient List<Part> uploadedFiles;
+
+    /** The edit page's photographs, main included, oldest first. */
+    private List<PetImageDTO> images = Collections.emptyList();
 
     /**
      * The add page's view action: fills the category menu.
@@ -111,6 +120,7 @@ public class PetFormBean implements Serializable {
             longDesc = pet.longDesc();
             categoryId = pet.categoryId();
             version = pet.version();
+            images = pet.images();
 
         } catch (ApiException failure) {
             if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
@@ -135,6 +145,13 @@ public class PetFormBean implements Serializable {
     }
 
     private String create() {
+        List<Part> files = chosenFiles();
+        // Checked before anything is created, so a refused form leaves no listing behind.
+        if (files.size() > MAX_PHOTOS) {
+            Messages.error("Choose at most " + MAX_PHOTOS + " photographs.");
+            return null;
+        }
+
         PetDTO created;
         try {
             created = petApi.create(form());
@@ -142,22 +159,22 @@ public class PetFormBean implements Serializable {
             return failure.getStatus() == 401 ? Messages.sessionExpired() : reportAndStay(failure);
         }
 
-        if (!hasFile()) {
+        if (files.isEmpty()) {
             return done("Your listing has been added.");
         }
 
-        try (InputStream content = uploadedFile.getInputStream()) {
-            petApi.uploadImage(created.id(), content, uploadedFile.getSubmittedFileName(),
-                    uploadedFile.getContentType());
-            return done("Your listing and its photograph have been added.");
-
-        } catch (ApiException | IOException photographFailed) {
-            // The listing exists but the photograph does not, and the edit page has no upload
-            // control. Say both, so the user does not re-enter the form and create a duplicate.
-            Messages.warn("Your listing was added without its photograph, which could not be stored. "
-                    + "A photograph cannot be added to a listing afterwards. " + photographFailed.getMessage());
-            return Messages.keep(DASHBOARD);
+        Upload upload = uploadAll(created.id(), files);
+        if (upload.failed() == 0) {
+            return done(files.size() == 1
+                    ? "Your listing and its photograph have been added."
+                    : "Your listing and its " + files.size() + " photographs have been added.");
         }
+        // The listing exists either way. Say so, so the user does not re-enter the form and
+        // create a duplicate, and point at the edit page, where photographs can be added.
+        Messages.warn("Your listing was added, but " + upload.failed() + " of " + files.size()
+                + " photographs could not be stored. You can add them from the listing's edit page. "
+                + upload.firstFailure());
+        return Messages.keep(DASHBOARD);
     }
 
     private String update() {
@@ -175,6 +192,127 @@ public class PetFormBean implements Serializable {
             }
             return reportAndStay(failure);
         }
+    }
+
+    // ------------------------------------------------------------------ the edit page's photos
+
+    /**
+     * Uploads the chosen files to the listing being edited, up to five photographs in all.
+     *
+     * @return null to stay on the edit page, or the login page if the token has expired
+     */
+    public String addPhotos() {
+        List<Part> files = chosenFiles();
+        if (files.isEmpty()) {
+            Messages.error("Choose a photograph to upload.");
+            return null;
+        }
+        int room = MAX_PHOTOS - images.size();
+        if (files.size() > room) {
+            Messages.error(room <= 0
+                    ? "This listing already has " + MAX_PHOTOS + " photographs. Delete one first."
+                    : "A listing can have at most " + MAX_PHOTOS + " photographs; you can add "
+                            + room + " more.");
+            return null;
+        }
+
+        Upload upload = uploadAll(petId, files);
+        if (upload.sessionExpired()) {
+            return Messages.sessionExpired();
+        }
+        if (upload.failed() == 0) {
+            Messages.info(files.size() == 1 ? "The photograph has been added."
+                    : files.size() + " photographs have been added.");
+        } else {
+            Messages.error(upload.failed() + " of " + files.size()
+                    + " photographs could not be stored. " + upload.firstFailure());
+        }
+        return reloadImages();
+    }
+
+    /**
+     * Makes a photograph the one the gallery shows.
+     *
+     * @param imageId the photograph
+     * @return null to stay on the edit page, or the login page if the token has expired
+     */
+    public String setMainPhoto(Long imageId) {
+        try {
+            petApi.setMainImage(petId, imageId);
+            Messages.info("The main photograph has been changed.");
+        } catch (ApiException failure) {
+            if (failure.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
+            Messages.error(failure.getMessage());
+        }
+        return reloadImages();
+    }
+
+    /**
+     * Deletes a photograph. If it was the main one, the oldest remaining one becomes main.
+     *
+     * @param imageId the photograph
+     * @return null to stay on the edit page, or the login page if the token has expired
+     */
+    public String deletePhoto(Long imageId) {
+        try {
+            petApi.deleteImage(petId, imageId);
+            Messages.info("The photograph has been deleted.");
+        } catch (ApiException failure) {
+            if (failure.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
+            Messages.error(failure.getMessage());
+        }
+        return reloadImages();
+    }
+
+    /**
+     * Re-reads the photographs after a change, or after a failure that may mean the page is out
+     * of date. Only the photographs: the form fields and their version stay as the user left
+     * them, and photograph changes do not move the version.
+     *
+     * @return null, or the login page if the token has expired
+     */
+    private String reloadImages() {
+        try {
+            images = petApi.detail(petId).images();
+        } catch (ApiException failure) {
+            if (failure.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
+            Messages.error(failure.getMessage());
+        }
+        return null;
+    }
+
+    /** What happened to a batch of uploads. */
+    private record Upload(int failed, String firstFailure, boolean sessionExpired) { }
+
+    /**
+     * Uploads each file in turn, carrying on past a failed one; the API makes the first stored
+     * photograph of a listing its main one. Stops at a 401, since every later call would fail too.
+     */
+    private Upload uploadAll(Long id, List<Part> files) {
+        int failed = 0;
+        String firstFailure = null;
+        for (int i = 0; i < files.size(); i++) {
+            Part file = files.get(i);
+            try (InputStream content = file.getInputStream()) {
+                petApi.addImage(id, content, file.getSubmittedFileName(), file.getContentType());
+            } catch (ApiException | IOException failure) {
+                failed++;
+                if (firstFailure == null) {
+                    firstFailure = failure.getMessage();
+                }
+                if (failure instanceof ApiException api && api.getStatus() == 401) {
+                    // The files not yet tried count as failed too.
+                    return new Upload(failed + files.size() - i - 1, firstFailure, true);
+                }
+            }
+        }
+        return new Upload(failed, firstFailure == null ? "" : firstFailure, false);
     }
 
     private PetForm form() {
@@ -197,13 +335,29 @@ public class PetFormBean implements Serializable {
     /** @return whether the form is editing an existing listing rather than creating one */
     public boolean isEditing() { return petId != null; }
 
-    /** @return the upload limits, shown before the user picks a file */
-    public String getUploadLimits() { return "JPEG, PNG, WebP or GIF, up to 5 MB."; }
+    /** @return the upload limits, shown before the user picks files */
+    public String getUploadLimits() {
+        return "Up to " + MAX_PHOTOS + " photographs: JPEG, PNG, WebP or GIF, each up to 5 MB. "
+                + "The first one is shown in the gallery.";
+    }
+
+    /** @return the edit page's photographs, main included, oldest first */
+    public List<PetImageDTO> getImages() { return images; }
+
+    /** @return whether the edit page may offer more uploads */
+    public boolean isRoomForPhotos() { return images.size() < MAX_PHOTOS; }
+
+    /** @return how many more photographs the listing can take */
+    public int getPhotoSlotsLeft() { return Math.max(0, MAX_PHOTOS - images.size()); }
 
     // ------------------------------------------------------------------------------- internals
 
-    private boolean hasFile() {
-        return uploadedFile != null && uploadedFile.getSize() > 0;
+    /** @return the chosen files, without the empty part a browser sends for "no file" */
+    private List<Part> chosenFiles() {
+        if (uploadedFiles == null) {
+            return List.of();
+        }
+        return uploadedFiles.stream().filter(part -> part != null && part.getSize() > 0).toList();
     }
 
     /** Ends the response with an error status, letting the container serve its error page. */
@@ -270,7 +424,7 @@ public class PetFormBean implements Serializable {
 
     public void setPetId(Long petId) { this.petId = petId; }
 
-    public Part getUploadedFile() { return uploadedFile; }
+    public List<Part> getUploadedFiles() { return uploadedFiles; }
 
-    public void setUploadedFile(Part uploadedFile) { this.uploadedFile = uploadedFile; }
+    public void setUploadedFiles(List<Part> uploadedFiles) { this.uploadedFiles = uploadedFiles; }
 }

@@ -44,7 +44,6 @@ CREATE TABLE IF NOT EXISTS pet (
     short_desc  VARCHAR(255),
     long_desc   TEXT,
     status      VARCHAR(20)  NOT NULL DEFAULT 'AVAILABLE',
-    image_url   VARCHAR(512),
     -- A category holding live listings cannot be deleted out from under them.
     category_id INTEGER      NOT NULL REFERENCES category (category_id) ON DELETE RESTRICT,
     -- Deleting a user removes their listings with them.
@@ -61,3 +60,20 @@ CREATE TABLE IF NOT EXISTS pet (
 -- Supporting the gallery query: newest first, optionally filtered by category.
 CREATE INDEX IF NOT EXISTS idx_pet_created_at ON pet (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pet_category   ON pet (category_id);
+
+-- ---------------------------------------------------------------------------
+-- pet_image: one or more photographs per pet, exactly one of them main once any exist
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pet_image (
+    image_id    BIGSERIAL    PRIMARY KEY,
+    -- Deleting a pet deletes its image rows; the application deletes the files.
+    pet_id      BIGINT       NOT NULL REFERENCES pet (pet_id) ON DELETE CASCADE,
+    image_url   VARCHAR(512) NOT NULL,
+    is_main     BOOLEAN      NOT NULL DEFAULT FALSE,
+    uploaded_at TIMESTAMP    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pet_image_pet ON pet_image (pet_id);
+
+-- At most one main image per pet, enforced by the database rather than trusted to the code.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pet_image_main ON pet_image (pet_id) WHERE is_main;

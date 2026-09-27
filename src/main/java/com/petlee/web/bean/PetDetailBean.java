@@ -1,6 +1,7 @@
 package com.petlee.web.bean;
 
 import com.petlee.dto.PetDetailDTO;
+import com.petlee.dto.PetImageDTO;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.PetApi;
 
@@ -12,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * Backs {@code petDetails.xhtml}: one listing, loaded once by a view action through the REST API.
@@ -74,6 +76,14 @@ public class PetDetailBean implements Serializable {
 
     /** @return the listing's photograph, or the bundled placeholder when it has none */
     public String getImageUrl() { return PetBean.imageOf(pet == null ? null : pet.imageUrl()); }
+
+    /** @return the photographs other than the main one, oldest first, for the row beneath it */
+    public List<PetImageDTO> getOtherImages() {
+        if (pet == null || pet.images() == null) {
+            return List.of();
+        }
+        return pet.images().stream().filter(image -> !image.main()).toList();
+    }
 
     /** @return whether the listing is no longer available */
     public boolean isWithdrawn() {

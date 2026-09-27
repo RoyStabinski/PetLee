@@ -121,6 +121,17 @@ directory on WildFly, run in the CLI:
 /system-property=petlee.upload.dir:add(value=C:/petlee/uploads)
 ```
 
+The add-pet form sends all its photographs in one request, up to five of up to 5 MB each.
+WildFly refuses a request body over its `max-post-size`, 10 MB unless configured, before the
+application sees it. To allow five full-size photographs at once, raise it in the CLI and reload:
+
+```
+/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size,value=27262976)
+reload
+```
+
+The API itself receives one photograph per request, so it is not affected.
+
 ### Troubleshooting
 
 - **`Required services that are not installed: jboss.naming.context.java.jdbc.petlee`** on deploy
@@ -165,7 +176,9 @@ The JSF tier (`com.petlee.web`) reaches the logic tier only through the REST API
 beans call `com.petlee.web.client` (`AuthApi`, `PetApi`, `CategoryApi` and `AdminApi` over one
 shared `ApiClient`), exchange the records in `com.petlee.dto`, and authenticate with the bearer
 token that login returns, kept in the session-scoped `ApiCredentials`; nothing in the JSF tier
-touches a service, an entity or a repository. This gives security and business rules a single
+touches a service, an entity or a repository. The same holds for photographs: the pages send
+the files to `POST /api/pets/{id}/images` and show the URLs the API returns. This gives security
+and business rules a single
 enforcement point, the API that every client goes through, and leaves the two tiers free to be
 split onto separate servers. The API's base URL is `http://localhost:<port><context path>/api`,
 derived from the request being served; set the `petlee.api.url` system property to override it.
@@ -202,13 +215,15 @@ session if there is one.
 | POST | `/api/categories` | admin |
 | DELETE | `/api/categories/{id}` | admin |
 | GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
-| GET | `/api/pets/{id}` | open — owner contact fields only when logged in; `ownedByCaller` is true only for the owner |
+| GET | `/api/pets/{id}` | open — owner contact fields only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth |
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
 | DELETE | `/api/pets/{id}` | owner or admin |
 | PUT | `/api/pets/{id}/status?status=ADOPTED\|AVAILABLE&version=N` | owner only — marks a listing adopted or available again; `N` is the `version` from the pet as last read |
-| POST | `/api/pets/{id}/image` | owner only — multipart/form-data, one part named `file`; returns the pet |
+| POST | `/api/pets/{id}/images` | owner only — multipart/form-data, one part named `file`; adds one photograph (at most 5); returns `{id, url, main}` |
+| DELETE | `/api/pets/{id}/images/{imageId}` | owner only — deletes the photograph and its file; 204 |
+| PUT | `/api/pets/{id}/images/{imageId}/main` | owner only — makes it the main photograph; 204 |
 | GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
 | GET | `/api/admin/category-counts` | admin — listings per category id, e.g. `{"1": 4}`; unused categories are absent |
@@ -231,16 +246,25 @@ curl -X PUT -H "Authorization: Bearer <token>" \
      "http://localhost:8080/pet-lee/api/pets/7/status?status=ADOPTED&version=3"
 ```
 
-`POST /api/pets/{id}/image` replaces a listing's photograph. The part must be a JPEG, PNG, GIF or
-WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400. The old
-file is deleted once the new one is attached, and the response is the pet with its new
-`imageUrl`:
+A listing has up to five photographs, and once it has any, exactly one of them is main. The
+main one is the `imageUrl` of every pet the API returns, and the only one the gallery, the
+owner's listings and the admin table show; `GET /api/pets/{id}` also lists all of them in
+`images`, oldest first, for the details page. `imageUrl` is null for a pet with no photographs.
+
+`POST /api/pets/{id}/images` adds one photograph per request. The part must be a JPEG, PNG, GIF
+or WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400, and a
+sixth photograph is a 409. A listing's first photograph becomes its main one:
 
 ```bash
 curl -H "Authorization: Bearer <token>" \
      -F "file=@rex.jpg;type=image/jpeg" \
-     http://localhost:8080/pet-lee/api/pets/7/image
+     http://localhost:8080/pet-lee/api/pets/7/images
 ```
+
+Deleting the main photograph makes the oldest remaining one main. An `imageId` that belongs to
+another pet is a 404. Deleting a pet deletes all its photographs, files included. Changing a
+listing's photographs does not change its `version`, so an edit form open at the same time can
+still be saved.
 
 A browser login through the JSF pages authenticates the pages, not the browser's own `/api`
 calls: the server-side client logs in with a bearer token, and the browser session never holds

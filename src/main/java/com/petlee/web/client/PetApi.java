@@ -3,6 +3,7 @@ package com.petlee.web.client;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
+import com.petlee.dto.PetImageDTO;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -127,17 +128,19 @@ public class PetApi {
     }
 
     /**
-     * {@code POST /api/pets/{id}/image}, as the multipart part {@code file}. The stream is read
-     * during the call but not closed.
+     * {@code POST /api/pets/{id}/images}, as the multipart part {@code file}: adds one
+     * photograph. The first one a listing gets becomes main. The stream is read during the call
+     * but not closed.
      *
      * @param id          the listing
      * @param content     the photograph's bytes
      * @param fileName    the file name to send, may be null
      * @param contentType its media type, such as {@code image/png}
-     * @return the listing, with its new {@code imageUrl}
-     * @throws ApiException 400 if missing, too large or not a supported image, 403 if not the owner
+     * @return the stored photograph
+     * @throws ApiException 400 if missing, too large or not a supported image, 403 if not the
+     *                      owner, 409 if the listing already has five photographs
      */
-    public PetDTO uploadImage(Long id, InputStream content, String fileName, String contentType) {
+    public PetImageDTO addImage(Long id, InputStream content, String fileName, String contentType) {
         EntityPart part;
         try {
             EntityPart.Builder builder = EntityPart.withName("file").content(content)
@@ -150,6 +153,29 @@ public class PetApi {
             // IllegalArgumentException: the browser sent a content type that does not parse.
             throw new ApiException(400, "UPLOAD_FAILED", "The photo could not be read.", unbuildable);
         }
-        return api.postMultipart("/pets/" + id + "/image", List.of(part), PetDTO.class);
+        return api.postMultipart("/pets/" + id + "/images", List.of(part), PetImageDTO.class);
+    }
+
+    /**
+     * {@code DELETE /api/pets/{id}/images/{imageId}}. Deleting the main photograph makes the
+     * oldest remaining one main.
+     *
+     * @param id      the listing
+     * @param imageId the photograph
+     * @throws ApiException 403 if not the owner, 404 if the photograph is not on that listing
+     */
+    public void deleteImage(Long id, Long imageId) {
+        api.delete("/pets/" + id + "/images/" + imageId);
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/images/{imageId}/main}.
+     *
+     * @param id      the listing
+     * @param imageId the photograph to show in the gallery
+     * @throws ApiException 403 if not the owner, 404 if the photograph is not on that listing
+     */
+    public void setMainImage(Long id, Long imageId) {
+        api.put("/pets/" + id + "/images/" + imageId + "/main", null, Void.class);
     }
 }

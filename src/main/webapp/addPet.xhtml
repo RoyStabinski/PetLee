@@ -15,14 +15,15 @@
         <div class="panel">
             <h1>Add a pet</h1>
 
-            <!-- enctype is not optional: without it the file is never sent and h:inputFile
-                 hands the bean a null Part, with no error to explain it. -->
+            <!-- enctype is not optional: without it the files are never sent and h:inputFile
+                 hands the bean nothing, with no error to explain it. -->
             <h:form id="petForm" enctype="multipart/form-data">
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
                 <div class="field field-wide">
-                    <h:outputLabel for="photo" value="Photograph"/>
-                    <h:inputFile id="photo" value="#{petFormBean.uploadedFile}" accept="image/*"/>
+                    <h:outputLabel for="photo" value="Photographs"/>
+                    <h:inputFile id="photo" value="#{petFormBean.uploadedFiles}" accept="image/*"
+                                 multiple="true"/>
                     <h:message for="photo" styleClass="field-error"/>
                     <span class="field-hint">#{petFormBean.uploadLimits}</span>
                 </div>

@@ -2,7 +2,9 @@ package com.petlee.service;
 
 import com.petlee.dto.PetForm;
 import com.petlee.model.Pet;
+import com.petlee.model.PetImage;
 import com.petlee.model.User;
+import com.petlee.repository.PetImageRepository;
 import com.petlee.repository.PetRepository;
 import com.petlee.repository.UserRepository;
 
@@ -24,7 +26,11 @@ import java.util.Map;
 @ApplicationScoped
 public class PetService {
 
+    /** How many photographs one listing may carry. */
+    public static final int MAX_IMAGES = 5;
+
     private PetRepository pets;
+    private PetImageRepository petImages;
     private UserRepository users;
     private CategoryService categories;
     private ImageStore images;
@@ -38,9 +44,10 @@ public class PetService {
     }
 
     @Inject
-    public PetService(PetRepository pets, UserRepository users, CategoryService categories,
-                      ImageStore images) {
+    public PetService(PetRepository pets, PetImageRepository petImages, UserRepository users,
+                      CategoryService categories, ImageStore images) {
         this.pets = pets;
+        this.petImages = petImages;
         this.users = users;
         this.categories = categories;
         this.images = images;
@@ -275,7 +282,7 @@ public class PetService {
     }
 
     /**
-     * Deletes a listing and its photograph. Owner or administrator only.
+     * Deletes a listing and all its photographs. Owner or administrator only.
      *
      * @param petId         the pet's id
      * @param callerUserId  the session user's id
@@ -292,40 +299,133 @@ public class PetService {
                     "Only the owner of a listing, or an administrator, can remove it");
         }
 
-        // Read the filename before the row goes; the cascade takes the row, not the file.
-        String photograph = pet.getImageUrl();
+        // Read the filenames before the rows go; the cascade takes the rows, not the files.
+        List<String> photographs = pet.getImages().stream().map(PetImage::getImageUrl).toList();
         try {
             pets.delete(pet);
         } catch (OptimisticLockException e) {
             throw concurrentEdit(e);
         }
-        images.delete(photograph);
+        photographs.forEach(images::delete);
     }
 
     /**
-     * Replaces a listing's photograph. The old file is deleted only once the new one is attached.
+     * Adds a photograph to a listing. The first one a listing gets becomes its main image.
+     *
+     * <p>The image methods lock the pet row and write {@link PetImage} rows directly, never
+     * through {@code Pet.getImages()}: changing that list would bump the pet's version and turn
+     * an open edit form's next save into a 409.
      *
      * @param petId        the pet's id
      * @param content      the photograph's bytes; read, not closed
      * @param contentType  its media type, such as {@code image/png}
      * @param callerUserId the caller's id
-     * @return the pet, with its new photograph
-     * @throws AppException 404 if no such pet, 403 if not the owner, 400 if the photograph is
-     *                      missing, too large or not a supported image type
+     * @return the stored image
+     * @throws AppException 404 if no such pet, 403 if not the owner, 409 if it already has
+     *                      {@value #MAX_IMAGES} photographs, 400 if the photograph is missing,
+     *                      too large or not a supported image type
      */
     @Transactional
-    public Pet attachImage(Long petId, InputStream content, String contentType, Long callerUserId) {
-        Pet pet = requireById(petId);
+    public PetImage addImage(Long petId, InputStream content, String contentType,
+                             Long callerUserId) {
+        Pet pet = requireOwnedAndLocked(petId, callerUserId);
+
+        List<PetImage> existing = petImages.findByPet(petId);
+        if (existing.size() >= MAX_IMAGES) {
+            throw new AppException(409,
+                    "A listing can have at most " + MAX_IMAGES + " photographs");
+        }
+
+        String url = images.store(content, contentType);
+        PetImage image = new PetImage(pet, url, existing.isEmpty());
+        try {
+            petImages.persist(image);
+            petImages.flush();
+        } catch (RuntimeException notSaved) {
+            images.delete(url);
+            throw notSaved;
+        }
+        return image;
+    }
+
+    /**
+     * Deletes one photograph, file included. If it was the main one, the oldest remaining image
+     * becomes main.
+     *
+     * @param petId        the pet's id
+     * @param imageId      the image's id
+     * @param callerUserId the caller's id
+     * @throws AppException 404 if no such pet, or no such image on it; 403 if not the owner
+     */
+    @Transactional
+    public void deleteImage(Long petId, Long imageId, Long callerUserId) {
+        requireOwnedAndLocked(petId, callerUserId);
+        PetImage image = requireImage(petId, imageId);
+
+        boolean wasMain = image.isMain();
+        String url = image.getImageUrl();
+        petImages.remove(image);
+
+        if (wasMain) {
+            // The provider runs deletes after updates. Without this flush, the promotion below
+            // would reach the database while the old main row still exists, and
+            // ux_pet_image_main would reject it.
+            petImages.flush();
+            petImages.findByPet(petId).stream().findFirst()
+                    .ifPresent(oldest -> oldest.setMain(true));
+        }
+        petImages.flush();
+        images.delete(url);
+    }
+
+    /**
+     * Makes one photograph the main one. Choosing the current main image changes nothing.
+     *
+     * @param petId        the pet's id
+     * @param imageId      the image to make main
+     * @param callerUserId the caller's id
+     * @throws AppException 404 if no such pet, or no such image on it; 403 if not the owner
+     */
+    @Transactional
+    public void setMainImage(Long petId, Long imageId, Long callerUserId) {
+        requireOwnedAndLocked(petId, callerUserId);
+        PetImage target = requireImage(petId, imageId);
+        if (target.isMain()) {
+            return;
+        }
+
+        for (PetImage image : petImages.findByPet(petId)) {
+            if (image.isMain()) {
+                image.setMain(false);
+            }
+        }
+        // Both changes are updates, and the provider may write them in either order. If the
+        // new main were written first, two rows would be main for a moment and the partial
+        // unique index ux_pet_image_main would reject it; so the old main is cleared, flushed,
+        // and only then the new one set.
+        petImages.flush();
+        target.setMain(true);
+    }
+
+    /**
+     * Locks the pet for an image change and checks the caller owns it.
+     *
+     * @return the locked pet
+     * @throws AppException 404 if no such pet, 403 if not the owner
+     */
+    private Pet requireOwnedAndLocked(Long petId, Long callerUserId) {
+        Pet pet = pets.lockById(petId)
+                .orElseThrow(() -> new AppException(404, "No such pet: " + petId));
         if (!isSameUser(pet.getOwner(), callerUserId)) {
-            throw new AppException(403, "Only the owner of a listing can change its photo");
+            throw new AppException(403, "Only the owner of a listing can change its photographs");
         }
-        String previous = pet.getImageUrl();
-        pet.setImageUrl(images.store(content, contentType));
-        Pet saved = pets.save(pet);
-        if (previous != null) {
-            images.delete(previous);
-        }
-        return saved;
+        return pet;
+    }
+
+    /** @throws AppException 404 unless the image exists and belongs to that pet */
+    private PetImage requireImage(Long petId, Long imageId) {
+        return petImages.findInPet(petId, imageId).orElseThrow(() -> new AppException(404,
+                "No such photograph on this listing: " + imageId));
     }
 
     /**

@@ -2,6 +2,8 @@ package com.petlee.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 // Validation lives on the form records in com.petlee.dto; persistence.xml disables it here.
 @Entity
@@ -60,8 +62,14 @@ public class Pet {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    @Column(name = "image_url", length = 512)
-    private String imageUrl;
+    /**
+     * Oldest first. Removing a pet removes its images through the cascade; the service changes
+     * images through {@code PetImageRepository} instead of through this list, because a change
+     * to the list would bump {@link #version} and make an open edit form stale.
+     */
+    @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("uploadedAt ASC, imageId ASC")
+    private List<PetImage> images = new ArrayList<>();
 
     // updatable = false, so an edit never reorders the newest-first gallery.
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -128,9 +136,17 @@ public class Pet {
 
     public void setOwner(User owner){ this.owner = owner; }
 
-    public String getImageUrl(){ return imageUrl; }
+    public List<PetImage> getImages(){ return images; }
 
-    public void setImageUrl(String imageUrl){ this.imageUrl = imageUrl; }
+    /** @return the main image's URL, or null when the pet has no images */
+    public String getMainImageUrl(){
+        for (PetImage image : images) {
+            if (image.isMain()) {
+                return image.getImageUrl();
+            }
+        }
+        return null;
+    }
 
     public LocalDateTime getCreatedAt(){ return createdAt; }
 

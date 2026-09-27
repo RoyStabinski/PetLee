@@ -2,6 +2,8 @@ package com.petlee.dto;
 
 import jakarta.validation.constraints.*;
 
+import java.io.Serializable;
+
 /**
  * The body of {@code POST /api/users/register}. Carries a plaintext password inbound only —
  * it is hashed by {@code UserService} and never stored, logged or echoed back.
@@ -15,4 +17,4 @@ public record RegisterForm(
         @NotBlank @Size(max = 50) String fullName,
         @NotBlank @Email @Size(max = 100) String email,
         @Size(max = 20) String phone,
-        @Size(max = 100) String region) { }
+        @Size(max = 100) String region) implements Serializable { }

@@ -2,6 +2,8 @@ package com.petlee.dto;
 
 import com.petlee.model.Pet;
 
+import java.io.Serializable;
+
 /**
  * A pet in full. The three owner fields are null for a caller who is not logged in.
  * {@code version} is what a client sends back with {@code PUT /api/pets/{id}?version=},
@@ -11,7 +13,7 @@ public record PetDetailDTO(Long id, String name, String breed, Integer age, Stri
                            String gender, String shortDesc, String longDesc, String status,
                            String categoryName, String imageUrl,
                            String ownerName, String ownerPhone, String ownerEmail,
-                           Long version) {
+                           Long version) implements Serializable {
 
     /**
      * @param p             the pet

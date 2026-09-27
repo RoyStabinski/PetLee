@@ -161,17 +161,35 @@ Register through `/register.xhtml` to try the flow as a first-time user.
 
 ## Architecture
 
-The JSF managed beans in `com.petlee.web` inject the CDI services in `com.petlee.service` directly
-rather than calling the REST API over HTTP. The REST API at `/api/*` (`com.petlee.rest`) is a
-complete, independently usable surface, exercisable the way any non-browser client would:
+The presentation tier is being moved onto the REST API, so that the JSF managed beans in
+`com.petlee.web` reach the logic tier only over HTTP. Authentication already does: login,
+registration and logout in `UserBean` go through `com.petlee.web.client` (`AuthApi` over one
+shared `ApiClient`), which calls `/api` with the bearer token kept in the session-scoped
+`ApiCredentials`. The other beans still inject the CDI services in `com.petlee.service` directly
+and are being migrated screen by screen. The API's base URL is
+`http://localhost:<port><context path>/api`, derived from the request being served; set the
+`petlee.api.url` system property to override it.
+
+The REST API at `/api/*` (`com.petlee.rest`) is a complete, independently usable surface,
+exercisable the way any non-browser client would:
 
 ```bash
 curl -b cookies.txt http://localhost:8080/pet-lee/api/pets
+curl -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/pets/mine
 ```
 
 ### Endpoints
 
-All bodies are JSON. "auth" means a valid session cookie, created by `POST /api/auth/login`.
+All bodies are JSON. "auth" means a logged-in caller, identified by either credential that
+`POST /api/auth/login` hands out:
+
+- the session cookie it sets, or
+- the `token` in its response body, sent as `Authorization: Bearer <token>` in place of the cookie.
+
+Login answers `{"user": {...}, "token": "..."}`. A token expires after 30 idle minutes, like the
+session. When a request carries a bearer header, that header alone decides: an unknown or
+expired token is a 401 even if a valid cookie came along. `POST /api/auth/logout` revokes the
+bearer token if one was sent and invalidates the session if there is one.
 
 | Method | Path | Access |
 |---|---|---|
@@ -194,8 +212,10 @@ Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, stat
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as
 `{"code": "...", "message": "..."}`.
 
-Both tiers share one `HttpSession`, so a browser login also authenticates that session's `/api`
-calls.
+A browser login through the JSF pages authenticates the pages, not the browser's own `/api`
+calls: the server-side client logs in with a bearer token, and the browser session never holds
+the REST tier's session user. To call `/api` from a browser, log in through
+`POST /api/auth/login`.
 
 Authorisation is decided in the service layer, from a caller id passed in as an argument — no
 service reads a session. `@Secured` and `@AdminOnly` guard the REST endpoints; `PageAccessFilter`

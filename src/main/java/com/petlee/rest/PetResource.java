@@ -30,8 +30,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * {@code /api/pets}. Decides who is asking — always from the session, never from the body — and
- * maps entities onto records; every rule and every error status belongs to {@link PetService}.
+ * {@code /api/pets}. Decides who is asking — from the bearer token or the session, never from the
+ * body — and maps entities onto records; every rule and every error status belongs to
+ * {@link PetService}.
  */
 @Path("pets")
 @RequestScoped
@@ -39,8 +40,10 @@ public class PetResource {
 
     private PetService pets;
 
+    private CurrentUser currentUser;
+
     /**
-     * For the session, which Jakarta REST has none of its own.
+     * For the Authorization header and the session, which Jakarta REST has none of its own.
      */
     @Context
     private HttpServletRequest request;
@@ -52,8 +55,9 @@ public class PetResource {
     }
 
     @Inject
-    public PetResource(PetService pets) {
+    public PetResource(PetService pets, CurrentUser currentUser) {
         this.pets = pets;
+        this.currentUser = currentUser;
     }
 
     /**
@@ -84,7 +88,7 @@ public class PetResource {
     @Path("{id: \\d+}")
     @Produces(MediaType.APPLICATION_JSON)
     public PetDetailDTO findDetail(@PathParam("id") Long id) {
-        return PetDetailDTO.of(pets.findDetail(id), CurrentUser.from(request).isPresent());
+        return PetDetailDTO.of(pets.findDetail(id), currentUser.from(request).isPresent());
     }
 
     /**
@@ -179,11 +183,11 @@ public class PetResource {
     }
 
     /**
-     * @return the session user, which {@code @Secured} has already guaranteed exists
+     * @return the caller, which {@code @Secured} has already guaranteed exists
      */
     private SessionUser caller() {
-        return CurrentUser.from(request).orElseThrow(() -> new IllegalStateException(
-                "no session on a @Secured endpoint; the annotation is missing or the filter is not bound"));
+        return currentUser.from(request).orElseThrow(() -> new IllegalStateException(
+                "no caller on a @Secured endpoint; the annotation is missing or the filter is not bound"));
     }
 
     static Pet.PetSize parseSize(String value) {

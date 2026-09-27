@@ -1,23 +1,26 @@
 package com.petlee.web.bean;
 
-import com.petlee.model.User;
-import com.petlee.rest.security.CurrentUser;
-import com.petlee.rest.security.SessionUser;
-import com.petlee.service.AppException;
-import com.petlee.service.UserService;
+import com.petlee.dto.RegisterForm;
+import com.petlee.dto.UserDTO;
+import com.petlee.web.client.ApiCredentials;
+import com.petlee.web.client.ApiException;
+import com.petlee.web.client.AuthApi;
 
 import jakarta.enterprise.context.SessionScoped;
+import jakarta.faces.context.ExternalContext;
 import jakarta.faces.context.FacesContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.ConstraintViolationException;
 
 import java.io.Serializable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Holds the signed-in user for the JSF tier and performs login, registration and logout.
- * The authority is the session attribute {@link CurrentUser} writes, which the REST tier reads too.
+ * Holds the signed-in user for the JSF tier and performs login, registration and logout, all
+ * through the REST API. The authority is the bearer token in {@link ApiCredentials}; this bean
+ * reads the user from there rather than keeping a second copy.
  */
 @Named("userBean")
 @SessionScoped
@@ -25,21 +28,27 @@ public class UserBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private static final Logger LOGGER = Logger.getLogger(UserBean.class.getName());
+
     /** Where the registration form's mismatch message is attached. */
     public static final String CONFIRM_PASSWORD_CLIENT_ID = "registerForm:confirmPassword";
 
     private static final String HOME = "/index.xhtml?faces-redirect=true";
     private static final String LOGIN = "/login.xhtml?faces-redirect=true";
 
+    /** The code {@code ConstraintViolationExceptionMapper} answers a bean-validation failure with. */
+    private static final String VALIDATION_FAILED = "VALIDATION_FAILED";
+
     /**
      * Not transient: CDI injects a serializable proxy, and transient would leave null behind
      * after the container passivates and restores the session.
      */
     @Inject
-    private UserService userService;
+    private AuthApi authApi;
 
-    /** The signed-in user, or null. The only long-lived state in this bean. */
-    private User currentUser;
+    /** The token and the signed-in user. Not transient, for the same reason. */
+    @Inject
+    private ApiCredentials credentials;
 
     // Form backing. The passwords are cleared by each submission's finally block.
     private String username;
@@ -53,22 +62,21 @@ public class UserBean implements Serializable {
     // ------------------------------------------------------------------------------- the actions
 
     /**
-     * Signs in and establishes the session shared with the REST tier.
+     * Signs in through {@code POST /api/auth/login}.
+     *
+     * <p>That call's session belongs to the server-to-server connection, not to the browser, so
+     * this browser's own session id is rotated here: the signed-in state lives in it, and a
+     * fixated pre-login id must not carry that over.
      *
      * @return home, or null to stay on the login page
      */
     public String login() {
         try {
-            User user = userService.authenticate(trimmed(username), password);
-
-            HttpServletRequest request = (HttpServletRequest) FacesContext.getCurrentInstance()
-                    .getExternalContext().getRequest();
-            CurrentUser.establish(request, SessionUser.of(user));
-
-            currentUser = user;
+            authApi.login(trimmed(username), password);
+            rotateSessionId();
             return HOME;
 
-        } catch (AppException failure) {
+        } catch (ApiException failure) {
             Messages.error(failure.getMessage());
             return null;
 
@@ -78,7 +86,8 @@ public class UserBean implements Serializable {
     }
 
     /**
-     * Creates an account. Registration does not sign anybody in.
+     * Creates an account through {@code POST /api/users/register}. Registration does not sign
+     * anybody in.
      *
      * @return the login page, or null to stay on the registration page
      */
@@ -89,18 +98,16 @@ public class UserBean implements Serializable {
                 return null;
             }
 
-            userService.register(trimmed(username), password, trimmed(fullName),
-                    trimmed(email), trimmed(phone), trimmed(region));
+            authApi.register(new RegisterForm(trimmed(username), password, trimmed(fullName),
+                    trimmed(email), trimmed(phone), trimmed(region)));
 
             Messages.info("Your account has been created. Please log in.");
             return Messages.keep(LOGIN);
 
-        } catch (ConstraintViolationException invalid) {
-            Messages.error(Messages.firstViolation(invalid, "That registration could not be accepted."));
-            return null;
-
-        } catch (AppException failure) {
-            Messages.error(failure.getMessage());
+        } catch (ApiException failure) {
+            Messages.error(VALIDATION_FAILED.equals(failure.getCode())
+                    ? violationText(failure.getMessage())
+                    : failure.getMessage());
             return null;
 
         } finally {
@@ -109,15 +116,21 @@ public class UserBean implements Serializable {
     }
 
     /**
-     * Signs out.
+     * Signs out: revokes the token through {@code POST /api/auth/logout} — {@link AuthApi#logout}
+     * clears {@link ApiCredentials} whatever the outcome — then invalidates this browser's
+     * session. The local logout happens even if the API call fails — a token that
+     * already expired is refused with 401, and the user still expects to be signed out.
      *
      * @return home
      */
     public String logout() {
-        HttpServletRequest request = (HttpServletRequest) FacesContext.getCurrentInstance()
-                .getExternalContext().getRequest();
-        CurrentUser.terminate(request);
-        currentUser = null;
+        try {
+            authApi.logout();
+        } catch (ApiException failure) {
+            LOGGER.log(Level.FINE, () -> "API logout failed (" + failure.getStatus()
+                    + "); signing out locally anyway");
+        }
+        FacesContext.getCurrentInstance().getExternalContext().invalidateSession();
         return HOME;
     }
 
@@ -132,7 +145,7 @@ public class UserBean implements Serializable {
 
     // -------------------------------------------------------------------- what the shell reads
 
-    public boolean isLoggedIn() { return currentUser != null; }
+    public boolean isLoggedIn() { return credentials.isLoggedIn(); }
 
     /**
      * Menu visibility only — not authorisation, which the services do.
@@ -140,23 +153,45 @@ public class UserBean implements Serializable {
      * @return whether the signed-in user's role is ADMIN
      */
     public boolean isAdmin() {
-        return currentUser != null && currentUser.isAdmin();
+        UserDTO user = getCurrentUser();
+        return user != null && "ADMIN".equals(user.role());
     }
 
     /** @return the user's full name for the navigation bar, or null when signed out */
     public String getDisplayName() {
-        return currentUser == null ? null : currentUser.getFullName();
+        UserDTO user = getCurrentUser();
+        return user == null ? null : user.fullName();
     }
 
     /** @return the signed-in user's id, or null */
     public Long getCurrentUserId() {
-        return currentUser == null ? null : currentUser.getUserId();
+        UserDTO user = getCurrentUser();
+        return user == null ? null : user.id();
     }
 
-    /** @return the signed-in user, or null. Carries a password digest — never render it. */
-    public User getCurrentUser() { return currentUser; }
+    /** @return the signed-in user, or null. Carries no password material. */
+    public UserDTO getCurrentUser() {
+        return credentials.isLoggedIn() ? credentials.getUser() : null;
+    }
 
     // ------------------------------------------------------------------------------- internals
+
+    /** Gives this browser's session a new id, keeping its contents; see {@link #login}. */
+    private static void rotateSessionId() {
+        ExternalContext external = FacesContext.getCurrentInstance().getExternalContext();
+        if (external.getSession(false) != null) {
+            ((HttpServletRequest) external.getRequest()).changeSessionId();
+        }
+    }
+
+    /**
+     * The mapper writes a violation as {@code "<property path> <message>"}; the page shows only
+     * the message, as it did when the constraint was checked in-process.
+     */
+    private static String violationText(String message) {
+        int space = message.indexOf(' ');
+        return space < 0 ? message : message.substring(space + 1);
+    }
 
     private void clearPasswords() {
         password = null;

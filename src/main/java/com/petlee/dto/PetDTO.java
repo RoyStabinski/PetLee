@@ -4,14 +4,18 @@ import com.petlee.model.Pet;
 
 import java.io.Serializable;
 
-/** A pet as the gallery lists it: no owner contact details, enums as the contract's strings. */
+/**
+ * A pet as the gallery lists it: no owner contact details, enums as the contract's strings.
+ * {@code version} is what the owner sends back with {@code PUT /api/pets/{id}/status?version=}.
+ */
 public record PetDTO(Long id, String name, String shortDesc, Integer age, String size,
-                     String gender, String status, String categoryName, String imageUrl)
+                     String gender, String status, String categoryName, String imageUrl,
+                     Long version)
         implements Serializable {
 
     public static PetDTO of(Pet p) {
         return new PetDTO(p.getPetId(), p.getPetName(), p.getShortDesc(), p.getAge(),
                 p.getSize().name(), p.getGender().name(), p.getStatus().name(),
-                p.getCategory().getCategoryName(), p.getImageUrl());
+                p.getCategory().getCategoryName(), p.getImageUrl(), p.getVersion());
     }
 }

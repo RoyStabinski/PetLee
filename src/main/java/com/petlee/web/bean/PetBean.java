@@ -42,6 +42,8 @@ public class PetBean implements Serializable {
     private Integer selectedCategoryId;
     private String selectedSize;
     private String selectedGender;
+    private Integer minAge;
+    private Integer maxAge;
 
     /** The owner's own listings, every status included; loaded on first use. */
     private List<PetDTO> myListings;
@@ -63,8 +65,17 @@ public class PetBean implements Serializable {
         return load();
     }
 
-    /** @return null, or the login page if the API refused an expired token */
+    /**
+     * Re-reads the gallery with the current filters. An inverted age range is refused here,
+     * without a call; {@code PetService} still refuses it for other REST clients.
+     *
+     * @return null, or the login page if the API refused an expired token
+     */
     public String applyFilter() {
+        if (minAge != null && maxAge != null && minAge > maxAge) {
+            Messages.error("Age from must not be greater than Age to");
+            return null;
+        }
         return load();
     }
 
@@ -73,12 +84,14 @@ public class PetBean implements Serializable {
         selectedCategoryId = null;
         selectedSize = null;
         selectedGender = null;
+        minAge = null;
+        maxAge = null;
         return load();
     }
 
     private String load() {
         try {
-            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender);
+            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender, minAge, maxAge);
         } catch (ApiException e) {
             if (e.getStatus() == 401) {
                 return Messages.sessionExpired();
@@ -197,6 +210,47 @@ public class PetBean implements Serializable {
         }
     }
 
+    /**
+     * Marks one of the caller's listings adopted, which takes it out of the public gallery.
+     *
+     * @param petId   the listing
+     * @param version its {@code version} as the dashboard read it
+     * @return null to stay on the dashboard, or the login page if the token has expired
+     */
+    public String markAdopted(Long petId, Long version) {
+        return changeOwnStatus(petId, "ADOPTED", version,
+                "The listing is marked as adopted and no longer appears in the gallery.");
+    }
+
+    /**
+     * Undoes {@link #markAdopted}, putting the listing back in the public gallery.
+     *
+     * @param petId   the listing
+     * @param version its {@code version} as the dashboard read it
+     * @return null to stay on the dashboard, or the login page if the token has expired
+     */
+    public String markAvailable(Long petId, Long version) {
+        return changeOwnStatus(petId, "AVAILABLE", version,
+                "The listing is available again and back in the gallery.");
+    }
+
+    private String changeOwnStatus(Long petId, String status, Long version, String done) {
+        try {
+            petApi.changeStatus(petId, status, version);
+            Messages.info(done);
+            myListings = null;
+            return null;
+        } catch (ApiException e) {
+            if (e.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
+            // 409 withdrawn, already so, or changed meanwhile: say why, and show the current state.
+            Messages.error(e.getMessage());
+            myListings = null;
+            return null;
+        }
+    }
+
     public String edit(Long petId) {
         return "/editPet.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
@@ -214,4 +268,8 @@ public class PetBean implements Serializable {
     public void setSelectedSize(String v) { this.selectedSize = v; }
     public String getSelectedGender() { return selectedGender; }
     public void setSelectedGender(String v) { this.selectedGender = v; }
+    public Integer getMinAge() { return minAge; }
+    public void setMinAge(Integer v) { this.minAge = v; }
+    public Integer getMaxAge() { return maxAge; }
+    public void setMaxAge(Integer v) { this.maxAge = v; }
 }

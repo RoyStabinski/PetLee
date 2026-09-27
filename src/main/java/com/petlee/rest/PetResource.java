@@ -71,14 +71,19 @@ public class PetResource {
      * @param categoryId the category to restrict to, or absent for all
      * @param size       SMALL, MEDIUM or LARGE, or absent
      * @param gender     MALE or FEMALE, or absent
+     * @param minAge     the youngest age to include, 0 to 50, or absent
+     * @param maxAge     the oldest age to include, 0 to 50, or absent
      * @return the matching available pets, newest first
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public List<PetDTO> findGallery(@QueryParam("categoryId") Integer categoryId,
                                     @QueryParam("size") String size,
-                                    @QueryParam("gender") String gender) {
-        return pets.findGallery(categoryId, parseSize(size), parseGender(gender))
+                                    @QueryParam("gender") String gender,
+                                    @QueryParam("minAge") String minAge,
+                                    @QueryParam("maxAge") String maxAge) {
+        return pets.findGallery(categoryId, parseSize(size), parseGender(gender),
+                        parseAge("minAge", minAge), parseAge("maxAge", maxAge))
                 .stream().map(PetDTO::of).toList();
     }
 
@@ -154,6 +159,63 @@ public class PetResource {
             throw new AppException(400, "A request body is required");
         }
         return PetDTO.of(pets.update(id, form, parseVersion(version), caller().userId()));
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/status?status=ADOPTED|AVAILABLE&version=N} — auth, owner only.
+     * Marks a listing adopted or available again. A listing an administrator has withdrawn
+     * cannot be changed this way, and a stale or missing version is 409, as for an edit.
+     *
+     * @param id      the listing
+     * @param status  ADOPTED or AVAILABLE
+     * @param version the version the client last read
+     * @return the listing in its new state
+     */
+    @PUT
+    @Path("{id: \\d+}/status")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public PetDTO changeOwnStatus(@PathParam("id") Long id, @QueryParam("status") String status,
+                                  @QueryParam("version") String version) {
+        return PetDTO.of(pets.changeOwnStatus(id, parseOwnStatus(status), parseVersion(version),
+                caller().userId()));
+    }
+
+    /**
+     * @param value the raw query parameter
+     * @return ADOPTED or AVAILABLE
+     * @throws AppException 400 for anything else, absent included
+     */
+    private static Pet.PetStatus parseOwnStatus(String value) {
+        Pet.PetStatus status = parseFilter(Pet.PetStatus.class, value,
+                "status must be ADOPTED or AVAILABLE");
+        if (status != Pet.PetStatus.ADOPTED && status != Pet.PetStatus.AVAILABLE) {
+            throw new AppException(400, "status must be ADOPTED or AVAILABLE");
+        }
+        return status;
+    }
+
+    /**
+     * Parses an optional age bound by hand, for the same reason as {@link #parseFilter}.
+     *
+     * @param name  the parameter's name, for the message
+     * @param value the raw query parameter, may be null or blank
+     * @return the bound, or null for none
+     * @throws AppException 400 unless the value is a whole number from 0 to 50
+     */
+    private static Integer parseAge(String name, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            int age = Integer.parseInt(value.trim());
+            if (age >= 0 && age <= 50) {
+                return age;
+            }
+        } catch (NumberFormatException notANumber) {
+            // fall through to the same message
+        }
+        throw new AppException(400, name + " must be a whole number from 0 to 50");
     }
 
     /**

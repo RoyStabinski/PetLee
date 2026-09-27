@@ -20,9 +20,15 @@ public class PetRepository {
     /**
      * The gallery query. LEFT JOIN FETCH on category and owner is load-bearing: the result
      * is detached when the service transaction ends, and the views read both.
+     *
+     * <p>Every filter is a named parameter; no value is ever concatenated into the JPQL. An age
+     * bound excludes listings whose age is unknown, since SQL compares null as unknown.
+     *
+     * @param minAge the youngest age to include, or null for no lower bound
+     * @param maxAge the oldest age to include, or null for no upper bound
      */
     public List<Pet> find(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
-                          Long ownerId, boolean availableOnly) {
+                          Integer minAge, Integer maxAge, Long ownerId, boolean availableOnly) {
         StringBuilder jpql = new StringBuilder(
                 "SELECT DISTINCT p FROM Pet p"
                 + " LEFT JOIN FETCH p.category LEFT JOIN FETCH p.owner WHERE 1 = 1");
@@ -46,6 +52,14 @@ public class PetRepository {
         if (gender != null) {
             jpql.append(" AND p.gender = :gender");
             params.add(new Object[]{"gender", gender});
+        }
+        if (minAge != null) {
+            jpql.append(" AND p.age >= :minAge");
+            params.add(new Object[]{"minAge", minAge});
+        }
+        if (maxAge != null) {
+            jpql.append(" AND p.age <= :maxAge");
+            params.add(new Object[]{"maxAge", maxAge});
         }
         jpql.append(" ORDER BY p.createdAt DESC");
 

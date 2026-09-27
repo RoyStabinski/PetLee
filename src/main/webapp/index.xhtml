@@ -3,7 +3,8 @@
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:f="jakarta.faces.core"
-                xmlns:ui="jakarta.faces.facelets">
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
 
     <f:metadata>
         <f:viewAction action="#{petBean.loadGallery}"/>
@@ -44,13 +45,39 @@
                         </h:selectOneMenu>
                     </div>
 
+                    <div class="field">
+                        <h:outputLabel for="minAge" value="Age from"/>
+                        <h:inputText id="minAge" value="#{petBean.minAge}" type="number"
+                                     p:min="0" p:max="50"
+                                     converterMessage="An age is a whole number from 0 to 50."
+                                     validatorMessage="An age is a whole number from 0 to 50.">
+                            <f:validateLongRange minimum="0" maximum="50"/>
+                        </h:inputText>
+                        <h:message for="minAge" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="maxAge" value="Age to"/>
+                        <h:inputText id="maxAge" value="#{petBean.maxAge}" type="number"
+                                     p:min="0" p:max="50"
+                                     converterMessage="An age is a whole number from 0 to 50."
+                                     validatorMessage="An age is a whole number from 0 to 50.">
+                            <f:validateLongRange minimum="0" maximum="50"/>
+                        </h:inputText>
+                        <h:message for="maxAge" styleClass="field-error"/>
+                    </div>
+
+                    <!-- Apply re-renders @form so a field's validation message shows. Clear
+                         executes only itself, so an invalid age cannot block it, and resetValues
+                         makes the inputs show the cleared values rather than what was typed. -->
                     <div class="actions">
                         <h:commandButton id="apply" value="Apply" action="#{petBean.applyFilter}">
-                            <f:ajax execute="@form" render=":globalMessages :galleryGrid"/>
+                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
                         </h:commandButton>
                         <h:commandButton id="clear" value="Clear" action="#{petBean.clearFilters}"
                                          styleClass="button-secondary">
-                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
+                            <f:ajax execute="@this" render=":globalMessages :galleryGrid @form"
+                                    resetValues="true"/>
                         </h:commandButton>
                     </div>
                 </fieldset>

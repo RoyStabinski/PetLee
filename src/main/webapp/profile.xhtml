@@ -72,6 +72,15 @@
                                         <div class="actions">
                                             <h:commandLink id="edit" value="Edit" styleClass="button-secondary"
                                                            action="#{petBean.edit(pet.id)}"/>
+                                            <!-- Neither for a withdrawn listing: only an administrator can restore it. -->
+                                            <h:commandLink id="markAdopted" value="Mark as adopted"
+                                                           styleClass="button-secondary"
+                                                           rendered="#{pet.status == 'AVAILABLE'}"
+                                                           action="#{petBean.markAdopted(pet.id, pet.version)}"/>
+                                            <h:commandLink id="markAvailable" value="Mark as available"
+                                                           styleClass="button-secondary"
+                                                           rendered="#{pet.status == 'ADOPTED'}"
+                                                           action="#{petBean.markAvailable(pet.id, pet.version)}"/>
                                             <!-- Confirmed before the call: deletion is permanent. -->
                                             <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
                                                            action="#{petBean.delete(pet.id)}"

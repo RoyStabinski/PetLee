@@ -30,15 +30,21 @@ public class PetApi {
      * @param categoryId the category to restrict to, or null
      * @param size       SMALL, MEDIUM or LARGE, or null
      * @param gender     MALE or FEMALE, or null
+     * @param minAge     the youngest age to include, or null
+     * @param maxAge     the oldest age to include, or null
      * @return the matching available pets, newest first
-     * @throws ApiException 400 for an unrecognised size or gender
+     * @throws ApiException 400 for an unrecognised size or gender, an age outside 0 to 50, or
+     *                      minAge greater than maxAge
      */
-    public List<PetDTO> gallery(Integer categoryId, String size, String gender) {
+    public List<PetDTO> gallery(Integer categoryId, String size, String gender,
+                                Integer minAge, Integer maxAge) {
         // HashMap, not Map.of: the values may be null, and ApiClient skips those.
         Map<String, Object> query = new HashMap<>();
         query.put("categoryId", categoryId);
         query.put("size", size);
         query.put("gender", gender);
+        query.put("minAge", minAge);
+        query.put("maxAge", maxAge);
         return api.get("/pets", query, PET_LIST);
     }
 
@@ -90,6 +96,24 @@ public class PetApi {
         Map<String, Object> query = new HashMap<>();
         query.put("version", version);
         return api.put("/pets/" + id, query, form, PetDTO.class);
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/status?status=&version=}: the owner marks a listing adopted,
+     * or available again.
+     *
+     * @param id      the listing
+     * @param status  ADOPTED or AVAILABLE
+     * @param version the {@code version} from the listing as last read; null is sent as absent
+     * @return the listing in its new state
+     * @throws ApiException 403 if not the owner, 409 if withdrawn by an administrator, already
+     *                      in that status, or changed since it was read
+     */
+    public PetDTO changeStatus(Long id, String status, Long version) {
+        Map<String, Object> query = new HashMap<>();
+        query.put("status", status);
+        query.put("version", version);
+        return api.put("/pets/" + id + "/status", query, null, PetDTO.class);
     }
 
     /**

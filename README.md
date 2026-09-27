@@ -201,12 +201,13 @@ session if there is one.
 | GET | `/api/categories` | open |
 | POST | `/api/categories` | admin |
 | DELETE | `/api/categories/{id}` | admin |
-| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender` |
+| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
 | GET | `/api/pets/{id}` | open — owner contact fields only when logged in; `ownedByCaller` is true only for the owner |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth |
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
 | DELETE | `/api/pets/{id}` | owner or admin |
+| PUT | `/api/pets/{id}/status?status=ADOPTED\|AVAILABLE&version=N` | owner only — marks a listing adopted or available again; `N` is the `version` from the pet as last read |
 | POST | `/api/pets/{id}/image` | owner only — multipart/form-data, one part named `file`; returns the pet |
 | GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
@@ -215,6 +216,20 @@ session if there is one.
 Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, status
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as
 `{"code": "...", "message": "..."}`.
+
+`minAge` and `maxAge` are whole numbers from 0 to 50, and either may be given alone; a listing
+whose age is unknown is left out once either is given. A value outside that range, or `minAge`
+greater than `maxAge`, is a 400 naming the problem.
+
+`PUT /api/pets/{id}/status` accepts only AVAILABLE to ADOPTED and back. It is a 409 when an
+administrator has withdrawn the listing (only an administrator can restore it), when the
+listing already has that status, or when `version` is missing or stale. Every pet in a list
+carries its `version`, so the owner's dashboard can send it back:
+
+```bash
+curl -X PUT -H "Authorization: Bearer <token>" \
+     "http://localhost:8080/pet-lee/api/pets/7/status?status=ADOPTED&version=3"
+```
 
 `POST /api/pets/{id}/image` replaces a listing's photograph. The part must be a JPEG, PNG, GIF or
 WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400. The old

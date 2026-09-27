@@ -52,11 +52,19 @@ public class PetService {
      * @param categoryId category filter, or null for any
      * @param size       size filter, or null for any
      * @param gender     gender filter, or null for any
-     * @return the matching pets, never null
+     * @param minAge     the youngest age to include, or null for no lower bound
+     * @param maxAge     the oldest age to include, or null for no upper bound
+     * @return the matching pets, never null; a listing with no age is left out once either
+     *         bound is given
+     * @throws AppException 400 if both bounds are given and minAge is greater than maxAge
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<Pet> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, true);
+    public List<Pet> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
+                                 Integer minAge, Integer maxAge) {
+        if (minAge != null && maxAge != null && minAge > maxAge) {
+            throw new AppException(400, "minAge must not be greater than maxAge");
+        }
+        return pets.find(categoryId, size, gender, minAge, maxAge, null, true);
     }
 
     /**
@@ -69,7 +77,7 @@ public class PetService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<Pet> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, false);
+        return pets.find(categoryId, size, gender, null, null, null, false);
     }
 
     /**
@@ -96,6 +104,56 @@ public class PetService {
     public Pet changeStatus(Long petId, String status) {
         Pet pet = requireById(petId);
         pet.setStatus(moderationStatus(status));
+        try {
+            return pets.save(pet);
+        } catch (OptimisticLockException e) {
+            throw concurrentEdit(e);
+        }
+    }
+
+    /**
+     * Lets an owner mark their listing adopted, or undo that. Only AVAILABLE to ADOPTED and
+     * ADOPTED to AVAILABLE are accepted; hiding and restoring stay with the administrators.
+     *
+     * <p>The withdrawn check comes before the version check on purpose: an administrator's
+     * change bumps the version too, and "changed by someone else" would hide the real reason.
+     *
+     * @param petId           the listing
+     * @param newStatus       ADOPTED or AVAILABLE
+     * @param expectedVersion the version the caller last read
+     * @param callerUserId    the caller's id
+     * @return the listing in its new state
+     * @throws AppException 404 if no such pet, 403 if not the owner, 400 for any other target
+     *                      status, 409 if an administrator withdrew it, if it already has that
+     *                      status, or if the version is missing or stale
+     */
+    @Transactional
+    public Pet changeOwnStatus(Long petId, Pet.PetStatus newStatus, Long expectedVersion,
+                               Long callerUserId) {
+        Pet pet = requireById(petId);
+
+        if (!isSameUser(pet.getOwner(), callerUserId)) {
+            throw new AppException(403, "Only the owner of a listing can change its status");
+        }
+        if (newStatus != Pet.PetStatus.ADOPTED && newStatus != Pet.PetStatus.AVAILABLE) {
+            throw new AppException(400, "status must be ADOPTED or AVAILABLE");
+        }
+        if (pet.getStatus() == Pet.PetStatus.REMOVED) {
+            throw new AppException(409, "An administrator has withdrawn this listing, "
+                    + "so its status cannot be changed");
+        }
+
+        // Boxed Long values are compared with equals, never with ==, which tests identity.
+        if (expectedVersion == null || !expectedVersion.equals(pet.getVersion())) {
+            throw concurrentEdit(null);
+        }
+        if (pet.getStatus() == newStatus) {
+            throw new AppException(409, newStatus == Pet.PetStatus.ADOPTED
+                    ? "This listing is already marked as adopted"
+                    : "This listing is already available");
+        }
+
+        pet.setStatus(newStatus);
         try {
             return pets.save(pet);
         } catch (OptimisticLockException e) {
@@ -281,7 +339,7 @@ public class PetService {
         if (ownerUserId == null) {
             return List.of();
         }
-        return pets.find(null, null, null, ownerUserId, false);
+        return pets.find(null, null, null, null, null, ownerUserId, false);
     }
 
     /**

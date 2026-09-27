@@ -11,6 +11,7 @@ import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.ResourceInfo;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
@@ -22,6 +23,11 @@ import java.util.Optional;
 /**
  * Turns {@link Secured} and {@link AdminOnly} into 401s and 403s for every endpoint carrying
  * either, and treats {@code @AdminOnly} as implying authentication so it can stand alone.
+ *
+ * <p>A bearer token that is unknown or expired is a 401 on every endpoint, open ones included.
+ * Treating it as a guest would hide the expiry: the client would get a guest's answer (no
+ * contact details, {@code ownedByCaller} false) and never learn to log in again. A request
+ * without an {@code Authorization: Bearer} header is unaffected.
  *
  * <p>Deliberately not name-bound: Jakarta REST name binding is an AND, so a filter annotated with
  * both would fire only for a resource carrying both — that is, for none of them. This runs for
@@ -47,17 +53,28 @@ public class SecurityFilter implements ContainerRequestFilter {
     @Context
     private ResourceInfo resourceInfo;
 
-    /** Rejects the request when the matched endpoint requires a caller, or an admin, and the
-     * caller is neither. An unknown or expired bearer token counts as no caller. Authentication
-     * is checked first, so a guest gets 401 rather than 403. */
+    /** Rejects a dead bearer token anywhere, then rejects the request when the matched endpoint
+     * requires a caller, or an admin, and the caller is neither. Authentication is checked
+     * first, so a guest gets 401 rather than 403. */
     @Override
     public void filter(ContainerRequestContext context) {
+        boolean bearerSent = currentUser.bearerToken(request).isPresent();
+        Optional<SessionUser> caller = currentUser.from(request);
+        if (bearerSent && caller.isEmpty()) {
+            context.abortWith(Response.status(401)
+                    .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\"")
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(new ErrorDTO("NOT_AUTHENTICATED",
+                            "Your session has expired. Please log in again."))
+                    .build());
+            return;
+        }
+
         boolean adminRequired = matched(AdminOnly.class);
         if (!matched(Secured.class) && !adminRequired) {
             return; // open endpoint: neither annotation present, nothing to enforce
         }
 
-        Optional<SessionUser> caller = currentUser.from(request);
         if (caller.isEmpty()) {
             abort(context, 401, "NOT_AUTHENTICATED", "You must be logged in to do that.");
             return;

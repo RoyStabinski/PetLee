@@ -67,13 +67,21 @@ public class PetFormBean implements Serializable {
     private Long version;
     private transient Part uploadedFile;
 
-    /** The add page's view action: fills the category menu. */
-    public void loadCategories() {
+    /**
+     * The add page's view action: fills the category menu.
+     *
+     * @return null to render the page, or the login page if the API refused an expired token
+     */
+    public String loadCategories() {
         try {
             categories = categoryApi.findAll();
         } catch (ApiException failure) {
+            if (failure.getStatus() == HttpServletResponse.SC_UNAUTHORIZED) {
+                return Messages.sessionExpired();
+            }
             Messages.error(failure.getMessage());
         }
+        return null;
     }
 
     /**
@@ -108,10 +116,13 @@ public class PetFormBean implements Serializable {
             if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
                 return fail(HttpServletResponse.SC_NOT_FOUND);
             }
+            if (failure.getStatus() == HttpServletResponse.SC_UNAUTHORIZED) {
+                // An expired token, not someone else's listing: log in again rather than 403.
+                return Messages.sessionExpired();
+            }
             return reportAndStay(failure);
         }
-        loadCategories();
-        return null;
+        return loadCategories();
     }
 
     /**

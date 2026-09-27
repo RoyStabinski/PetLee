@@ -161,17 +161,14 @@ Register through `/register.xhtml` to try the flow as a first-time user.
 
 ## Architecture
 
-The presentation tier is being moved onto the REST API, so that the JSF managed beans in
-`com.petlee.web` reach the logic tier only over HTTP. Authentication and the read screens already
-do, through `com.petlee.web.client`: `AuthApi`, `PetApi` and `CategoryApi` over one shared
-`ApiClient`, which calls `/api` with the bearer token kept in the session-scoped `ApiCredentials`.
-Login, registration and logout (`UserBean`), the gallery, "My listings" and deleting a listing
-(`PetBean`), the pet details page (`PetDetailBean`), and adding and editing a listing with its
-photograph (`PetFormBean`) work this way; on the details page the API decides whether the
-owner's contact details are sent. The admin panel still injects the CDI services in
-`com.petlee.service` directly and is being migrated next. The API's base URL is
-`http://localhost:<port><context path>/api`, derived from the request being served; set the
-`petlee.api.url` system property to override it.
+The JSF tier (`com.petlee.web`) reaches the logic tier only through the REST API. Its managed
+beans call `com.petlee.web.client` (`AuthApi`, `PetApi`, `CategoryApi` and `AdminApi` over one
+shared `ApiClient`), exchange the records in `com.petlee.dto`, and authenticate with the bearer
+token that login returns, kept in the session-scoped `ApiCredentials`; nothing in the JSF tier
+touches a service, an entity or a repository. This gives security and business rules a single
+enforcement point, the API that every client goes through, and leaves the two tiers free to be
+split onto separate servers. The API's base URL is `http://localhost:<port><context path>/api`,
+derived from the request being served; set the `petlee.api.url` system property to override it.
 
 The REST API at `/api/*` (`com.petlee.rest`) is a complete, independently usable surface,
 exercisable the way any non-browser client would:
@@ -191,8 +188,10 @@ All bodies are JSON. "auth" means a logged-in caller, identified by either crede
 
 Login answers `{"user": {...}, "token": "..."}`. A token expires after 30 idle minutes, like the
 session. When a request carries a bearer header, that header alone decides: an unknown or
-expired token is a 401 even if a valid cookie came along. `POST /api/auth/logout` revokes the
-bearer token if one was sent and invalidates the session if there is one.
+expired token is a 401 even if a valid cookie came along, on every endpoint, open ones
+included, so a client learns that it has to log in again. A request without the header is
+unaffected. `POST /api/auth/logout` revokes the bearer token if one was sent and invalidates the
+session if there is one.
 
 | Method | Path | Access |
 |---|---|---|
@@ -209,8 +208,9 @@ bearer token if one was sent and invalidates the session if there is one.
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
 | DELETE | `/api/pets/{id}` | owner or admin |
 | POST | `/api/pets/{id}/image` | owner only — multipart/form-data, one part named `file`; returns the pet |
-| GET | `/api/admin/pets` | admin — every status |
+| GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
+| GET | `/api/admin/category-counts` | admin — listings per category id, e.g. `{"1": 4}`; unused categories are absent |
 
 Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, status
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as

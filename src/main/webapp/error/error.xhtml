@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- One generic page for 403, 500 and an expired view: none of them benefit from naming the
-     status, and one page is one less place for the same sentence to drift. -->
+<!-- One page for 403, 500 and an expired view. A 403 says what happened, since "try again"
+     would not help; everything else keeps the generic text. The status is the one the container
+     records when it dispatches here for sendError, so a 403 must be sent that way, not forwarded. -->
 <ui:composition template="/WEB-INF/templates/main.xhtml"
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:ui="jakarta.faces.facelets">
 
-    <ui:define name="title">Something went wrong - Pet-Lee</ui:define>
+    <ui:param name="forbidden"
+              value="#{requestScope['jakarta.servlet.error.status_code'] == 403}"/>
+
+    <ui:define name="title">#{forbidden ? 'Access denied' : 'Something went wrong'} - Pet-Lee</ui:define>
 
     <ui:define name="content">
         <div class="panel panel-narrow">
-            <h1>Something went wrong</h1>
-            <p>We could not complete that request. Please try again.</p>
+            <ui:fragment rendered="#{forbidden}">
+                <h1>Access denied</h1>
+                <p>You do not have permission to view this page.</p>
+            </ui:fragment>
+            <ui:fragment rendered="#{not forbidden}">
+                <h1>Something went wrong</h1>
+                <p>We could not complete that request. Please try again.</p>
+            </ui:fragment>
 
             <!-- Shows no exception, stack trace or SQL, in any project stage. -->
 

@@ -46,33 +46,46 @@ public class PetBean implements Serializable {
     /** The owner's own listings, every status included; loaded on first use. */
     private List<PetDTO> myListings;
 
-    /** The gallery's view action: the filter's categories, then the unfiltered gallery. */
-    public void loadGallery() {
+    /**
+     * The gallery's view action: the filter's categories, then the unfiltered gallery.
+     *
+     * @return null to render the page, or the login page if the API refused an expired token
+     */
+    public String loadGallery() {
         try {
             categories = categoryApi.findAll();
         } catch (ApiException e) {
+            if (e.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
             Messages.error(e.getMessage());
         }
-        load();
+        return load();
     }
 
-    public void applyFilter() {
-        load();
+    /** @return null, or the login page if the API refused an expired token */
+    public String applyFilter() {
+        return load();
     }
 
-    public void clearFilters() {
+    /** @return null, or the login page if the API refused an expired token */
+    public String clearFilters() {
         selectedCategoryId = null;
         selectedSize = null;
         selectedGender = null;
-        load();
+        return load();
     }
 
-    private void load() {
+    private String load() {
         try {
             pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender);
         } catch (ApiException e) {
+            if (e.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
             Messages.error(e.getMessage());
         }
+        return null;
     }
 
     public String viewDetails(Long petId) {

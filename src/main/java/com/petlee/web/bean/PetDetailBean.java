@@ -47,6 +47,9 @@ public class PetDetailBean implements Serializable {
             if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
                 return notFound();
             }
+            if (failure.getStatus() == HttpServletResponse.SC_UNAUTHORIZED) {
+                return Messages.sessionExpired();
+            }
             Messages.error(failure.getMessage());
             return null;
         }

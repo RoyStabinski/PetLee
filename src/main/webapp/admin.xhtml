@@ -9,6 +9,10 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
+    <f:metadata>
+        <f:viewAction action="#{adminBean.loadPage}"/>
+    </f:metadata>
+
     <ui:define name="title">Admin panel - Pet-Lee</ui:define>
 
     <ui:define name="content">
@@ -81,11 +85,11 @@
                             <ui:repeat id="rows" value="#{adminBean.listings}" var="pet">
                                 <tr>
                                     <td class="cell-thumb">
-                                        <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.petName}"/>
+                                        <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.name}"/>
                                     </td>
-                                    <td>#{pet.petName}</td>
-                                    <td>#{pet.owner.fullName}</td>
-                                    <td>#{pet.category.categoryName}</td>
+                                    <td>#{pet.name}</td>
+                                    <td>#{pet.ownerName}</td>
+                                    <td>#{pet.categoryName}</td>
                                     <td>
                                         <span class="#{adminBean.statusStyle(pet)}">
                                             #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
@@ -96,12 +100,12 @@
                                         <div class="actions">
                                             <h:commandLink id="hide" value="Hide" styleClass="button-secondary"
                                                            rendered="#{not adminBean.isHidden(pet)}"
-                                                           action="#{adminBean.hide(pet.petId)}"/>
+                                                           action="#{adminBean.hide(pet.id)}"/>
                                             <h:commandLink id="restore" value="Restore" styleClass="button-secondary"
                                                            rendered="#{adminBean.isHidden(pet)}"
-                                                           action="#{adminBean.restore(pet.petId)}"/>
+                                                           action="#{adminBean.restore(pet.id)}"/>
                                             <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
-                                                           action="#{adminBean.deletePet(pet.petId)}"
+                                                           action="#{adminBean.deletePet(pet.id)}"
                                                            onclick="return confirm('#{adminBean.confirmDelete(pet)}');"/>
                                         </div>
                                     </td>
@@ -138,13 +142,13 @@
                     <tbody>
                         <ui:repeat id="categoryRows" value="#{adminBean.categories}" var="category">
                             <tr>
-                                <td>#{category.categoryName}</td>
+                                <td>#{category.name}</td>
                                 <td>#{adminBean.listingCount(category)}</td>
                                 <td>
                                     <!-- Disabled rather than absent, so the count beside it explains itself.
                                          The 409 still stands: the count can change between render and click. -->
                                     <h:commandLink id="deleteCategory" value="Delete" styleClass="button button-danger"
-                                                   action="#{adminBean.deleteCategory(category.categoryId)}"
+                                                   action="#{adminBean.deleteCategory(category.id)}"
                                                    disabled="#{adminBean.isInUse(category)}"
                                                    title="#{adminBean.isInUse(category) ? 'A category that still holds listings cannot be deleted.' : ''}"/>
                                 </td>

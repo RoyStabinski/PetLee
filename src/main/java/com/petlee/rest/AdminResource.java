@@ -1,5 +1,6 @@
 package com.petlee.rest;
 
+import com.petlee.dto.AdminPetDTO;
 import com.petlee.dto.PetDTO;
 import com.petlee.rest.security.AdminOnly;
 import com.petlee.service.PetService;
@@ -15,6 +16,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * {@code /api/admin} — the moderation endpoints, an extension to the frozen contract.
@@ -37,7 +39,8 @@ public class AdminResource {
     }
 
     /**
-     * {@code GET /api/admin/pets} — admin. Every listing, in every status, newest first.
+     * {@code GET /api/admin/pets} — admin. Every listing, in every status, newest first, with
+     * its owner's name and creation time.
      *
      * @param categoryId the category to restrict to, or absent for all
      * @param size       SMALL, MEDIUM or LARGE, or absent
@@ -47,11 +50,25 @@ public class AdminResource {
     @GET
     @Path("pets")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<PetDTO> findAll(@QueryParam("categoryId") Integer categoryId,
-                                @QueryParam("size") String size,
-                                @QueryParam("gender") String gender) {
+    public List<AdminPetDTO> findAll(@QueryParam("categoryId") Integer categoryId,
+                                     @QueryParam("size") String size,
+                                     @QueryParam("gender") String gender) {
         return pets.findAllForAdmin(categoryId, PetResource.parseSize(size), PetResource.parseGender(gender))
-                .stream().map(PetDTO::of).toList();
+                .stream().map(AdminPetDTO::of).toList();
+    }
+
+    /**
+     * {@code GET /api/admin/category-counts} — admin. How many listings each category holds, in
+     * every status, so a moderator can see which categories cannot be deleted yet.
+     *
+     * @return listing counts keyed by category id, as a JSON object such as {@code {"1": 4}};
+     *         a category with no listings is absent
+     */
+    @GET
+    @Path("category-counts")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Map<Integer, Long> categoryCounts() {
+        return pets.countListingsByCategory();
     }
 
     /**

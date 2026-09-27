@@ -1,4 +1,4 @@
-package com.petlee.web;
+package com.petlee.rest;
 
 import com.petlee.service.ImageStore;
 
@@ -21,6 +21,10 @@ import java.util.logging.Logger;
 /**
  * Serves uploaded photographs at {@code /images/...}. Open, since a guest browsing the gallery
  * has to see them.
+ *
+ * <p>Part of the server tier, beside the REST resources, not the JSF presentation tier: it reads
+ * the upload store directly and serves the files over plain HTTP. They arrive through
+ * {@code POST /api/pets/{id}/image} in {@link PetResource}.
  *
  * <p>The path is attacker-controlled, so two guards stand in front of the filesystem:
  * {@link ImageStore#resolve} normalises and re-checks containment in the upload root, and the

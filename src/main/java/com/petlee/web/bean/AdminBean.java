@@ -1,12 +1,11 @@
 package com.petlee.web.bean;
 
-import com.petlee.model.Category;
-import com.petlee.model.Pet;
-import com.petlee.service.AppException;
-import com.petlee.service.CategoryService;
-import com.petlee.service.PetService;
+import com.petlee.dto.AdminPetDTO;
+import com.petlee.dto.CategoryDTO;
+import com.petlee.web.client.AdminApi;
+import com.petlee.web.client.ApiException;
+import com.petlee.web.client.CategoryApi;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.faces.model.SelectItem;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
@@ -22,8 +21,12 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Backs {@code admin.xhtml}: the moderation table and the category vocabulary.
- * The services remain the authorisation boundary; nothing here checks a role to decide a call.
+ * Backs {@code admin.xhtml}: the moderation table and the category vocabulary, through the REST
+ * API. The API remains the authorisation boundary; nothing here checks a role to decide a call.
+ *
+ * <p>Loaded from a view action ({@link #loadPage}) rather than {@code @PostConstruct}: the
+ * template renders the messages before the content, so a failure reported during rendering
+ * would never be seen.
  */
 @Named("adminBean")
 @ViewScoped
@@ -41,15 +44,12 @@ public class AdminBean implements Serializable {
     private static final String[] STATUSES = {"AVAILABLE", "ADOPTED", "REMOVED"};
     private static final String[] STATUS_LABELS = {"Available", "Adopted", "Withdrawn"};
 
-    @Inject private transient PetService petService;
-    @Inject private transient CategoryService categoryService;
+    /** Not transient: application-scoped proxies are serializable. */
+    @Inject private AdminApi adminApi;
+    @Inject private CategoryApi categoryApi;
 
-    /** Not transient: see UserBean's own field for why. */
-    @Inject
-    private UserBean userBean;
-
-    private List<Pet> listings = Collections.emptyList();
-    private List<Category> categories = Collections.emptyList();
+    private List<AdminPetDTO> listings = Collections.emptyList();
+    private List<CategoryDTO> categories = Collections.emptyList();
 
     /**
      * How many listings each category holds, keyed by id — the delete guard's evidence.
@@ -63,17 +63,20 @@ public class AdminBean implements Serializable {
     private String selectedStatus;
     private String newCategoryName;
 
-    @PostConstruct
-    void init() {
-        load();
+    /**
+     * The page's view action.
+     *
+     * @return null to render the page, or the login page if the API refused an expired token
+     */
+    public String loadPage() {
+        return load();
     }
 
     // ------------------------------------------------------------------------------- listings
 
     /** @return null — re-reads the table with the current filters and stays on the page */
     public String applyFilter() {
-        load();
-        return null;
+        return load();
     }
 
     /** @return null — clears every filter and re-reads */
@@ -82,8 +85,7 @@ public class AdminBean implements Serializable {
         selectedSize = null;
         selectedGender = null;
         selectedStatus = null;
-        load();
-        return null;
+        return load();
     }
 
     /**
@@ -108,13 +110,12 @@ public class AdminBean implements Serializable {
 
     private String changeStatus(Long petId, String status, String successMessage) {
         try {
-            petService.changeStatus(petId, status);
+            adminApi.changeStatus(petId, status);
             Messages.info(successMessage);
-            load();
-        } catch (AppException failure) {
-            Messages.error(failure.getMessage());
+            return load();
+        } catch (ApiException failure) {
+            return report(failure);
         }
-        return null;
     }
 
     /**
@@ -125,13 +126,12 @@ public class AdminBean implements Serializable {
      */
     public String deletePet(Long petId) {
         try {
-            petService.delete(petId, userBean.getCurrentUserId(), userBean.isAdmin());
+            adminApi.deletePet(petId);
             Messages.info("The listing has been deleted permanently.");
-            load();
-        } catch (AppException failure) {
-            Messages.error(failure.getMessage());
+            return load();
+        } catch (ApiException failure) {
+            return report(failure);
         }
-        return null;
     }
 
     // ----------------------------------------------------------------------------- categories
@@ -139,14 +139,13 @@ public class AdminBean implements Serializable {
     /** @return null — adds a category to the vocabulary the gallery and add-pet form read */
     public String addCategory() {
         try {
-            Category created = categoryService.create(newCategoryName);
-            Messages.info("Category added: " + created.getCategoryName());
+            CategoryDTO created = adminApi.createCategory(newCategoryName);
+            Messages.info("Category added: " + created.name());
             newCategoryName = null;
-            load();
-        } catch (AppException failure) {
-            Messages.error(failure.getMessage());
+            return load();
+        } catch (ApiException failure) {
+            return report(failure);
         }
-        return null;
     }
 
     /**
@@ -158,88 +157,99 @@ public class AdminBean implements Serializable {
      */
     public String deleteCategory(Integer categoryId) {
         try {
-            categoryService.delete(categoryId);
+            adminApi.deleteCategory(categoryId);
             Messages.info("The category has been deleted.");
-            load();
-        } catch (AppException failure) {
-            Messages.error(failure.getMessage());
+            return load();
+        } catch (ApiException failure) {
+            return report(failure);
         }
-        return null;
     }
 
     /**
      * @param category a category
      * @return how many listings reference it, hidden ones included
      */
-    public long listingCount(Category category) {
-        if (category == null || category.getCategoryId() == null) {
+    public long listingCount(CategoryDTO category) {
+        if (category == null || category.id() == null) {
             return 0L;
         }
-        return listingsPerCategory.getOrDefault(category.getCategoryId(), 0L);
+        return listingsPerCategory.getOrDefault(category.id(), 0L);
     }
 
     /**
      * @param category a category
      * @return whether deleting it would be refused
      */
-    public boolean isInUse(Category category) {
+    public boolean isInUse(CategoryDTO category) {
         return listingCount(category) > 0;
     }
 
     // ---------------------------------------------------------------------------------- reading
 
-    private void load() {
+    /** @return null, or the login page if the API refused an expired token */
+    private String load() {
         try {
-            List<Pet> all = petService.findAllForAdmin(selectedCategoryId,
-                    selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
-                    selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
-            listings = all.stream().filter(this::matchesStatus).toList();
-            listingsPerCategory = petService.countListingsByCategory();
-            categories = categoryService.findAll();
-        } catch (AppException failure) {
-            Messages.error(failure.getMessage());
+            listings = adminApi.listings(selectedCategoryId, selectedSize, selectedGender)
+                    .stream().filter(this::matchesStatus).toList();
+            listingsPerCategory = adminApi.categoryCounts();
+            categories = categoryApi.findAll();
+            return null;
+        } catch (ApiException failure) {
+            return report(failure);
         }
     }
 
-    private boolean matchesStatus(Pet pet) {
+    private boolean matchesStatus(AdminPetDTO pet) {
         return selectedStatus == null || selectedStatus.isEmpty()
-                || selectedStatus.equals(pet.getStatus().name());
+                || selectedStatus.equals(pet.status());
+    }
+
+    /**
+     * Shows a refusal as a message and stays, except that an expired token goes to log in again.
+     *
+     * @return null, or the login page
+     */
+    private static String report(ApiException failure) {
+        if (failure.getStatus() == 401) {
+            return Messages.sessionExpired();
+        }
+        Messages.error(failure.getMessage());
+        return null;
     }
 
     // --------------------------------------------------------------------------- presentation
 
-    public List<Pet> getListings() { return listings; }
+    public List<AdminPetDTO> getListings() { return listings; }
 
     public boolean isNoListings() { return listings.isEmpty(); }
 
-    public List<Category> getCategories() { return categories; }
+    public List<CategoryDTO> getCategories() { return categories; }
 
     /**
      * @param pet a listing
      * @return whether it is currently hidden from the public gallery
      */
-    public boolean isHidden(Pet pet) {
-        return pet != null && pet.getStatus() == Pet.PetStatus.REMOVED;
+    public boolean isHidden(AdminPetDTO pet) {
+        return pet != null && "REMOVED".equals(pet.status());
     }
 
-    public String statusStyle(Pet pet) {
-        return PetBean.statusClassOf(pet == null || pet.getStatus() == null
-                ? null : pet.getStatus().name());
+    public String statusStyle(AdminPetDTO pet) {
+        return PetBean.statusClassOf(pet == null ? null : pet.status());
     }
 
-    public String thumbnailOf(Pet pet) {
-        return PetBean.imageOf(pet == null ? null : pet.getImageUrl());
+    public String thumbnailOf(AdminPetDTO pet) {
+        return PetBean.imageOf(pet == null ? null : pet.imageUrl());
     }
 
     /**
      * @param pet a listing
      * @return its creation date as {@code yyyy-MM-dd HH:mm}, or an empty string
      */
-    public String createdOn(Pet pet) {
-        if (pet == null || pet.getCreatedAt() == null) {
+    public String createdOn(AdminPetDTO pet) {
+        if (pet == null || pet.createdAt() == null) {
             return "";
         }
-        return CREATED_ON.format(pet.getCreatedAt());
+        return CREATED_ON.format(pet.createdAt());
     }
 
     /**
@@ -248,8 +258,8 @@ public class AdminBean implements Serializable {
      * @param pet the listing about to be deleted
      * @return the question to put to the administrator
      */
-    public String confirmDelete(Pet pet) {
-        String name = pet == null || pet.getPetName() == null ? "" : pet.getPetName();
+    public String confirmDelete(AdminPetDTO pet) {
+        String name = pet == null || pet.name() == null ? "" : pet.name();
         return MessageFormat.format(
                         "Delete {0} permanently? The listing and its photographs cannot be recovered.", name)
                 .replace("\\", "\\\\")
@@ -260,8 +270,8 @@ public class AdminBean implements Serializable {
     public List<SelectItem> getCategoryOptions() {
         List<SelectItem> items = new ArrayList<>(categories.size() + 1);
         items.add(new SelectItem(null, "Any"));
-        for (Category category : categories) {
-            items.add(new SelectItem(category.getCategoryId(), category.getCategoryName()));
+        for (CategoryDTO category : categories) {
+            items.add(new SelectItem(category.id(), category.name()));
         }
         return items;
     }

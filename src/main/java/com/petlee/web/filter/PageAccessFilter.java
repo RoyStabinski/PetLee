@@ -44,7 +44,6 @@ public class PageAccessFilter implements Filter {
     private static final Set<String> ADMIN_VIEWS = Set.of("/admin.xhtml");
 
     private static final String LOGIN_VIEW = "/login.xhtml";
-    private static final String FORBIDDEN_VIEW = "/error/error.xhtml";
 
     @Inject
     private UserBean userBean;
@@ -77,8 +76,9 @@ public class PageAccessFilter implements Filter {
         if (ADMIN_VIEWS.contains(view) && !userBean.isAdmin()) {
             // Not a redirect to login: they are logged in, and logging in again would not help.
             LOGGER.log(Level.FINE, () -> "non-administrator refused " + view);
-            httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            http.getRequestDispatcher(FORBIDDEN_VIEW).forward(request, response);
+            // sendError, not a forward: the container then sets the error attributes the
+            // error page reads to say "permission" rather than "something went wrong".
+            httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 

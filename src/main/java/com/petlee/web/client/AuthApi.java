@@ -27,6 +27,9 @@ public class AuthApi {
      * @throws ApiException 401 if the credentials are wrong
      */
     public UserDTO login(String username, String password) {
+        // A leftover token would be sent along, and the API refuses a dead one with 401 even
+        // on login. Whatever it was, this login replaces it.
+        credentials.clear();
         LoginResponse response = api.post("/auth/login", new LoginForm(username, password),
                 LoginResponse.class);
         credentials.store(response.token(), response.user());

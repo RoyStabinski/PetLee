@@ -5,6 +5,10 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
+    <f:metadata>
+        <f:viewAction action="#{petBean.loadGallery}"/>
+    </f:metadata>
+
     <ui:define name="title">Pets looking for a home - Pet-Lee</ui:define>
 
     <ui:define name="content">
@@ -22,7 +26,7 @@
                         <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
                             <f:selectItem itemValue="#{null}" itemLabel="Any"/>
                             <f:selectItems value="#{petBean.categories}" var="c"
-                                           itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
+                                           itemValue="#{c.id}" itemLabel="#{c.name}"/>
                         </h:selectOneMenu>
                     </div>
 
@@ -73,23 +77,23 @@
 
                                 <!-- No contextPath: h:graphicImage prepends it itself for a "/" value. -->
                                 <div class="card-media">
-                                    <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.petName}"/>
+                                    <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"/>
                                 </div>
 
                                 <div class="card-body">
-                                    <h3 class="card-title">#{pet.petName}</h3>
+                                    <h3 class="card-title">#{pet.name}</h3>
                                     <p class="card-desc">#{pet.shortDesc}</p>
 
                                     <ul class="tags">
                                         <li class="tag">#{pet.size == 'SMALL' ? 'Small' : (pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</li>
                                         <li class="tag">#{pet.gender == 'MALE' ? 'Male' : 'Female'}</li>
-                                        <li class="tag">#{pet.category.categoryName}</li>
+                                        <li class="tag">#{pet.categoryName}</li>
                                     </ul>
 
                                     <div class="card-actions">
                                         <h:form>
                                             <h:commandLink value="See details" styleClass="button"
-                                                           action="#{petBean.viewDetails(pet.petId)}"/>
+                                                           action="#{petBean.viewDetails(pet.id)}"/>
                                         </h:form>
                                     </div>
                                 </div>

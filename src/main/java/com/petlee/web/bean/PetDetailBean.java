@@ -1,8 +1,8 @@
 package com.petlee.web.bean;
 
-import com.petlee.model.Pet;
-import com.petlee.service.AppException;
-import com.petlee.service.PetService;
+import com.petlee.dto.PetDetailDTO;
+import com.petlee.web.client.ApiException;
+import com.petlee.web.client.PetApi;
 
 import jakarta.faces.context.FacesContext;
 import jakarta.faces.view.ViewScoped;
@@ -14,8 +14,9 @@ import java.io.IOException;
 import java.io.Serializable;
 
 /**
- * Backs {@code petDetails.xhtml}: one listing, loaded once by a view action.
- * Whether the owner's contact details are shown is gated here, by {@link #isContactVisible()}.
+ * Backs {@code petDetails.xhtml}: one listing, loaded once by a view action through the REST API.
+ * The API fills the owner's contact details only for a logged-in caller, so the server is the
+ * privacy gate; {@link #isContactVisible()} just follows what it sent.
  */
 @Named("petDetailBean")
 @ViewScoped
@@ -23,13 +24,11 @@ public class PetDetailBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Inject private transient PetService petService;
-
     /** Not transient: see UserBean's own field for why. */
-    @Inject private UserBean userBean;
+    @Inject private PetApi petApi;
 
     private Long petId;
-    private Pet pet;
+    private PetDetailDTO pet;
 
     /**
      * Fetches the listing. Bound as an {@code <f:viewAction>}, so it runs once before rendering.
@@ -41,10 +40,10 @@ public class PetDetailBean implements Serializable {
             return notFound();
         }
         try {
-            pet = petService.findDetail(petId);
+            pet = petApi.detail(petId);
             return null;
 
-        } catch (AppException failure) {
+        } catch (ApiException failure) {
             if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
                 return notFound();
             }
@@ -71,25 +70,26 @@ public class PetDetailBean implements Serializable {
     }
 
     /** @return the listing's photograph, or the bundled placeholder when it has none */
-    public String getImageUrl() { return PetBean.imageOf(pet); }
+    public String getImageUrl() { return PetBean.imageOf(pet == null ? null : pet.imageUrl()); }
 
     /** @return whether the listing is no longer available */
     public boolean isWithdrawn() {
-        return pet != null && pet.getStatus() != Pet.PetStatus.AVAILABLE;
+        return pet != null && !"AVAILABLE".equals(pet.status());
     }
 
     /**
-     * The tier's own privacy gate: the entity always carries its owner, so the page must not.
+     * Follows the server's privacy decision: {@code ownerEmail} is required on every account, so
+     * it is null exactly when the API did not see a logged-in caller.
      *
-     * @return whether the owner's contact details may be shown
+     * @return whether the API sent the owner's contact details
      */
     public boolean isContactVisible() {
-        return userBean.isLoggedIn();
+        return pet != null && pet.ownerEmail() != null;
     }
 
     public Long getPetId() { return petId; }
 
     public void setPetId(Long petId) { this.petId = petId; }
 
-    public Pet getPet() { return pet; }
+    public PetDetailDTO getPet() { return pet; }
 }

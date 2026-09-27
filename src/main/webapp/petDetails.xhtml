@@ -10,13 +10,13 @@
         <f:viewAction action="#{petDetailBean.load}"/>
     </f:metadata>
 
-    <ui:define name="title">#{petDetailBean.pet.petName} - Pet-Lee</ui:define>
+    <ui:define name="title">#{petDetailBean.pet.name} - Pet-Lee</ui:define>
 
     <ui:define name="content">
 
         <ui:fragment rendered="#{not empty petDetailBean.pet}">
 
-            <h1>#{petDetailBean.pet.petName}</h1>
+            <h1>#{petDetailBean.pet.name}</h1>
 
             <ui:fragment rendered="#{petDetailBean.withdrawn}">
                 <p class="tag tag-removed">This listing is no longer available</p>
@@ -26,7 +26,7 @@
 
                 <div>
                     <h:panelGroup layout="block" styleClass="detail-media">
-                        <h:graphicImage value="#{petDetailBean.imageUrl}" alt="#{petDetailBean.pet.petName}"/>
+                        <h:graphicImage value="#{petDetailBean.imageUrl}" alt="#{petDetailBean.pet.name}"/>
                     </h:panelGroup>
                 </div>
 
@@ -43,7 +43,7 @@
                         <dt>Gender</dt>
                         <dd>#{petDetailBean.pet.gender == 'MALE' ? 'Male' : 'Female'}</dd>
                         <dt>Category</dt>
-                        <dd>#{petDetailBean.pet.category.categoryName}</dd>
+                        <dd>#{petDetailBean.pet.categoryName}</dd>
                         <dt>Status</dt>
                         <dd>#{petDetailBean.pet.status == 'AVAILABLE' ? 'Available' : (petDetailBean.pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}</dd>
                     </dl>
@@ -51,18 +51,19 @@
                     <h2>About</h2>
                     <p>#{petDetailBean.pet.longDesc}</p>
 
-                    <!-- This rendered check is the privacy gate on this tier: the entity always
-                         carries its owner, so removing it exposes a stranger's contact details. -->
+                    <!-- The server is the privacy gate: the API fills the owner's contact
+                         fields only for a logged-in caller, and contactVisible just checks that
+                         they arrived. -->
                     <h:panelGroup layout="block" styleClass="panel"
                                   rendered="#{petDetailBean.contactVisible}">
                         <h2>Contact the owner</h2>
                         <dl class="detail-facts">
                             <dt>Posted by</dt>
-                            <dd>#{petDetailBean.pet.owner.fullName}</dd>
+                            <dd>#{petDetailBean.pet.ownerName}</dd>
                             <dt>Email</dt>
-                            <dd><a href="mailto:#{petDetailBean.pet.owner.email}">#{petDetailBean.pet.owner.email}</a></dd>
+                            <dd><a href="mailto:#{petDetailBean.pet.ownerEmail}">#{petDetailBean.pet.ownerEmail}</a></dd>
                             <dt>Telephone</dt>
-                            <dd><a href="tel:#{petDetailBean.pet.owner.phoneNumber}">#{petDetailBean.pet.owner.phoneNumber}</a></dd>
+                            <dd><a href="tel:#{petDetailBean.pet.ownerPhone}">#{petDetailBean.pet.ownerPhone}</a></dd>
                         </dl>
                     </h:panelGroup>
 

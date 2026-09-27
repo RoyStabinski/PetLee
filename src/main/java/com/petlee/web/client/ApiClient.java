@@ -11,11 +11,13 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -71,7 +73,7 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public <T> T get(String path, Class<T> type) {
-        return call("GET", path, null, new GenericType<>(type));
+        return call("GET", path, Map.of(), null, new GenericType<>(type));
     }
 
     /**
@@ -83,7 +85,21 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public <T> T get(String path, GenericType<T> type) {
-        return call("GET", path, null, type);
+        return call("GET", path, Map.of(), null, type);
+    }
+
+    /**
+     * {@code GET} a JSON resource with query parameters. A parameter whose value is null is
+     * left out of the URL, so callers can pass optional filters as they are.
+     *
+     * @param path  the path under {@code /api}
+     * @param query the query parameters by name; null values are skipped
+     * @param type  the type to read the body into
+     * @return the body
+     * @throws ApiException on a non-2xx response or when the API cannot be reached
+     */
+    public <T> T get(String path, Map<String, ?> query, GenericType<T> type) {
+        return call("GET", path, query, null, type);
     }
 
     /**
@@ -96,7 +112,7 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public <T> T post(String path, Object body, Class<T> type) {
-        return call("POST", path, body, new GenericType<>(type));
+        return call("POST", path, Map.of(), body, new GenericType<>(type));
     }
 
     /**
@@ -109,7 +125,7 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public <T> T put(String path, Object body, Class<T> type) {
-        return call("PUT", path, body, new GenericType<>(type));
+        return call("PUT", path, Map.of(), body, new GenericType<>(type));
     }
 
     /**
@@ -119,12 +135,18 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public void delete(String path) {
-        call("DELETE", path, null, new GenericType<>(Void.class));
+        call("DELETE", path, Map.of(), null, new GenericType<>(Void.class));
     }
 
-    private <T> T call(String method, String path, Object body, GenericType<T> type) {
-        Invocation.Builder builder = client.target(baseUrl()).path(path)
-                .request(MediaType.APPLICATION_JSON_TYPE);
+    private <T> T call(String method, String path, Map<String, ?> query, Object body,
+                       GenericType<T> type) {
+        WebTarget target = client.target(baseUrl()).path(path);
+        for (Map.Entry<String, ?> parameter : query.entrySet()) {
+            if (parameter.getValue() != null) {
+                target = target.queryParam(parameter.getKey(), parameter.getValue());
+            }
+        }
+        Invocation.Builder builder = target.request(MediaType.APPLICATION_JSON_TYPE);
         String token = credentials.getToken();
         if (token != null) {
             builder.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
@@ -135,6 +157,12 @@ public class ApiClient {
                 : builder.method(method, Entity.json(body))) {
 
             if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+                if (response.getStatus() == 401 && token != null) {
+                    // The token expired or the server restarted: it will never work again, so
+                    // forget it. The browser session then reads as signed out, and
+                    // PageAccessFilter sends the user to the login page.
+                    credentials.clear();
+                }
                 throw ApiException.from(response);
             }
             if (type.getRawType() == Void.class || !response.hasEntity()) {

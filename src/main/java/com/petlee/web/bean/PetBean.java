@@ -1,12 +1,14 @@
 package com.petlee.web.bean;
 
-import com.petlee.model.Category;
+import com.petlee.dto.CategoryDTO;
+import com.petlee.dto.PetDTO;
 import com.petlee.model.Pet;
 import com.petlee.service.AppException;
-import com.petlee.service.CategoryService;
 import com.petlee.service.PetService;
+import com.petlee.web.client.ApiException;
+import com.petlee.web.client.CategoryApi;
+import com.petlee.web.client.PetApi;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.faces.model.SelectItem;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
@@ -17,8 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Backs the public gallery and the owner's dashboard. View-scoped, so a filter belongs to the
- * page being looked at; filtering is a fresh query, never an in-memory pass over {@link #pets}.
+ * Backs the public gallery and the owner's dashboard, both read through the REST API.
+ * View-scoped, so a filter belongs to the page being looked at; filtering is a fresh query, never
+ * an in-memory pass over {@link #pets}.
+ *
+ * <p>Each page loads what it needs from an {@code <f:viewAction>} ({@link #loadGallery} or
+ * {@link #loadMyListings}) rather than from {@code @PostConstruct}: the template renders the
+ * messages before the content, so a failure reported during rendering would never be seen.
  */
 @Named("petBean")
 @ViewScoped
@@ -31,24 +38,32 @@ public class PetBean implements Serializable {
 
     private static final String LOGIN = "/login.xhtml?faces-redirect=true";
 
+    /** For {@link #delete} only, until writes move onto the API. */
     @Inject private transient PetService petService;
-    @Inject private transient CategoryService categoryService;
+
+    /** Not transient: application-scoped proxies are serializable. */
+    @Inject private PetApi petApi;
+    @Inject private CategoryApi categoryApi;
 
     /** Not transient: see UserBean's own field for why. */
     @Inject private UserBean userBean;
 
-    private List<Pet> pets = List.of();
-    private List<Category> categories = List.of();
+    private List<PetDTO> pets = List.of();
+    private List<CategoryDTO> categories = List.of();
     private Integer selectedCategoryId;
     private String selectedSize;
     private String selectedGender;
 
     /** The owner's own listings, every status included; loaded on first use. */
-    private List<Pet> myListings;
+    private List<PetDTO> myListings;
 
-    @PostConstruct
-    void init() {
-        categories = categoryService.findAll();
+    /** The gallery's view action: the filter's categories, then the unfiltered gallery. */
+    public void loadGallery() {
+        try {
+            categories = categoryApi.findAll();
+        } catch (ApiException e) {
+            Messages.error(e.getMessage());
+        }
         load();
     }
 
@@ -65,10 +80,8 @@ public class PetBean implements Serializable {
 
     private void load() {
         try {
-            pets = petService.findGallery(selectedCategoryId,
-                    selectedSize == null ? null : Pet.PetSize.valueOf(selectedSize),
-                    selectedGender == null ? null : Pet.PetGender.valueOf(selectedGender));
-        } catch (AppException e) {
+            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender);
+        } catch (ApiException e) {
             Messages.error(e.getMessage());
         }
     }
@@ -77,28 +90,47 @@ public class PetBean implements Serializable {
         return "/petDetails.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
-    public String imageUrlOf(Pet pet) { return imageOf(pet); }
+    public String imageUrlOf(PetDTO pet) { return imageOf(pet == null ? null : pet.imageUrl()); }
 
     /**
+     * The entity version, for {@link AdminBean} until the admin screens move onto the API.
+     *
      * @param pet a listing, may be null
      * @return its photograph, or the bundled placeholder
      */
     static String imageOf(Pet pet) {
-        String url = pet == null ? null : pet.getImageUrl();
-        return url == null || url.isBlank() ? PLACEHOLDER_IMAGE : url;
+        return imageOf(pet == null ? null : pet.getImageUrl());
     }
 
     /**
+     * @param imageUrl a listing's {@code imageUrl}, may be null or blank
+     * @return that photograph, or the bundled placeholder
+     */
+    static String imageOf(String imageUrl) {
+        return imageUrl == null || imageUrl.isBlank() ? PLACEHOLDER_IMAGE : imageUrl;
+    }
+
+    /**
+     * The entity version, for {@link AdminBean} until the admin screens move onto the API.
+     *
      * @param pet a listing, may be null
      * @return the CSS class that colours its status badge
      */
     static String statusClassOf(Pet pet) {
-        if (pet == null || pet.getStatus() == null) {
+        return statusClassOf(pet == null || pet.getStatus() == null ? null : pet.getStatus().name());
+    }
+
+    /**
+     * @param status a listing's status string, as the API returns it; may be null
+     * @return the CSS class that colours its status badge
+     */
+    static String statusClassOf(String status) {
+        if (status == null) {
             return "tag";
         }
-        return switch (pet.getStatus()) {
-            case ADOPTED -> "tag tag-adopted";
-            case REMOVED -> "tag tag-removed";
+        return switch (status) {
+            case "ADOPTED" -> "tag tag-adopted";
+            case "REMOVED" -> "tag tag-removed";
             default -> "tag";
         };
     }
@@ -122,11 +154,38 @@ public class PetBean implements Serializable {
 
     // ----------------------------------------------------------------------- the owner's dashboard
 
-    /** @return this user's listings, newest first, in every status */
-    public List<Pet> getMyListings() {
+    /**
+     * The dashboard's view action.
+     *
+     * @return null to render the page, or the login page if the API no longer accepts the token
+     */
+    public String loadMyListings() {
+        try {
+            myListings = petApi.mine();
+            return null;
+        } catch (ApiException e) {
+            myListings = List.of();
+            if (e.getStatus() == 401) {
+                Messages.error("Your session has expired. Please log in again.");
+                return Messages.keep(LOGIN);
+            }
+            Messages.error(e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * @return this user's listings, newest first, in every status. Reloaded here only after
+     *         {@link #delete} empties the cache; the view action does the first load.
+     */
+    public List<PetDTO> getMyListings() {
         if (myListings == null) {
-            Long ownerId = userBean.getCurrentUserId();
-            myListings = petService.findByOwner(ownerId);
+            try {
+                myListings = petApi.mine();
+            } catch (ApiException e) {
+                Messages.error(e.getMessage());
+                myListings = List.of();
+            }
         }
         return myListings;
     }
@@ -157,12 +216,12 @@ public class PetBean implements Serializable {
         return "/editPet.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
-    public String statusStyle(Pet pet) { return statusClassOf(pet); }
+    public String statusStyle(PetDTO pet) { return statusClassOf(pet == null ? null : pet.status()); }
 
     // -------------------------------------------------------------------------------- properties
 
-    public List<Pet> getPets() { return pets; }
-    public List<Category> getCategories() { return categories; }
+    public List<PetDTO> getPets() { return pets; }
+    public List<CategoryDTO> getCategories() { return categories; }
     public boolean isEmpty() { return pets.isEmpty(); }
     public Integer getSelectedCategoryId() { return selectedCategoryId; }
     public void setSelectedCategoryId(Integer v) { this.selectedCategoryId = v; }

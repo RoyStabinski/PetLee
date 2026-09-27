@@ -5,6 +5,10 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
+    <f:metadata>
+        <f:viewAction action="#{petBean.loadMyListings}"/>
+    </f:metadata>
+
     <ui:define name="title">My profile - Pet-Lee</ui:define>
 
     <ui:define name="content">
@@ -55,10 +59,10 @@
                             <ui:repeat id="rows" value="#{petBean.myListings}" var="pet">
                                 <tr>
                                     <td class="cell-thumb">
-                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.petName}"/>
+                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"/>
                                     </td>
-                                    <td>#{pet.petName}</td>
-                                    <td>#{pet.category.categoryName}</td>
+                                    <td>#{pet.name}</td>
+                                    <td>#{pet.categoryName}</td>
                                     <td>
                                         <span class="#{petBean.statusStyle(pet)}">
                                             #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
@@ -67,10 +71,10 @@
                                     <td>
                                         <div class="actions">
                                             <h:commandLink id="edit" value="Edit" styleClass="button-secondary"
-                                                           action="#{petBean.edit(pet.petId)}"/>
+                                                           action="#{petBean.edit(pet.id)}"/>
                                             <!-- Confirmed before the call: deletion is permanent. -->
                                             <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
-                                                           action="#{petBean.delete(pet.petId)}"
+                                                           action="#{petBean.delete(pet.id)}"
                                                            onclick="return confirm('Delete this listing permanently? Its photographs go with it.');"/>
                                         </div>
                                     </td>

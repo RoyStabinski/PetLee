@@ -162,11 +162,14 @@ Register through `/register.xhtml` to try the flow as a first-time user.
 ## Architecture
 
 The presentation tier is being moved onto the REST API, so that the JSF managed beans in
-`com.petlee.web` reach the logic tier only over HTTP. Authentication already does: login,
-registration and logout in `UserBean` go through `com.petlee.web.client` (`AuthApi` over one
-shared `ApiClient`), which calls `/api` with the bearer token kept in the session-scoped
-`ApiCredentials`. The other beans still inject the CDI services in `com.petlee.service` directly
-and are being migrated screen by screen. The API's base URL is
+`com.petlee.web` reach the logic tier only over HTTP. Authentication and the read screens already
+do, through `com.petlee.web.client`: `AuthApi`, `PetApi` and `CategoryApi` over one shared
+`ApiClient`, which calls `/api` with the bearer token kept in the session-scoped `ApiCredentials`.
+Login, registration and logout (`UserBean`), the gallery and "My listings" (`PetBean`) and the
+pet details page (`PetDetailBean`) work this way; on the details page the API decides whether the
+owner's contact details are sent. Creating, editing and deleting listings, image upload and the
+admin panel still inject the CDI services in `com.petlee.service` directly and are being
+migrated next. The API's base URL is
 `http://localhost:<port><context path>/api`, derived from the request being served; set the
 `petlee.api.url` system property to override it.
 

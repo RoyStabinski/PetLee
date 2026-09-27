@@ -1,12 +1,12 @@
 package com.petlee.service;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.servlet.http.Part;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -28,30 +28,83 @@ public class ImageStore {
     /**
      * Saves an uploaded photograph under a generated name.
      *
-     * @param part the uploaded file
+     * <p>A stream has no size up front, so the limit is enforced while copying: at most
+     * {@code MAX_BYTES + 1} bytes are read, and reaching that one extra byte means the photograph
+     * is too large. The partial file is deleted on every failure. The stream is read but not
+     * closed; it belongs to the caller.
+     *
+     * @param content     the photograph's bytes
+     * @param contentType its media type, such as {@code image/png}; parameters are ignored
      * @return the URL to store on the pet
-     * @throws AppException 400 if it is missing, too large, or not a supported image type
+     * @throws AppException 400 if it is missing, empty, too large, or not a supported image type
      */
-    public String store(Part part) {
-        if (part == null || part.getSize() == 0) {
+    public String store(InputStream content, String contentType) {
+        if (content == null) {
             throw new AppException(400, "A photo file is required");
         }
-        if (part.getSize() > MAX_BYTES) {
-            throw new AppException(400, "The photo must be 5 MB or smaller");
-        }
-        String extension = EXTENSIONS.get(
-                String.valueOf(part.getContentType()).toLowerCase(Locale.ROOT));
+        String extension = EXTENSIONS.get(baseType(contentType));
         if (extension == null) {
             throw new AppException(400, "The photo must be a JPEG, PNG, GIF or WebP image");
         }
-        String fileName = UUID.randomUUID() + "." + extension;
-        try (InputStream in = part.getInputStream()) {
+
+        Path target = root.resolve(UUID.randomUUID() + "." + extension);
+        long copied;
+        try {
             Files.createDirectories(root);
-            Files.copy(in, root.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            try (OutputStream out = Files.newOutputStream(target, StandardOpenOption.CREATE_NEW)) {
+                copied = copyAtMost(content, out, MAX_BYTES + 1);
+            }
         } catch (IOException e) {
+            deleteQuietly(target);
             throw new AppException(500, "The photo could not be saved");
         }
-        return URL_PREFIX + fileName;
+
+        if (copied > MAX_BYTES) {
+            deleteQuietly(target);
+            throw new AppException(400, "The photo must be 5 MB or smaller");
+        }
+        if (copied == 0) {
+            deleteQuietly(target);
+            throw new AppException(400, "A photo file is required");
+        }
+        return URL_PREFIX + target.getFileName();
+    }
+
+    /**
+     * Copies until the input ends or {@code limit} bytes have been copied, whichever is first.
+     *
+     * @return the number of bytes copied, at most {@code limit}
+     */
+    private static long copyAtMost(InputStream in, OutputStream out, long limit) throws IOException {
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        while (total < limit) {
+            int read = in.read(buffer, 0, (int) Math.min(buffer.length, limit - total));
+            if (read < 0) {
+                break;
+            }
+            out.write(buffer, 0, read);
+            total += read;
+        }
+        return total;
+    }
+
+    /** {@code "image/PNG; foo=bar"} to {@code "image/png"}; null stays unmatched. */
+    private static String baseType(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+        int semicolon = contentType.indexOf(';');
+        String type = semicolon < 0 ? contentType : contentType.substring(0, semicolon);
+        return type.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static void deleteQuietly(Path file) {
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException ignored) {
+            // an orphaned file is not worth hiding the real failure over
+        }
     }
 
     /** Deletes the file behind a photograph URL, if it is still there. */

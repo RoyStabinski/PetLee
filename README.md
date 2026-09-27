@@ -165,11 +165,11 @@ The presentation tier is being moved onto the REST API, so that the JSF managed 
 `com.petlee.web` reach the logic tier only over HTTP. Authentication and the read screens already
 do, through `com.petlee.web.client`: `AuthApi`, `PetApi` and `CategoryApi` over one shared
 `ApiClient`, which calls `/api` with the bearer token kept in the session-scoped `ApiCredentials`.
-Login, registration and logout (`UserBean`), the gallery and "My listings" (`PetBean`) and the
-pet details page (`PetDetailBean`) work this way; on the details page the API decides whether the
-owner's contact details are sent. Creating, editing and deleting listings, image upload and the
-admin panel still inject the CDI services in `com.petlee.service` directly and are being
-migrated next. The API's base URL is
+Login, registration and logout (`UserBean`), the gallery, "My listings" and deleting a listing
+(`PetBean`), the pet details page (`PetDetailBean`), and adding and editing a listing with its
+photograph (`PetFormBean`) work this way; on the details page the API decides whether the
+owner's contact details are sent. The admin panel still injects the CDI services in
+`com.petlee.service` directly and is being migrated next. The API's base URL is
 `http://localhost:<port><context path>/api`, derived from the request being served; set the
 `petlee.api.url` system property to override it.
 
@@ -203,17 +203,29 @@ bearer token if one was sent and invalidates the session if there is one.
 | POST | `/api/categories` | admin |
 | DELETE | `/api/categories/{id}` | admin |
 | GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender` |
-| GET | `/api/pets/{id}` | open — owner contact fields only when logged in |
+| GET | `/api/pets/{id}` | open — owner contact fields only when logged in; `ownedByCaller` is true only for the owner |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth |
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
 | DELETE | `/api/pets/{id}` | owner or admin |
+| POST | `/api/pets/{id}/image` | owner only — multipart/form-data, one part named `file`; returns the pet |
 | GET | `/api/admin/pets` | admin — every status |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
 
 Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, status
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as
 `{"code": "...", "message": "..."}`.
+
+`POST /api/pets/{id}/image` replaces a listing's photograph. The part must be a JPEG, PNG, GIF or
+WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400. The old
+file is deleted once the new one is attached, and the response is the pet with its new
+`imageUrl`:
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+     -F "file=@rex.jpg;type=image/jpeg" \
+     http://localhost:8080/pet-lee/api/pets/7/image
+```
 
 A browser login through the JSF pages authenticates the pages, not the browser's own `/api`
 calls: the server-side client logs in with a bearer token, and the browser session never holds
@@ -223,11 +235,3 @@ the REST tier's session user. To call `/api` from a browser, log in through
 Authorisation is decided in the service layer, from a caller id passed in as an argument — no
 service reads a session. `@Secured` and `@AdminOnly` guard the REST endpoints; `PageAccessFilter`
 keeps guests off the pages that are not for them, which is convenience rather than enforcement.
-
-## Known limitation
-
-Photo upload is available through the web UI only, not the REST API. Jersey cannot inject a Servlet
-`Part` as a `@FormParam`, and both ways around that would add a runtime dependency, so
-`POST /api/pets/{id}/image` does not exist. Uploading works through `addPet.xhtml`'s
-`<h:inputFile>`, posted to the Faces servlet, capped at 5 MB by the
-`jakarta.faces.UPLOADER_MAX_FILE_SIZE` context-param in `web.xml`.

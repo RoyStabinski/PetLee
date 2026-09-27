@@ -1,12 +1,13 @@
 package com.petlee.web.bean;
 
-import com.petlee.model.Category;
-import com.petlee.model.Pet;
-import com.petlee.service.AppException;
-import com.petlee.service.CategoryService;
-import com.petlee.service.PetService;
+import com.petlee.dto.CategoryDTO;
+import com.petlee.dto.PetDTO;
+import com.petlee.dto.PetDetailDTO;
+import com.petlee.dto.PetForm;
+import com.petlee.web.client.ApiException;
+import com.petlee.web.client.CategoryApi;
+import com.petlee.web.client.PetApi;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.faces.context.FacesContext;
 import jakarta.faces.model.SelectItem;
 import jakarta.faces.view.ViewScoped;
@@ -14,17 +15,22 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
-import jakarta.validation.ConstraintViolationException;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * Backs {@code addPet.xhtml} and {@code editPet.xhtml}. The fields are held individually
- * because a {@code PetForm} record cannot be the target of two-way Facelets binding.
+ * Backs {@code addPet.xhtml} and {@code editPet.xhtml}, reading and writing through the REST API.
+ * The fields are held individually because a {@code PetForm} record cannot be the target of
+ * two-way Facelets binding.
+ *
+ * <p>The categories load from a view action ({@link #loadCategories}, or {@link #load} on the
+ * edit page) rather than {@code @PostConstruct}: the template renders the messages before the
+ * content, so a failure reported during rendering would never be seen.
  */
 @Named("petFormBean")
 @ViewScoped
@@ -38,12 +44,9 @@ public class PetFormBean implements Serializable {
     private static final String[] SIZES = {"SMALL", "MEDIUM", "LARGE"};
     private static final String[] GENDERS = {"MALE", "FEMALE"};
 
-    @Inject private transient PetService petService;
-    @Inject private transient CategoryService categoryService;
-
-    /** Not transient: see UserBean's own field for why. */
-    @Inject
-    private UserBean userBean;
+    /** Not transient: application-scoped proxies are serializable. */
+    @Inject private PetApi petApi;
+    @Inject private CategoryApi categoryApi;
 
     private String name;
     private String breed;
@@ -54,7 +57,7 @@ public class PetFormBean implements Serializable {
     private String longDesc;
     private Integer categoryId;
 
-    private List<Category> categories = Collections.emptyList();
+    private List<CategoryDTO> categories = Collections.emptyList();
 
     /** Set by the edit page's view parameter; null means "creating". */
     private Long petId;
@@ -64,18 +67,19 @@ public class PetFormBean implements Serializable {
     private Long version;
     private transient Part uploadedFile;
 
-    @PostConstruct
-    void init() {
+    /** The add page's view action: fills the category menu. */
+    public void loadCategories() {
         try {
-            categories = categoryService.findAll();
-        } catch (AppException failure) {
+            categories = categoryApi.findAll();
+        } catch (ApiException failure) {
             Messages.error(failure.getMessage());
         }
     }
 
     /**
      * Loads an existing listing into the form, for the edit page's {@code <f:viewAction>}.
-     * Non-owners meet the 403 page here rather than a form they could not save.
+     * Non-owners meet the 403 page here rather than a form they could not save; the API's
+     * {@code ownedByCaller} decides, and the update endpoint checks again.
      *
      * @return null to render the form; the response is already complete otherwise
      */
@@ -84,29 +88,30 @@ public class PetFormBean implements Serializable {
             return fail(HttpServletResponse.SC_NOT_FOUND);
         }
         try {
-            Pet pet = petService.findDetail(petId);
+            PetDetailDTO pet = petApi.detail(petId);
 
-            if (!isOwnedByCurrentUser(pet)) {
+            if (!pet.ownedByCaller()) {
                 return fail(HttpServletResponse.SC_FORBIDDEN);
             }
 
-            name = pet.getPetName();
-            breed = pet.getBreed();
-            age = pet.getAge();
-            size = pet.getSize().name();
-            gender = pet.getGender().name();
-            shortDesc = pet.getShortDesc();
-            longDesc = pet.getLongDesc();
-            categoryId = pet.getCategory() == null ? null : pet.getCategory().getCategoryId();
-            version = pet.getVersion();
-            return null;
+            name = pet.name();
+            breed = pet.breed();
+            age = pet.age();
+            size = pet.size();
+            gender = pet.gender();
+            shortDesc = pet.shortDesc();
+            longDesc = pet.longDesc();
+            categoryId = pet.categoryId();
+            version = pet.version();
 
-        } catch (AppException failure) {
+        } catch (ApiException failure) {
             if (failure.getStatus() == HttpServletResponse.SC_NOT_FOUND) {
                 return fail(HttpServletResponse.SC_NOT_FOUND);
             }
             return reportAndStay(failure);
         }
+        loadCategories();
+        return null;
     }
 
     /**
@@ -119,25 +124,23 @@ public class PetFormBean implements Serializable {
     }
 
     private String create() {
-        Pet created;
+        PetDTO created;
         try {
-            created = petService.create(name, breed, age, size, gender, shortDesc, longDesc,
-                    categoryId, userBean.getCurrentUserId());
-        } catch (ConstraintViolationException invalid) {
-            return reportAndStay(invalid);
-        } catch (AppException failure) {
-            return reportAndStay(failure);
+            created = petApi.create(form());
+        } catch (ApiException failure) {
+            return failure.getStatus() == 401 ? Messages.sessionExpired() : reportAndStay(failure);
         }
 
         if (!hasFile()) {
             return done("Your listing has been added.");
         }
 
-        try {
-            petService.attachImage(created.getPetId(), uploadedFile, userBean.getCurrentUserId());
+        try (InputStream content = uploadedFile.getInputStream()) {
+            petApi.uploadImage(created.id(), content, uploadedFile.getSubmittedFileName(),
+                    uploadedFile.getContentType());
             return done("Your listing and its photograph have been added.");
 
-        } catch (AppException photographFailed) {
+        } catch (ApiException | IOException photographFailed) {
             // The listing exists but the photograph does not, and the edit page has no upload
             // control. Say both, so the user does not re-enter the form and create a duplicate.
             Messages.warn("Your listing was added without its photograph, which could not be stored. "
@@ -148,19 +151,23 @@ public class PetFormBean implements Serializable {
 
     private String update() {
         try {
-            petService.update(petId, name, breed, age, size, gender, shortDesc, longDesc,
-                    categoryId, version, userBean.getCurrentUserId());
+            petApi.update(petId, form(), version);
             return done("Your listing has been updated.");
 
-        } catch (ConstraintViolationException invalid) {
-            return reportAndStay(invalid);
-        } catch (AppException failure) {
+        } catch (ApiException failure) {
+            if (failure.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
             if (failure.getStatus() == 409) {
                 Messages.error("This listing was changed by someone else. Reload it and try again.");
                 return null;
             }
             return reportAndStay(failure);
         }
+    }
+
+    private PetForm form() {
+        return new PetForm(name, breed, age, size, gender, shortDesc, longDesc, categoryId);
     }
 
     private String done(String text) {
@@ -170,7 +177,7 @@ public class PetFormBean implements Serializable {
 
     // ------------------------------------------------------------------------------ the menus
 
-    public List<Category> getCategories() { return categories; }
+    public List<CategoryDTO> getCategories() { return categories; }
 
     public List<SelectItem> getSizeOptions() { return options(SIZES); }
 
@@ -188,12 +195,6 @@ public class PetFormBean implements Serializable {
         return uploadedFile != null && uploadedFile.getSize() > 0;
     }
 
-    private boolean isOwnedByCurrentUser(Pet pet) {
-        return userBean.getCurrentUserId() != null
-                && pet.getOwner() != null
-                && userBean.getCurrentUserId().equals(pet.getOwner().getUserId());
-    }
-
     /** Ends the response with an error status, letting the container serve its error page. */
     private String fail(int status) {
         FacesContext context = FacesContext.getCurrentInstance();
@@ -206,13 +207,9 @@ public class PetFormBean implements Serializable {
         return null;
     }
 
-    private String reportAndStay(AppException failure) {
+    /** A 400's message names the field and the rule, so it is shown as the server wrote it. */
+    private String reportAndStay(ApiException failure) {
         Messages.error(failure.getMessage());
-        return null;
-    }
-
-    private String reportAndStay(ConstraintViolationException invalid) {
-        Messages.error(Messages.firstViolation(invalid, "That listing could not be saved."));
         return null;
     }
 

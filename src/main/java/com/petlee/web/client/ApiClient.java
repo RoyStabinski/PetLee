@@ -12,11 +12,14 @@ import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.core.EntityPart;
+import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -112,6 +115,23 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public <T> T post(String path, Object body, Class<T> type) {
+        return call("POST", path, Map.of(), json(body), new GenericType<>(type));
+    }
+
+    /**
+     * {@code POST} a multipart/form-data body. The parts' content streams are read during the
+     * call, so they must stay open until it returns.
+     *
+     * @param path  the path under {@code /api}
+     * @param parts the form parts
+     * @param type  the type to read the response into
+     * @return the response body
+     * @throws ApiException on a non-2xx response or when the API cannot be reached
+     */
+    public <T> T postMultipart(String path, List<EntityPart> parts, Class<T> type) {
+        // GenericEntity keeps List<EntityPart> visible to the multipart writer past erasure.
+        Entity<?> body = Entity.entity(new GenericEntity<List<EntityPart>>(parts) { },
+                MediaType.MULTIPART_FORM_DATA_TYPE);
         return call("POST", path, Map.of(), body, new GenericType<>(type));
     }
 
@@ -125,7 +145,21 @@ public class ApiClient {
      * @throws ApiException on a non-2xx response or when the API cannot be reached
      */
     public <T> T put(String path, Object body, Class<T> type) {
-        return call("PUT", path, Map.of(), body, new GenericType<>(type));
+        return call("PUT", path, Map.of(), json(body), new GenericType<>(type));
+    }
+
+    /**
+     * {@code PUT} a JSON body with query parameters; a null value is left out of the URL.
+     *
+     * @param path  the path under {@code /api}
+     * @param query the query parameters by name; null values are skipped
+     * @param body  the body, or null to send none
+     * @param type  the type to read the response into, or {@code Void.class} to ignore it
+     * @return the response body, or null for {@code Void.class} or an empty response
+     * @throws ApiException on a non-2xx response or when the API cannot be reached
+     */
+    public <T> T put(String path, Map<String, ?> query, Object body, Class<T> type) {
+        return call("PUT", path, query, json(body), new GenericType<>(type));
     }
 
     /**
@@ -138,7 +172,11 @@ public class ApiClient {
         call("DELETE", path, Map.of(), null, new GenericType<>(Void.class));
     }
 
-    private <T> T call(String method, String path, Map<String, ?> query, Object body,
+    private static Entity<?> json(Object body) {
+        return body == null ? null : Entity.json(body);
+    }
+
+    private <T> T call(String method, String path, Map<String, ?> query, Entity<?> body,
                        GenericType<T> type) {
         WebTarget target = client.target(baseUrl()).path(path);
         for (Map.Entry<String, ?> parameter : query.entrySet()) {
@@ -154,7 +192,7 @@ public class ApiClient {
 
         try (Response response = body == null
                 ? builder.method(method)
-                : builder.method(method, Entity.json(body))) {
+                : builder.method(method, body)) {
 
             if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
                 if (response.getStatus() == 401 && token != null) {

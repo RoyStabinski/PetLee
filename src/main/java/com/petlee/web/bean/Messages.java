@@ -2,11 +2,11 @@ package com.petlee.web.bean;
 
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
 
 /** Queues Faces messages for the page to render. Shared by the managed beans. */
 final class Messages {
+
+    private static final String LOGIN = "/login.xhtml?faces-redirect=true";
 
     private Messages() {
     }
@@ -24,20 +24,6 @@ final class Messages {
     }
 
     /**
-     * Picks one violation message, for a form that shows a single error at a time.
-     *
-     * @param invalid  the validation failure
-     * @param fallback the message to use when the set is empty
-     * @return the first message the set yields, or {@code fallback}
-     */
-    static String firstViolation(ConstraintViolationException invalid, String fallback) {
-        for (ConstraintViolation<?> violation : invalid.getConstraintViolations()) {
-            return violation.getMessage();
-        }
-        return fallback;
-    }
-
-    /**
      * Keeps queued messages alive across a redirect.
      *
      * @param outcome the navigation outcome, returned unchanged
@@ -46,5 +32,16 @@ final class Messages {
     static String keep(String outcome) {
         FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
         return outcome;
+    }
+
+    /**
+     * For an API call answered 401: the token has expired and {@code ApiClient} has already
+     * forgotten it, so the user is sent to log in again.
+     *
+     * @return the login page, keeping the message across the redirect
+     */
+    static String sessionExpired() {
+        error("Your session has expired. Please log in again.");
+        return keep(LOGIN);
     }
 }

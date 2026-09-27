@@ -43,7 +43,7 @@
                              required="true" requiredMessage="Required">
                 <f:selectItem itemValue="#{null}" itemLabel="" noSelectionOption="true"/>
                 <f:selectItems value="#{petFormBean.categories}" var="c"
-                               itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
+                               itemValue="#{c.id}" itemLabel="#{c.name}"/>
             </h:selectOneMenu>
             <h:message for="category" styleClass="field-error"/>
         </div>

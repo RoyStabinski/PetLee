@@ -5,6 +5,10 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
+    <f:metadata>
+        <f:viewAction action="#{petFormBean.loadCategories}"/>
+    </f:metadata>
+
     <ui:define name="title">Add a pet - Pet-Lee</ui:define>
 
     <ui:define name="content">

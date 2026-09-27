@@ -2,9 +2,6 @@ package com.petlee.web.bean;
 
 import com.petlee.dto.CategoryDTO;
 import com.petlee.dto.PetDTO;
-import com.petlee.model.Pet;
-import com.petlee.service.AppException;
-import com.petlee.service.PetService;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.CategoryApi;
 import com.petlee.web.client.PetApi;
@@ -36,17 +33,9 @@ public class PetBean implements Serializable {
     /** Shown for a listing with no photograph. Bundled, so it cannot 404. */
     static final String PLACEHOLDER_IMAGE = "/resources/images/placeholder-pet.png";
 
-    private static final String LOGIN = "/login.xhtml?faces-redirect=true";
-
-    /** For {@link #delete} only, until writes move onto the API. */
-    @Inject private transient PetService petService;
-
     /** Not transient: application-scoped proxies are serializable. */
     @Inject private PetApi petApi;
     @Inject private CategoryApi categoryApi;
-
-    /** Not transient: see UserBean's own field for why. */
-    @Inject private UserBean userBean;
 
     private List<PetDTO> pets = List.of();
     private List<CategoryDTO> categories = List.of();
@@ -93,31 +82,11 @@ public class PetBean implements Serializable {
     public String imageUrlOf(PetDTO pet) { return imageOf(pet == null ? null : pet.imageUrl()); }
 
     /**
-     * The entity version, for {@link AdminBean} until the admin screens move onto the API.
-     *
-     * @param pet a listing, may be null
-     * @return its photograph, or the bundled placeholder
-     */
-    static String imageOf(Pet pet) {
-        return imageOf(pet == null ? null : pet.getImageUrl());
-    }
-
-    /**
      * @param imageUrl a listing's {@code imageUrl}, may be null or blank
      * @return that photograph, or the bundled placeholder
      */
     static String imageOf(String imageUrl) {
         return imageUrl == null || imageUrl.isBlank() ? PLACEHOLDER_IMAGE : imageUrl;
-    }
-
-    /**
-     * The entity version, for {@link AdminBean} until the admin screens move onto the API.
-     *
-     * @param pet a listing, may be null
-     * @return the CSS class that colours its status badge
-     */
-    static String statusClassOf(Pet pet) {
-        return statusClassOf(pet == null || pet.getStatus() == null ? null : pet.getStatus().name());
     }
 
     /**
@@ -166,8 +135,7 @@ public class PetBean implements Serializable {
         } catch (ApiException e) {
             myListings = List.of();
             if (e.getStatus() == 401) {
-                Messages.error("Your session has expired. Please log in again.");
-                return Messages.keep(LOGIN);
+                return Messages.sessionExpired();
             }
             Messages.error(e.getMessage());
             return null;
@@ -195,20 +163,24 @@ public class PetBean implements Serializable {
     }
 
     /**
-     * Removes one of the caller's own listings and refreshes the dashboard.
+     * Removes one of the caller's own listings through {@code DELETE /api/pets/{id}} and
+     * refreshes the dashboard.
      *
      * @param petId the listing to remove
-     * @return null to stay on the dashboard, or the login page if the session has gone
+     * @return null to stay on the dashboard, or the login page if the token has expired
      */
     public String delete(Long petId) {
         try {
-            petService.delete(petId, userBean.getCurrentUserId(), userBean.isAdmin());
+            petApi.delete(petId);
             myListings = null;
             return null;
-        } catch (AppException e) {
+        } catch (ApiException e) {
+            if (e.getStatus() == 401) {
+                return Messages.sessionExpired();
+            }
+            // 403 not yours, 404 already gone, 409 edited meanwhile: say so and stay.
             Messages.error(e.getMessage());
-            // These are the caller's own listings, so a refusal means the session ended.
-            return e.getStatus() == 403 ? Messages.keep(LOGIN) : null;
+            return null;
         }
     }
 

@@ -222,9 +222,14 @@ public class AdminBean implements Serializable {
         return pet != null && pet.getStatus() == Pet.PetStatus.REMOVED;
     }
 
-    public String statusStyle(Pet pet) { return PetBean.statusClassOf(pet); }
+    public String statusStyle(Pet pet) {
+        return PetBean.statusClassOf(pet == null || pet.getStatus() == null
+                ? null : pet.getStatus().name());
+    }
 
-    public String thumbnailOf(Pet pet) { return PetBean.imageOf(pet); }
+    public String thumbnailOf(Pet pet) {
+        return PetBean.imageOf(pet == null ? null : pet.getImageUrl());
+    }
 
     /**
      * @param pet a listing

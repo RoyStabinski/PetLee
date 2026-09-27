@@ -185,8 +185,8 @@ public class UserBean implements Serializable {
     }
 
     /**
-     * The mapper writes a violation as {@code "<property path> <message>"}; the page shows only
-     * the message, as it did when the constraint was checked in-process.
+     * The mapper writes a violation as {@code "<field> <message>"}; the page shows only the
+     * message, since the registration messages already name their field.
      */
     private static String violationText(String message) {
         int space = message.indexOf(' ');

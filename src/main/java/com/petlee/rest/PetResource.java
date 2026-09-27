@@ -15,6 +15,7 @@ import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -23,11 +24,15 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.EntityPart;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * {@code /api/pets}. Decides who is asking — from the bearer token or the session, never from the
@@ -79,7 +84,7 @@ public class PetResource {
 
     /**
      * {@code GET /api/pets/{id}} — open, but the owner's contact fields are filled only for a
-     * logged-in caller.
+     * logged-in caller, and {@code ownedByCaller} is true only for the owner.
      *
      * @param id the pet id
      * @return the pet in full
@@ -88,7 +93,11 @@ public class PetResource {
     @Path("{id: \\d+}")
     @Produces(MediaType.APPLICATION_JSON)
     public PetDetailDTO findDetail(@PathParam("id") Long id) {
-        return PetDetailDTO.of(pets.findDetail(id), currentUser.from(request).isPresent());
+        Pet pet = pets.findDetail(id);
+        Optional<SessionUser> caller = currentUser.from(request);
+        boolean owned = caller.isPresent() && pet.getOwner() != null
+                && caller.get().userId().equals(pet.getOwner().getUserId());
+        return PetDetailDTO.of(pet, caller.isPresent(), owned);
     }
 
     /**
@@ -180,6 +189,39 @@ public class PetResource {
         SessionUser caller = caller();
         pets.delete(id, caller.userId(), caller.admin());
         return Response.noContent().build();
+    }
+
+    /**
+     * {@code POST /api/pets/{id}/image} — auth, owner only. Replaces the listing's photograph
+     * with the multipart/form-data part named {@code file}: JPEG, PNG, GIF or WebP, at most
+     * 5 MB. The old file is deleted once the new one is attached.
+     *
+     * @param id   the pet
+     * @param file the {@code file} part, or null when the request has none
+     * @return the listing, with its new {@code imageUrl}
+     */
+    @POST
+    @Path("{id: \\d+}/image")
+    @Secured
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public PetDTO uploadImage(@PathParam("id") Long id, @FormParam("file") EntityPart file) {
+        if (file == null) {
+            throw new AppException(400, "A photo file is required, as the multipart part \"file\"");
+        }
+        MediaType type = file.getMediaType();
+        String contentType = type == null ? null : type.getType() + "/" + type.getSubtype();
+
+        InputStream content = file.getContent();
+        try {
+            return PetDTO.of(pets.attachImage(id, content, contentType, caller().userId()));
+        } finally {
+            try {
+                content.close();
+            } catch (IOException ignored) {
+                // the photograph is stored or refused by now; a failed close changes neither
+            }
+        }
     }
 
     /**

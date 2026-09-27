@@ -9,10 +9,10 @@ import com.petlee.repository.UserRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.OptimisticLockException;
-import jakarta.servlet.http.Part;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -248,19 +248,21 @@ public class PetService {
      * Replaces a listing's photograph. The old file is deleted only once the new one is attached.
      *
      * @param petId        the pet's id
-     * @param file         the uploaded file
-     * @param callerUserId the session user's id
+     * @param content      the photograph's bytes; read, not closed
+     * @param contentType  its media type, such as {@code image/png}
+     * @param callerUserId the caller's id
      * @return the pet, with its new photograph
-     * @throws AppException 404 if no such pet, 403 if not the owner
+     * @throws AppException 404 if no such pet, 403 if not the owner, 400 if the photograph is
+     *                      missing, too large or not a supported image type
      */
     @Transactional
-    public Pet attachImage(Long petId, Part file, Long callerUserId) {
+    public Pet attachImage(Long petId, InputStream content, String contentType, Long callerUserId) {
         Pet pet = requireById(petId);
         if (!isSameUser(pet.getOwner(), callerUserId)) {
             throw new AppException(403, "Only the owner of a listing can change its photo");
         }
         String previous = pet.getImageUrl();
-        pet.setImageUrl(images.store(file));
+        pet.setImageUrl(images.store(content, contentType));
         Pet saved = pets.save(pet);
         if (previous != null) {
             images.delete(previous);

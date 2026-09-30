@@ -12,72 +12,94 @@
 
     <ui:define name="title">Edit your listing - Pet-Lee</ui:define>
 
+    <ui:define name="head">
+        <script src="#{request.contextPath}/resources/js/upload.js?v=#{initParam['petlee.ASSET_VERSION']}"
+                defer="defer"></script>
+    </ui:define>
+
     <ui:define name="content">
-        <div class="panel">
+        <div class="card-box form-card">
             <h1>Edit your listing</h1>
 
             <!-- The listing's fields. The photographs below have forms of their own, so changing
-                 a photograph neither submits nor validates these fields. -->
+                 a photograph neither submits nor validates these fields - which is also why Save
+                 sits with the fields it saves rather than under the photographs. -->
             <h:form id="petForm">
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
-                <div class="actions">
-                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
+                <div class="actions form-actions">
                     <h:outputLink value="#{request.contextPath}/profile.xhtml"
                                   styleClass="button-secondary">Cancel</h:outputLink>
+                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
                 </div>
             </h:form>
-        </div>
 
-        <div class="panel">
-            <h2>Photographs</h2>
+            <section class="form-section photos-section" aria-labelledby="photosTitle">
+                <h2 id="photosTitle" class="form-section-title">Photos</h2>
 
-            <ui:fragment rendered="#{empty petFormBean.images}">
-                <p>This listing has no photographs yet.</p>
-            </ui:fragment>
+                <ui:fragment rendered="#{empty petFormBean.images}">
+                    <p class="field-hint">This listing has no photographs yet.</p>
+                </ui:fragment>
 
-            <h:form id="photosForm" rendered="#{not empty petFormBean.images}">
-                <ul class="photo-grid">
-                    <ui:repeat id="photos" value="#{petFormBean.images}" var="image">
-                        <li class="photo-tile">
-                            <h:graphicImage value="#{image.url}" alt="Photograph of #{petFormBean.name}"/>
-                            <ui:fragment rendered="#{image.main}">
-                                <span class="tag">Main photograph</span>
-                            </ui:fragment>
-                            <div class="actions">
-                                <h:commandLink id="setMain" value="Set as main" styleClass="button-secondary"
-                                               rendered="#{not image.main}"
-                                               action="#{petFormBean.setMainPhoto(image.id)}"/>
-                                <h:commandLink id="deletePhoto" value="Delete" styleClass="button button-danger"
-                                               action="#{petFormBean.deletePhoto(image.id)}"
-                                               onclick="return confirm('Delete this photograph permanently?');"/>
-                            </div>
-                        </li>
-                    </ui:repeat>
-                </ul>
-            </h:form>
+                <!-- Both forms use display: contents, so their tiles share the one row. -->
+                <div class="photo-row">
+                    <h:form id="photosForm" rendered="#{not empty petFormBean.images}" styleClass="form-contents">
+                        <ul class="photo-list">
+                            <ui:repeat id="photos" value="#{petFormBean.images}" var="image">
+                                <li class="photo-tile">
+                                    <div class="photo-tile-media">
+                                        <h:graphicImage value="#{image.url}" alt="Photograph of #{petFormBean.name}"
+                                                        width="120" height="120"/>
+                                        <ui:fragment rendered="#{image.main}">
+                                            <span class="photo-main-badge">Main photograph</span>
+                                        </ui:fragment>
+                                    </div>
+                                    <div class="button-stack">
+                                        <h:commandLink id="setMain" value="Set as main" styleClass="button-secondary button-small"
+                                                       rendered="#{not image.main}"
+                                                       action="#{petFormBean.setMainPhoto(image.id)}"/>
+                                        <h:commandLink id="deletePhoto" value="Delete" styleClass="button-danger button-small"
+                                                       action="#{petFormBean.deletePhoto(image.id)}"
+                                                       onclick="return confirm('Delete this photograph permanently?');"/>
+                                    </div>
+                                </li>
+                            </ui:repeat>
+                        </ul>
+                    </h:form>
 
-            <!-- Its own multipart form: enctype is not optional for h:inputFile. -->
-            <h:form id="uploadForm" enctype="multipart/form-data"
-                    rendered="#{petFormBean.roomForPhotos}">
-                <div class="field field-wide">
-                    <h:outputLabel for="morePhotos" value="Add photographs"/>
-                    <h:inputFile id="morePhotos" value="#{petFormBean.uploadedFiles}" accept="image/*"
-                                 multiple="true"/>
-                    <span class="field-hint">
+                    <!-- Its own multipart form: enctype is not optional for h:inputFile. -->
+                    <h:form id="uploadForm" enctype="multipart/form-data"
+                            rendered="#{petFormBean.roomForPhotos}" styleClass="form-contents">
+                        <div class="upload-slot">
+                            <h:outputLabel for="morePhotos" styleClass="upload-tile">
+                                <svg class="icon" viewBox="0 0 24 24"
+                                     width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true" focusable="false">
+                                    <path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+                                </svg>
+                                <span class="upload-tile-text">Add photo</span>
+                                <h:inputFile id="morePhotos" value="#{petFormBean.uploadedFiles}" accept="image/*"
+                                             multiple="true" styleClass="upload-input"/>
+                            </h:outputLabel>
+                            <h:commandButton id="upload" value="Upload" action="#{petFormBean.addPhotos}"
+                                             styleClass="button-small button-block"/>
+                        </div>
+                    </h:form>
+                </div>
+
+                <ui:fragment rendered="#{petFormBean.roomForPhotos}">
+                    <p class="field-hint">
                         <h:outputFormat value="You can add {0} more. JPEG, PNG, WebP or GIF, each up to 5 MB.">
                             <f:param value="#{petFormBean.photoSlotsLeft}"/>
                         </h:outputFormat>
-                    </span>
-                </div>
-                <div class="actions">
-                    <h:commandButton id="upload" value="Upload" action="#{petFormBean.addPhotos}"/>
-                </div>
-            </h:form>
+                    </p>
+                </ui:fragment>
 
-            <ui:fragment rendered="#{not petFormBean.roomForPhotos}">
-                <p class="field-hint">A listing can have at most 5 photographs. Delete one to add another.</p>
-            </ui:fragment>
+                <ui:fragment rendered="#{not petFormBean.roomForPhotos}">
+                    <p class="field-hint">A listing can have at most 5 photographs. Delete one to add another.</p>
+                </ui:fragment>
+            </section>
         </div>
     </ui:define>
 

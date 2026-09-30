@@ -3,7 +3,8 @@
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:f="jakarta.faces.core"
-                xmlns:ui="jakarta.faces.facelets">
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
 
     <f:metadata>
         <f:viewAction action="#{petBean.loadMyListings}"/>
@@ -11,89 +12,106 @@
 
     <ui:define name="title">My profile - Pet-Lee</ui:define>
 
+    <ui:define name="banner">
+        <div class="page-banner">
+            <div class="container">
+                <h1>My profile: #{userBean.currentUser.fullName}</h1>
+            </div>
+        </div>
+    </ui:define>
+
     <ui:define name="content">
 
-        <h1>My profile</h1>
+        <div class="profile-layout">
 
-        <!-- The user's own details, so no privacy gate applies here. -->
-        <div class="panel">
-            <dl class="detail-facts">
-                <dt>Full name</dt>
-                <dd>#{userBean.currentUser.fullName}</dd>
-                <dt>Username</dt>
-                <dd>#{userBean.currentUser.username}</dd>
-                <dt>Email</dt>
-                <dd>#{userBean.currentUser.email}</dd>
-                <dt>Telephone</dt>
-                <dd>#{userBean.currentUser.phone}</dd>
-                <dt>Status</dt>
-                <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
-            </dl>
-        </div>
+            <!-- The user's own details, so no privacy gate applies here. -->
+            <aside class="card-box profile-card" aria-label="Your account">
+                <div class="avatar" aria-hidden="true">#{userBean.initials}</div>
+                <p class="profile-name">#{userBean.currentUser.fullName}</p>
+                <p class="profile-counts">
+                    <h:outputFormat value="{0} {1} · {2} active">
+                        <f:param value="#{petBean.listingCount}"/>
+                        <f:param value="#{petBean.listingCount == 1 ? 'listing' : 'listings'}"/>
+                        <f:param value="#{petBean.activeListingCount}"/>
+                    </h:outputFormat>
+                </p>
 
-        <h2>My listings</h2>
+                <nav class="side-menu" aria-label="Profile">
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="side-menu-item is-current"
+                                  p:aria-current="page">My listings</h:outputLink>
+                    <span class="side-menu-item is-disabled" aria-disabled="true">
+                        Edit profile <span class="side-menu-note">coming soon</span>
+                    </span>
+                </nav>
 
-        <ui:fragment rendered="#{petBean.noListings}">
-            <div class="empty-state">
-                <p>You have not posted any listings yet.</p>
-                <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
-                    Add your first pet
-                </h:outputLink>
-            </div>
-        </ui:fragment>
+                <dl class="profile-details">
+                    <dt>Username</dt>
+                    <dd>#{userBean.currentUser.username}</dd>
+                    <dt>Email</dt>
+                    <dd>#{userBean.currentUser.email}</dd>
+                    <dt>Telephone</dt>
+                    <dd>#{userBean.currentUser.phone}</dd>
+                    <dt>Status</dt>
+                    <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
+                </dl>
+            </aside>
 
-        <ui:fragment rendered="#{not petBean.noListings}">
-            <h:form id="listingsForm">
-                <div class="table-scroll">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Photograph</th>
-                                <th scope="col">Name</th>
-                                <th scope="col">Category</th>
-                                <th scope="col">Status</th>
-                                <th scope="col">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <section aria-labelledby="listingsTitle">
+                <h2 id="listingsTitle" class="section-title">My listings</h2>
+
+                <ui:fragment rendered="#{petBean.noListings}">
+                    <div class="empty-state">
+                        <img src="#{request.contextPath}/resources/images/paw.svg" alt="" width="48" height="48"/>
+                        <p>You have not posted any listings yet.</p>
+                        <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button button-accent">
+                            Add your first pet
+                        </h:outputLink>
+                    </div>
+                </ui:fragment>
+
+                <ui:fragment rendered="#{not petBean.noListings}">
+                    <h:form id="listingsForm">
+                        <ul class="pet-grid">
                             <ui:repeat id="rows" value="#{petBean.myListings}" var="pet">
-                                <tr>
-                                    <td class="cell-thumb">
-                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"/>
-                                    </td>
-                                    <td>#{pet.name}</td>
-                                    <td>#{pet.categoryName}</td>
-                                    <td>
-                                        <span class="#{petBean.statusStyle(pet)}">
-                                            #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="actions">
-                                            <h:commandLink id="edit" value="Edit" styleClass="button-secondary"
-                                                           action="#{petBean.edit(pet.id)}"/>
+                                <li class="pet-card">
+                                    <div class="pet-card-media">
+                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"
+                                                        width="400" height="300"/>
+                                    </div>
+                                    <div class="pet-card-body">
+                                        <div class="pet-card-heading">
+                                            <h3 class="pet-card-name">#{pet.name}</h3>
+                                            <span class="#{petBean.statusStyle(pet)}">
+                                                #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
+                                            </span>
+                                        </div>
+
+                                        <div class="button-stack">
                                             <!-- Neither for a withdrawn listing: only an administrator can restore it. -->
                                             <h:commandLink id="markAdopted" value="Mark as adopted"
-                                                           styleClass="button-secondary"
+                                                           styleClass="button button-small"
                                                            rendered="#{pet.status == 'AVAILABLE'}"
                                                            action="#{petBean.markAdopted(pet.id, pet.version)}"/>
                                             <h:commandLink id="markAvailable" value="Mark as available"
-                                                           styleClass="button-secondary"
+                                                           styleClass="button button-small"
                                                            rendered="#{pet.status == 'ADOPTED'}"
                                                            action="#{petBean.markAvailable(pet.id, pet.version)}"/>
+                                            <h:commandLink id="edit" value="Edit" styleClass="button-secondary button-small"
+                                                           action="#{petBean.edit(pet.id)}"/>
                                             <!-- Confirmed before the call: deletion is permanent. -->
-                                            <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
+                                            <h:commandLink id="delete" value="Delete" styleClass="button-danger button-small"
                                                            action="#{petBean.delete(pet.id)}"
                                                            onclick="return confirm('Delete this listing permanently? Its photographs go with it.');"/>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </div>
+                                </li>
                             </ui:repeat>
-                        </tbody>
-                    </table>
-                </div>
-            </h:form>
-        </ui:fragment>
+                        </ul>
+                    </h:form>
+                </ui:fragment>
+            </section>
+
+        </div>
 
     </ui:define>
 

@@ -20,6 +20,13 @@
         <param-value>Production</param-value>
     </context-param>
 
+    <!-- The version stamped on petlee.css and carousel.js URLs (?v=...) by the template. Raise it
+         whenever either file changes, so browsers fetch the new copy instead of a cached one. -->
+    <context-param>
+        <param-name>petlee.ASSET_VERSION</param-name>
+        <param-value>3</param-value>
+    </context-param>
+
     <!-- 5 MB matches ImageStore.MAX_BYTES; the request cap leaves room for the rest of the form. -->
     <context-param>
         <param-name>jakarta.faces.UPLOADER_MAX_FILE_SIZE</param-name>

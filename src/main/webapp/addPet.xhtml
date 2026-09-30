@@ -11,27 +11,45 @@
 
     <ui:define name="title">Add a pet - Pet-Lee</ui:define>
 
+    <ui:define name="head">
+        <script src="#{request.contextPath}/resources/js/upload.js?v=#{initParam['petlee.ASSET_VERSION']}"
+                defer="defer"></script>
+    </ui:define>
+
     <ui:define name="content">
-        <div class="panel">
-            <h1>Add a pet</h1>
+        <div class="card-box form-card">
+            <h1>Publish a new adoption listing</h1>
 
             <!-- enctype is not optional: without it the files are never sent and h:inputFile
                  hands the bean nothing, with no error to explain it. -->
             <h:form id="petForm" enctype="multipart/form-data">
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
-                <div class="field field-wide">
-                    <h:outputLabel for="photo" value="Photographs"/>
-                    <h:inputFile id="photo" value="#{petFormBean.uploadedFiles}" accept="image/*"
-                                 multiple="true"/>
+                <fieldset class="form-section">
+                    <legend>Photos</legend>
+                    <div class="photo-row">
+                        <!-- The file input sits inside its label, visually hidden but focusable;
+                             the dashed tile is the label, and shows the input's focus ring. -->
+                        <h:outputLabel for="photo" styleClass="upload-tile">
+                            <svg class="icon" viewBox="0 0 24 24"
+                                 width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round"
+                                 aria-hidden="true" focusable="false">
+                                <path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+                            </svg>
+                            <span class="upload-tile-text">Add photo</span>
+                            <h:inputFile id="photo" value="#{petFormBean.uploadedFiles}" accept="image/*"
+                                         multiple="true" styleClass="upload-input"/>
+                        </h:outputLabel>
+                    </div>
                     <h:message for="photo" styleClass="field-error"/>
-                    <span class="field-hint">#{petFormBean.uploadLimits}</span>
-                </div>
+                    <p class="field-hint">#{petFormBean.uploadLimits}</p>
+                </fieldset>
 
-                <div class="actions">
-                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
+                <div class="actions form-actions">
                     <h:outputLink value="#{request.contextPath}/profile.xhtml"
                                   styleClass="button-secondary">Cancel</h:outputLink>
+                    <h:commandButton id="save" value="Publish" action="#{petFormBean.save}"/>
                 </div>
             </h:form>
         </div>

@@ -163,6 +163,27 @@ public class UserBean implements Serializable {
         return user == null ? null : user.fullName();
     }
 
+    /**
+     * @return up to two initials from the full name, for the profile's avatar circle: the first
+     *         letter of the first and last words, or of the username, or "?" when signed out
+     */
+    public String getInitials() {
+        UserDTO user = getCurrentUser();
+        if (user == null) {
+            return "?";
+        }
+        String name = user.fullName() == null || user.fullName().isBlank() ? user.username() : user.fullName();
+        if (name == null || name.isBlank()) {
+            return "?";
+        }
+        String[] words = name.trim().split("\\s+");
+        String initials = words[0].substring(0, 1);
+        if (words.length > 1) {
+            initials += words[words.length - 1].substring(0, 1);
+        }
+        return initials.toUpperCase();
+    }
+
     /** @return the signed-in user's id, or null */
     public Long getCurrentUserId() {
         UserDTO user = getCurrentUser();

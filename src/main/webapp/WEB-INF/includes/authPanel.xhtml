@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The pale teal side panel shared by login.xhtml and register.xhtml. First in the markup, so
+     on a phone, where the card is one column, it sits above the form. -->
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <aside class="auth-panel">
+        <!-- Decorative: the heading below says what the panel is about. -->
+        <img class="auth-logo" src="#{request.contextPath}/resources/images/logo.svg"
+             alt="" width="56" height="56"/>
+        <img class="auth-illustration" src="#{request.contextPath}/resources/images/auth-illustration.png"
+             alt="A smiling person with dogs and cats" width="802" height="500"/>
+        <h2>One account for both</h2>
+        <p>Whether you want to adopt your next friend or find a loving home for yours.</p>
+    </aside>
+
+</ui:composition>

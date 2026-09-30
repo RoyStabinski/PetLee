@@ -13,7 +13,8 @@
     <ui:define name="title">#{forbidden ? 'Access denied' : 'Something went wrong'} - Pet-Lee</ui:define>
 
     <ui:define name="content">
-        <div class="panel panel-narrow">
+        <div class="card-box error-card">
+            <img src="#{request.contextPath}/resources/images/paw.svg" alt="" width="48" height="48"/>
             <ui:fragment rendered="#{forbidden}">
                 <h1>Access denied</h1>
                 <p>You do not have permission to view this page.</p>

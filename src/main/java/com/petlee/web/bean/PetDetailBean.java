@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -77,13 +78,31 @@ public class PetDetailBean implements Serializable {
     /** @return the listing's photograph, or the bundled placeholder when it has none */
     public String getImageUrl() { return PetBean.imageOf(pet == null ? null : pet.imageUrl()); }
 
-    /** @return the photographs other than the main one, oldest first, for the row beneath it */
-    public List<PetImageDTO> getOtherImages() {
-        if (pet == null || pet.images() == null) {
-            return List.of();
+    /**
+     * @return every photograph's URL for the carousel, the main one first and the rest oldest
+     *         first; just the placeholder when the listing has none
+     */
+    public List<String> getPhotoUrls() {
+        if (pet == null || pet.images() == null || pet.images().isEmpty()) {
+            return List.of(getImageUrl());
         }
-        return pet.images().stream().filter(image -> !image.main()).toList();
+        List<String> urls = new ArrayList<>();
+        pet.images().stream().filter(PetImageDTO::main).forEach(image -> urls.add(image.url()));
+        pet.images().stream().filter(image -> !image.main()).forEach(image -> urls.add(image.url()));
+        return urls;
     }
+
+    /** @return how many photographs the carousel shows; at least one, the placeholder */
+    public int getPhotoCount() { return getPhotoUrls().size(); }
+
+    /** @return the age as the gallery shows it, or "Unknown" */
+    public String getAgeLabel() {
+        String label = PetBean.ageLabelOf(pet == null ? null : pet.age());
+        return label.isEmpty() ? "Unknown" : label;
+    }
+
+    /** @return the CSS classes for the listing's status badge */
+    public String getStatusStyle() { return PetBean.statusClassOf(pet == null ? null : pet.status()); }
 
     /** @return whether the listing is no longer available */
     public boolean isWithdrawn() {

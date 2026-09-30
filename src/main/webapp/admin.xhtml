@@ -15,15 +15,22 @@
 
     <ui:define name="title">Admin panel - Pet-Lee</ui:define>
 
+    <ui:define name="banner">
+        <div class="page-banner">
+            <div class="container">
+                <h1>Admin panel</h1>
+            </div>
+        </div>
+    </ui:define>
+
     <ui:define name="content">
 
-        <h1>Admin panel</h1>
+        <h2 class="section-title">Listing management</h2>
 
-        <h2>Listing management</h2>
-
-        <h:form id="adminFilterForm" styleClass="panel filter-panel">
-            <fieldset>
-                <legend>Narrow the list</legend>
+        <!-- A horizontal toolbar: the fields and the buttons share one row where they fit. -->
+        <h:form id="adminFilterForm" styleClass="card-box toolbar">
+            <fieldset class="toolbar-fields">
+                <legend class="sr-only">Narrow the list</legend>
 
                 <div class="field">
                     <h:outputLabel for="category" value="Category"/>
@@ -54,7 +61,7 @@
                     </h:selectOneMenu>
                 </div>
 
-                <div class="actions">
+                <div class="actions toolbar-actions">
                     <h:commandButton id="apply" value="Apply" action="#{adminBean.applyFilter}"/>
                     <h:commandButton id="clear" value="Clear" action="#{adminBean.clearFilters}"
                                      styleClass="button-secondary"/>
@@ -63,12 +70,15 @@
         </h:form>
 
         <ui:fragment rendered="#{adminBean.noListings}">
-            <div class="empty-state"><p>No listing matches these filters.</p></div>
+            <div class="empty-state">
+                <img src="#{request.contextPath}/resources/images/paw.svg" alt="" width="48" height="48"/>
+                <p>No listing matches these filters.</p>
+            </div>
         </ui:fragment>
 
         <ui:fragment rendered="#{not adminBean.noListings}">
             <h:form id="listingsForm">
-                <div class="table-scroll">
+                <div class="card-box table-card">
                     <table class="table">
                         <thead>
                             <tr>
@@ -85,9 +95,10 @@
                             <ui:repeat id="rows" value="#{adminBean.listings}" var="pet">
                                 <tr>
                                     <td class="cell-thumb">
-                                        <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.name}"/>
+                                        <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.name}"
+                                                        width="48" height="48"/>
                                     </td>
-                                    <td>#{pet.name}</td>
+                                    <td class="cell-strong">#{pet.name}</td>
                                     <td>#{pet.ownerName}</td>
                                     <td>#{pet.categoryName}</td>
                                     <td>
@@ -95,16 +106,16 @@
                                             #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
                                         </span>
                                     </td>
-                                    <td>#{adminBean.createdOn(pet)}</td>
+                                    <td class="cell-nowrap">#{adminBean.createdOn(pet)}</td>
                                     <td>
                                         <div class="actions">
-                                            <h:commandLink id="hide" value="Hide" styleClass="button-secondary"
+                                            <h:commandLink id="hide" value="Hide" styleClass="button-secondary button-small"
                                                            rendered="#{not adminBean.isHidden(pet)}"
                                                            action="#{adminBean.hide(pet.id)}"/>
-                                            <h:commandLink id="restore" value="Restore" styleClass="button-secondary"
+                                            <h:commandLink id="restore" value="Restore" styleClass="button-secondary button-small"
                                                            rendered="#{adminBean.isHidden(pet)}"
                                                            action="#{adminBean.restore(pet.id)}"/>
-                                            <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
+                                            <h:commandLink id="delete" value="Delete" styleClass="button-danger button-small"
                                                            action="#{adminBean.deletePet(pet.id)}"
                                                            onclick="return confirm('#{adminBean.confirmDelete(pet)}');"/>
                                         </div>
@@ -117,10 +128,10 @@
             </h:form>
         </ui:fragment>
 
-        <h2>Category management</h2>
+        <h2 class="section-title">Category management</h2>
 
-        <h:form id="categoryForm">
-            <div class="panel">
+        <h:form id="categoryForm" styleClass="card-box category-card">
+            <div class="category-add">
                 <div class="field">
                     <h:outputLabel for="newCategory" value="New category"/>
                     <h:inputText id="newCategory" value="#{adminBean.newCategoryName}" maxlength="50"/>
@@ -130,7 +141,7 @@
                 </div>
             </div>
 
-            <div class="table-scroll">
+            <div class="table-card-scroll">
                 <table class="table">
                     <thead>
                         <tr>
@@ -142,12 +153,12 @@
                     <tbody>
                         <ui:repeat id="categoryRows" value="#{adminBean.categories}" var="category">
                             <tr>
-                                <td>#{category.name}</td>
+                                <td class="cell-strong">#{category.name}</td>
                                 <td>#{adminBean.listingCount(category)}</td>
                                 <td>
                                     <!-- Disabled rather than absent, so the count beside it explains itself.
                                          The 409 still stands: the count can change between render and click. -->
-                                    <h:commandLink id="deleteCategory" value="Delete" styleClass="button button-danger"
+                                    <h:commandLink id="deleteCategory" value="Delete" styleClass="button-danger button-small"
                                                    action="#{adminBean.deleteCategory(category.id)}"
                                                    disabled="#{adminBean.isInUse(category)}"
                                                    title="#{adminBean.isInUse(category) ? 'A category that still holds listings cannot be deleted.' : ''}"/>

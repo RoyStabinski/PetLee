@@ -108,6 +108,18 @@ public class PetBean implements Serializable {
     public String imageUrlOf(PetDTO pet) { return imageOf(pet == null ? null : pet.imageUrl()); }
 
     /**
+     * @param pet a gallery listing
+     * @return its photographs for the card's carousel, main first; just the placeholder when it
+     *         has none, so the card always has one photo to show
+     */
+    public List<String> photosOf(PetDTO pet) {
+        if (pet == null || pet.imageUrls() == null || pet.imageUrls().isEmpty()) {
+            return List.of(imageUrlOf(pet));
+        }
+        return pet.imageUrls();
+    }
+
+    /**
      * @param imageUrl a listing's {@code imageUrl}, may be null or blank
      * @return that photograph, or the bundled placeholder
      */
@@ -117,18 +129,35 @@ public class PetBean implements Serializable {
 
     /**
      * @param status a listing's status string, as the API returns it; may be null
-     * @return the CSS class that colours its status badge
+     * @return the CSS classes that colour its status badge
      */
     static String statusClassOf(String status) {
         if (status == null) {
-            return "tag";
+            return "badge";
         }
         return switch (status) {
-            case "ADOPTED" -> "tag tag-adopted";
-            case "REMOVED" -> "tag tag-removed";
-            default -> "tag";
+            case "AVAILABLE" -> "badge badge-available";
+            case "ADOPTED" -> "badge badge-adopted";
+            case "REMOVED" -> "badge badge-withdrawn";
+            default -> "badge";
         };
     }
+
+    /**
+     * @param age a listing's age in whole years; may be null
+     * @return the gallery card's age chip: "Under 1 yr", "1 yr", "N yrs", or "" when unknown
+     */
+    static String ageLabelOf(Integer age) {
+        if (age == null) {
+            return "";
+        }
+        if (age < 1) {
+            return "Under 1 yr";
+        }
+        return age == 1 ? "1 yr" : age + " yrs";
+    }
+
+    public String ageOf(PetDTO pet) { return ageLabelOf(pet == null ? null : pet.age()); }
 
     public List<SelectItem> getSizeOptions() {
         return options("Any size", "SMALL", "MEDIUM", "LARGE");
@@ -186,6 +215,16 @@ public class PetBean implements Serializable {
 
     public boolean isNoListings() {
         return getMyListings().isEmpty();
+    }
+
+    /** @return how many listings this user has, in every status, for the profile sidebar */
+    public int getListingCount() {
+        return getMyListings().size();
+    }
+
+    /** @return how many of them are still available, for the profile sidebar */
+    public long getActiveListingCount() {
+        return getMyListings().stream().filter(pet -> "AVAILABLE".equals(pet.status())).count();
     }
 
     /**

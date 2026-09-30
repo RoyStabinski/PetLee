@@ -5,6 +5,10 @@
 
     The navigation bar's three shapes - guest, member, administrator - are menu visibility only,
     never a security boundary. Under WEB-INF, so no browser can request the template itself.
+
+    The stylesheet is a plain link, not h:outputStylesheet: Faces serves its resources with a
+    seven-day max-age, so a browser kept an old petlee.css. The ?v= comes from the
+    petlee.ASSET_VERSION context-param in web.xml; raise it after changing a CSS or JS file.
 -->
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
@@ -16,7 +20,12 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title><ui:insert name="title">Pet-Lee</ui:insert></title>
-    <h:outputStylesheet library="css" name="petlee.css"/>
+    <link rel="icon" type="image/svg+xml"
+          href="#{request.contextPath}/resources/images/logo.svg?v=#{initParam['petlee.ASSET_VERSION']}"/>
+    <link rel="stylesheet"
+          href="#{request.contextPath}/resources/css/petlee.css?v=#{initParam['petlee.ASSET_VERSION']}"/>
+    <!-- A page's own scripts, such as the carousel on petDetails.xhtml. -->
+    <ui:insert name="head"/>
 </h:head>
 
 <h:body styleClass="page">
@@ -25,31 +34,38 @@
     <a class="skip-link" href="#content">Skip to content</a>
 
     <header class="site-header">
-        <div class="container">
+        <div class="container header-inner">
 
+            <!-- The mark's alt is empty: the wordmark beside it already says "Pet-Lee". -->
             <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="brand">
-                <span class="brand-name">Pet-Lee</span>
-                <span class="brand-tagline">Find a companion, give a home</span>
+                <img class="brand-mark" src="#{request.contextPath}/resources/images/logo.svg"
+                     alt="" width="36" height="36"/>
+                <span class="brand-text">
+                    <span class="brand-name">Pet-Lee</span>
+                    <span class="brand-tagline">Find your new companion</span>
+                </span>
             </h:outputLink>
 
             <nav class="nav" aria-label="Main navigation">
 
-                <h:outputLink value="#{request.contextPath}/index.xhtml">Home</h:outputLink>
+                <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="nav-link">Home</h:outputLink>
 
                 <!-- Guest -->
                 <ui:fragment rendered="#{not userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/login.xhtml">Log in</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/register.xhtml">Register</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="nav-link">Log in</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/register.xhtml"
+                                  styleClass="button button-accent">Register</h:outputLink>
                 </ui:fragment>
 
                 <!-- Member -->
                 <ui:fragment rendered="#{userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/addPet.xhtml">Add a pet</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/profile.xhtml">My listings</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/addPet.xhtml"
+                                  styleClass="button button-accent">Add a pet</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="nav-link">My listings</h:outputLink>
 
                     <!-- Administrator: the member links plus this one. -->
                     <ui:fragment rendered="#{userBean.admin}">
-                        <h:outputLink value="#{request.contextPath}/admin.xhtml">Admin panel</h:outputLink>
+                        <h:outputLink value="#{request.contextPath}/admin.xhtml" styleClass="nav-link">Admin panel</h:outputLink>
                     </ui:fragment>
 
                     <span class="nav-user">
@@ -60,7 +76,7 @@
 
                     <!-- A POST, not a link: a GET that changes server state can be triggered
                          by any image tag on any page the user visits. -->
-                    <h:form id="logoutForm">
+                    <h:form id="logoutForm" styleClass="nav-form">
                         <h:commandButton id="logout" value="Log out" action="#{userBean.logout}"
                                          styleClass="button-secondary"/>
                     </h:form>
@@ -69,6 +85,9 @@
             </nav>
         </div>
     </header>
+
+    <!-- A page's full-width teal banner, if it has one. -->
+    <ui:insert name="banner"/>
 
     <main class="main" id="content">
         <div class="container">
@@ -85,8 +104,19 @@
     </main>
 
     <footer class="site-footer">
-        <div class="container">
-            <ui:insert name="footer">Pet-Lee - a not-for-profit pet adoption exchange</ui:insert>
+        <div class="container footer-inner">
+            <ui:insert name="footer">
+                <div class="footer-brand">
+                    <!-- On a white disc: the teal mark would vanish into the dark teal band. -->
+                    <span class="footer-mark">
+                        <img src="#{request.contextPath}/resources/images/logo.svg"
+                             alt="" width="28" height="28"/>
+                    </span>
+                    <span class="footer-name">Pet-Lee</span>
+                    <span class="footer-tagline">Find your new companion</span>
+                </div>
+                <p class="footer-copy">&#169; 2026 Pet-Lee</p>
+            </ui:insert>
         </div>
     </footer>
 

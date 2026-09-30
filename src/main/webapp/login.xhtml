@@ -13,36 +13,44 @@
 
     <ui:define name="content">
 
-        <div class="panel panel-narrow">
-            <h1>Log in</h1>
+        <div class="auth-card">
+            <ui:include src="/WEB-INF/includes/authPanel.xhtml"/>
 
-            <h:form id="loginForm">
+            <div class="auth-form">
+                <h1>Log in</h1>
 
-                <div class="field">
-                    <h:outputLabel for="username" value="Username"/>
-                    <h:inputText id="username" value="#{userBean.username}" required="true"
-                                 requiredMessage="Required" autocomplete="username"/>
-                    <h:message for="username" styleClass="field-error"/>
-                </div>
+                <h:form id="loginForm">
+                    <div class="form-stack">
+                        <div class="field">
+                            <h:outputLabel for="username" value="Username"/>
+                            <h:inputText id="username" value="#{userBean.username}" required="true"
+                                         requiredMessage="Required" autocomplete="username"/>
+                            <h:message for="username" styleClass="field-error"/>
+                        </div>
 
-                <div class="field">
-                    <h:outputLabel for="password" value="Password"/>
-                    <h:inputSecret id="password" value="#{userBean.password}" required="true"
-                                   requiredMessage="Required" redisplay="false"
-                                   autocomplete="current-password"/>
-                    <h:message for="password" styleClass="field-error"/>
-                </div>
+                        <div class="field">
+                            <h:outputLabel for="password" value="Password"/>
+                            <h:inputSecret id="password" value="#{userBean.password}" required="true"
+                                           requiredMessage="Required" redisplay="false"
+                                           autocomplete="current-password"/>
+                            <h:message for="password" styleClass="field-error"/>
+                        </div>
+                    </div>
 
-                <div class="actions">
-                    <h:commandButton id="submit" value="Log in" action="#{userBean.login}"/>
-                </div>
-            </h:form>
+                    <div class="actions">
+                        <h:commandButton id="submit" value="Log in" action="#{userBean.login}"
+                                         styleClass="button-block"/>
+                    </div>
+                </h:form>
 
-            <p>
-                No account yet?
-                <h:outputLink value="#{request.contextPath}/register.xhtml">Register</h:outputLink>
-            </p>
+                <p class="auth-switch">
+                    No account yet?
+                    <h:outputLink value="#{request.contextPath}/register.xhtml">Register</h:outputLink>
+                </p>
+            </div>
         </div>
+
+        <ui:include src="/WEB-INF/includes/authScene.xhtml"/>
 
     </ui:define>
 

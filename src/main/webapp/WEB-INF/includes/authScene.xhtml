@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The picture under the login and register card: a puppy giving its paw to a hand, standing on
+     a thin teal line as wide as the card, with a one-line caption beneath. -->
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <div class="auth-scene">
+        <img class="auth-scene-image" src="#{request.contextPath}/resources/images/dog-hand.png"
+             alt="A puppy giving its paw to a person's hand" width="435" height="210"/>
+        <div class="auth-scene-line"></div>
+        <p class="auth-scene-caption">
+            <img src="#{request.contextPath}/resources/images/paw.svg" alt="" width="16" height="16"/>
+            Pet-Lee: a loving home for every pet
+        </p>
+    </div>
+
+</ui:composition>

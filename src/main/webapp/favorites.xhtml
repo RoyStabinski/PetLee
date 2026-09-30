@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The member's saved pets, as the same cards as the gallery with the heart filled. Members only:
+    PageAccessFilter sends a guest to the login page. Adopted pets stay listed, with a badge, so
+    the member sees what became of them; withdrawn ones are left out by the API.
+-->
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <f:metadata>
+        <f:viewAction action="#{favoriteBean.load}"/>
+    </f:metadata>
+
+    <ui:define name="title">My favourites - Pet-Lee</ui:define>
+
+    <!-- The card carousels. defer, and the script also waits for the DOM itself. -->
+    <ui:define name="head">
+        <script src="#{request.contextPath}/resources/js/carousel.js?v=#{initParam['petlee.ASSET_VERSION']}"
+                defer="defer"></script>
+    </ui:define>
+
+    <ui:define name="banner">
+        <div class="page-banner">
+            <div class="container">
+                <h1>My favourites</h1>
+            </div>
+        </div>
+    </ui:define>
+
+    <ui:define name="content">
+
+        <!-- Re-rendered when a heart is toggled, so an unsaved pet leaves the list at once. -->
+        <h:panelGroup id="favGrid" layout="block">
+
+            <ui:fragment rendered="#{favoriteBean.loadFailed}">
+                <p class="load-error" role="alert">Your favourites could not be loaded</p>
+            </ui:fragment>
+
+            <ui:fragment rendered="#{favoriteBean.noFavorites}">
+                <div class="empty-state">
+                    <img src="#{request.contextPath}/resources/images/paw.svg" alt="" width="48" height="48"/>
+                    <p>You have not saved any pets yet. Tap the heart on a pet to save it here.</p>
+                    <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button">
+                        Browse the gallery
+                    </h:outputLink>
+                </div>
+            </ui:fragment>
+
+            <ui:fragment rendered="#{not empty favoriteBean.favorites}">
+                <p class="section-lead">
+                    <h:outputFormat value="{0} saved {1}, newest first.">
+                        <f:param value="#{favoriteBean.count}"/>
+                        <f:param value="#{favoriteBean.count == 1 ? 'pet' : 'pets'}"/>
+                    </h:outputFormat>
+                </p>
+                <ul class="pet-grid">
+                    <ui:repeat value="#{favoriteBean.favorites}" var="pet">
+                        <ui:include src="/WEB-INF/includes/petCard.xhtml">
+                            <ui:param name="pet" value="#{pet}"/>
+                            <ui:param name="heartRender" value=":favGrid :navFavorites"/>
+                        </ui:include>
+                    </ui:repeat>
+                </ul>
+            </ui:fragment>
+
+        </h:panelGroup>
+
+    </ui:define>
+
+</ui:composition>

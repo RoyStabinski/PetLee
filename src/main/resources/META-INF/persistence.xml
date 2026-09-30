@@ -22,6 +22,8 @@
         <class>com.petlee.model.Category</class>
         <class>com.petlee.model.Pet</class>
         <class>com.petlee.model.PetImage</class>
+        <class>com.petlee.model.Favorite</class>
+        <class>com.petlee.model.FavoriteId</class>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
 
         <properties>

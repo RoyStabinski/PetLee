@@ -23,6 +23,14 @@
             <div class="page-banner">
                 <div class="container banner-row">
                     <h1>#{petDetailBean.pet.name}: adoption details</h1>
+                    <!-- Always shown, so a saved pet that has since been adopted can be un-saved;
+                         saving one that is no longer available answers with a message. -->
+                    <div class="banner-heart">
+                        <ui:include src="/WEB-INF/includes/heart.xhtml">
+                            <ui:param name="petId" value="#{petDetailBean.pet.id}"/>
+                            <ui:param name="render" value=":navFavorites"/>
+                        </ui:include>
+                    </div>
                     <ui:fragment rendered="#{petDetailBean.withdrawn}">
                         <span class="#{petDetailBean.statusStyle} badge-on-banner">
                             #{petDetailBean.pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn'}

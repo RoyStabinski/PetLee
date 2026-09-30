@@ -487,7 +487,9 @@ span.button, span.button-secondary, span.button-danger {
     align-items: start;
 }
 
-.filter-card { position: sticky; top: var(--space-2); }
+/* The left column: the filter, then (for a member) the "My favourites" card. */
+.gallery-side { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.filter-card { min-width: 0; }
 .filter-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .filter-fieldset > .field + .field { margin-top: var(--space-2); }
 
@@ -593,7 +595,133 @@ span.button, span.button-secondary, span.button-danger {
 .card-dot:focus-visible { outline: 2px solid var(--on-dark); outline-offset: 0; }
 
 /* Reserved for the favourite (heart) button the next task adds; empty until then. */
-.pet-card-slot { position: absolute; top: 12px; right: 12px; }
+.pet-card-slot { position: absolute; top: 12px; right: 12px; z-index: 2; }
+
+/* --- the favourite (heart) toggle: a 36px white circle; outline when not saved, orange when
+       saved. The orange is a graphic, not text: 3.2:1 against white meets the 3:1 it needs. --- */
+.heart-form { margin: 0; }
+
+.heart {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--teal-dark);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.heart:hover { color: var(--orange); transform: scale(1.08); }
+.heart:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.heart-icon { display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.heart.is-saved { color: var(--orange); }
+.heart.is-saved .heart-icon { fill: currentColor; }
+.banner-heart { flex: none; }
+.page-banner .heart:focus-visible { outline-color: var(--focus-on-dark); }
+
+/* A small number pill: the saved count in the navigation bar and on the favourites card. */
+.count-badge {
+    display: inline-block;
+    min-width: 22px;
+    margin-left: var(--space-half);
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--teal);
+    color: var(--on-dark);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+}
+
+.nav-favorites:empty { display: none; }
+
+/* --- "My favourites" on the home page --- */
+.fav-panel { padding: var(--space-3); }
+.fav-panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); margin-bottom: 12px; }
+
+.fav-panel-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0;
+    font-size: 1.125rem;
+}
+
+.fav-panel-title .icon { color: var(--orange); }
+.fav-empty { margin: 0; color: var(--muted); font-size: 0.875rem; }
+
+/* When the favourites list could not be read: said plainly, never shown as "nothing saved". */
+.load-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0;
+    padding: var(--space-1) 12px;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    background: var(--danger-tint);
+    color: var(--danger-dark);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.load-error::before {
+    content: "!";
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--danger);
+    color: var(--on-dark);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+.fav-list { display: flex; flex-direction: column; gap: var(--space-1); list-style: none; margin: 0; padding: 0; }
+.fav-row { display: flex; align-items: center; gap: var(--space-1); }
+
+.fav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-half);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    text-decoration: none;
+}
+
+/* An underline, not a tint: the muted age line would drop below 4.5:1 on a coloured row. */
+.fav-link:hover { color: var(--text); }
+.fav-link:hover .fav-name { text-decoration: underline; }
+.fav-thumb { display: block; flex: none; width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); }
+.fav-text { display: flex; flex-direction: column; min-width: 0; }
+.fav-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav-meta { font-size: 0.8125rem; color: var(--muted); }
+.fav-remove-form { margin: 0; flex: none; }
+
+.fav-remove {
+    width: 28px;
+    height: 28px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 1.125rem;
+    line-height: 1;
+}
+
+.fav-remove:hover { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
+.fav-all { display: inline-block; margin-top: 12px; font-weight: 700; }
+.section-lead { color: var(--text); margin-bottom: var(--space-2); }
 
 .pet-card-body { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; padding: var(--space-2); }
 .pet-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-1); }
@@ -962,7 +1090,6 @@ span.button, span.button-secondary, span.button-danger {
 /* Small tablet: every two-column layout stacks. */
 @media (max-width: 860px) {
     .gallery-layout, .profile-layout, .detail-layout { grid-template-columns: minmax(0, 1fr); }
-    .filter-card { position: static; }
     .form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .auth-card { grid-template-columns: minmax(0, 1fr); }
     .auth-panel { padding: var(--space-3); }

@@ -24,6 +24,9 @@
           href="#{request.contextPath}/resources/images/logo.svg?v=#{initParam['petlee.ASSET_VERSION']}"/>
     <link rel="stylesheet"
           href="#{request.contextPath}/resources/css/petlee.css?v=#{initParam['petlee.ASSET_VERSION']}"/>
+    <!-- Site-wide: the Space key for link-buttons, and focus kept across ajax updates. -->
+    <script src="#{request.contextPath}/resources/js/site.js?v=#{initParam['petlee.ASSET_VERSION']}"
+            defer="defer"></script>
     <!-- A page's own scripts, such as the carousel on petDetails.xhtml. -->
     <ui:insert name="head"/>
 </h:head>
@@ -62,7 +65,18 @@
                     <h:outputLink value="#{request.contextPath}/addPet.xhtml"
                                   styleClass="button button-accent">Add a pet</h:outputLink>
                     <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="nav-link">My listings</h:outputLink>
+                </ui:fragment>
 
+                <!-- Always rendered, even for a guest: every heart's ajax call names :navFavorites
+                     among its targets, and Faces refuses a target id that is not on the page. -->
+                <h:panelGroup id="navFavorites" styleClass="nav-favorites">
+                    <ui:fragment rendered="#{userBean.loggedIn}">
+                        <a class="nav-link" href="#{request.contextPath}/favorites.xhtml">Favourites
+                            <span class="count-badge">#{favoriteBean.count}<span class="sr-only"> saved</span></span></a>
+                    </ui:fragment>
+                </h:panelGroup>
+
+                <ui:fragment rendered="#{userBean.loggedIn}">
                     <!-- Administrator: the member links plus this one. -->
                     <ui:fragment rendered="#{userBean.admin}">
                         <h:outputLink value="#{request.contextPath}/admin.xhtml" styleClass="nav-link">Admin panel</h:outputLink>

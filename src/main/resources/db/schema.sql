@@ -77,3 +77,18 @@ CREATE INDEX IF NOT EXISTS idx_pet_image_pet ON pet_image (pet_id);
 
 -- At most one main image per pet, enforced by the database rather than trusted to the code.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_pet_image_main ON pet_image (pet_id) WHERE is_main;
+
+-- ---------------------------------------------------------------------------
+-- favorite: the pets a member has saved, one row per member and pet
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS favorite (
+    -- Deleting the member or the pet deletes the saved row with it.
+    user_id    BIGINT    NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    pet_id     BIGINT    NOT NULL REFERENCES pet (pet_id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL,
+    -- Also what makes saving idempotent: a second insert of the same pair is refused.
+    PRIMARY KEY (user_id, pet_id)
+);
+
+-- The primary key serves lookups by member; this one serves the cascade when a pet is deleted.
+CREATE INDEX IF NOT EXISTS idx_favorite_pet ON favorite (pet_id);

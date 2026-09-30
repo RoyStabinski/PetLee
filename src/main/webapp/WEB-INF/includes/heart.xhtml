@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The favourite (heart) button, on a gallery card and beside the name on the details page.
+
+    Parameters: petId, and render - the other ids the toggle refreshes besides this heart (the
+    "My favourites" card, the count in the navigation bar...). Every id named must exist on the
+    page, which is why the template always renders :navFavorites, even for a guest.
+
+    Its own small form, so the toggle submits nothing else and cannot trip a card's "See details"
+    or the carousel. A link rather than a button because only a link can hold the SVG; role,
+    aria-pressed and aria-label make it a toggle button to assistive technology, and site.js adds
+    the Space key a real button would have. A guest's click goes to the login page.
+-->
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
+
+    <h:form styleClass="heart-form">
+        <h:commandLink id="heart" styleClass="heart#{favoriteBean.isSaved(petId) ? ' is-saved' : ''}"
+                       action="#{favoriteBean.toggle(petId)}"
+                       title="#{favoriteBean.isSaved(petId) ? 'Remove from favourites' : 'Save to favourites'}"
+                       p:role="button"
+                       p:aria-pressed="#{favoriteBean.isSaved(petId)}"
+                       p:aria-label="#{favoriteBean.isSaved(petId) ? 'Remove from favourites' : 'Save to favourites'}">
+            <f:ajax execute="@this" render="@form :globalMessages #{render}"/>
+            <svg class="heart-icon" viewBox="0 0 24 24" width="20" height="20"
+                 aria-hidden="true" focusable="false">
+                <path d="M12 20.5s-7.5-4.7-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.6-7.5 10.3-7.5 10.3z"/>
+            </svg>
+        </h:commandLink>
+    </h:form>
+
+</ui:composition>

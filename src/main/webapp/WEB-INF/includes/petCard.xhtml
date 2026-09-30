@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    One pet card, shared by the gallery (index.xhtml) and the favourites page, as an <li> of a
+    ul.pet-grid. Parameters: pet (a PetDTO), and heartRender - what the heart refreshes besides
+    itself on that page.
+-->
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:ui="jakarta.faces.facelets">
+
+    <li class="pet-card">
+
+        <!-- A compact carousel, set up by the same carousel.js as the details page. The buttons
+             and dots are type="button" and the script stops their clicks, so browsing photos
+             never opens the listing. With one photo (or only the placeholder) no controls render. -->
+        <div class="pet-card-media" data-carousel="card" role="group"
+             aria-label="Photos of #{pet.name}">
+            <ui:repeat value="#{petBean.photosOf(pet)}" var="photo" varStatus="loop">
+                <img class="pet-card-photo carousel-slide#{loop.first ? ' is-current' : ''}"
+                     data-carousel-slide="" src="#{request.contextPath}#{photo}"
+                     width="400" height="300" loading="#{loop.first ? 'eager' : 'lazy'}"
+                     alt="#{petBean.photosOf(pet).size() gt 1 ? 'Photo ' += (loop.index + 1) += ' of ' += pet.name : pet.name}"/>
+            </ui:repeat>
+
+            <ui:fragment rendered="#{petBean.photosOf(pet).size() gt 1}">
+                <button type="button" class="card-nav card-nav-prev" data-carousel-prev=""
+                        aria-label="Previous photo of #{pet.name}" hidden="hidden">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M15 5l-7 7 7 7"/>
+                    </svg>
+                </button>
+                <button type="button" class="card-nav card-nav-next" data-carousel-next=""
+                        aria-label="Next photo of #{pet.name}" hidden="hidden">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                <div class="card-dots" data-carousel-dots="" hidden="hidden">
+                    <ui:repeat value="#{petBean.photosOf(pet)}" var="photo" varStatus="dot">
+                        <button type="button" class="card-dot" data-carousel-dot=""
+                                aria-current="#{dot.first}"
+                                aria-label="Show photo #{dot.index + 1} of #{petBean.photosOf(pet).size()}"></button>
+                    </ui:repeat>
+                </div>
+            </ui:fragment>
+
+            <!-- The top-right slot: the heart. -->
+            <div class="pet-card-slot">
+                <ui:include src="/WEB-INF/includes/heart.xhtml">
+                    <ui:param name="petId" value="#{pet.id}"/>
+                    <ui:param name="render" value="#{heartRender}"/>
+                </ui:include>
+            </div>
+        </div>
+
+        <div class="pet-card-body">
+            <div class="pet-card-heading">
+                <h3 class="pet-card-name">#{pet.name}</h3>
+                <!-- Only on the favourites page: the gallery lists available pets alone. -->
+                <ui:fragment rendered="#{pet.status == 'ADOPTED'}">
+                    <span class="#{petBean.statusStyle(pet)}">Adopted</span>
+                </ui:fragment>
+            </div>
+            <p class="pet-card-desc" title="#{pet.shortDesc}">#{pet.shortDesc}</p>
+
+            <p class="pet-card-meta">
+                <svg class="icon" viewBox="0 0 24 24"
+                     width="16" height="16" fill="currentColor"
+                     aria-hidden="true" focusable="false">
+                    <ellipse cx="6" cy="10" rx="2.2" ry="2.8"/>
+                    <ellipse cx="10" cy="5.5" rx="2.2" ry="2.8"/>
+                    <ellipse cx="14" cy="5.5" rx="2.2" ry="2.8"/>
+                    <ellipse cx="18" cy="10" rx="2.2" ry="2.8"/>
+                    <path d="M12 11c-3.5 0-6 4-6 6.5 0 2 1.6 3 3.2 3 1.2 0 1.8-.6 2.8-.6s1.6.6 2.8.6c1.6 0 3.2-1 3.2-3 0-2.5-2.5-6.5-6-6.5z"/>
+                </svg>
+                <ui:fragment rendered="#{not empty petBean.ageOf(pet)}">
+                    <span class="meta-item">#{petBean.ageOf(pet)}</span>
+                </ui:fragment>
+                <span class="meta-item">#{pet.size == 'SMALL' ? 'Small' : (pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</span>
+                <span class="meta-item">#{pet.gender == 'MALE' ? 'Male' : 'Female'}</span>
+            </p>
+
+            <h:form styleClass="pet-card-action">
+                <h:commandLink value="See details" styleClass="button button-block"
+                               action="#{petBean.viewDetails(pet.id)}"/>
+            </h:form>
+        </div>
+
+    </li>
+
+</ui:composition>

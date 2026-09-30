@@ -24,7 +24,7 @@
          whenever either file changes, so browsers fetch the new copy instead of a cached one. -->
     <context-param>
         <param-name>petlee.ASSET_VERSION</param-name>
-        <param-value>3</param-value>
+        <param-value>5</param-value>
     </context-param>
 
     <!-- 5 MB matches ImageStore.MAX_BYTES; the request cap leaves room for the rest of the form. -->

@@ -47,6 +47,15 @@ Both are idempotent. `src/main/resources/db/README.md` covers the schema in more
 how to create the least-privileged `petlee_app` role the server's connection pool authenticates as.
 Create that role before the next step.
 
+**Upgrading an existing database** instead of creating one: apply the migrations it has not had
+yet, in number order, as described in `src/main/resources/db/README.md#migrations`. The latest,
+`migrate-002-favorite.sql`, adds the `favorite` table behind the favourites feature; a build
+with that feature fails on the favourites pages and hearts until it has been run:
+
+```bash
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
+```
+
 ### 3. WildFly: JDBC driver and DataSource
 
 The application never opens its own JDBC connection and names no driver class; it looks up the
@@ -227,6 +236,10 @@ session if there is one.
 | GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
 | GET | `/api/admin/category-counts` | admin — listings per category id, e.g. `{"1": 4}`; unused categories are absent |
+| GET | `/api/favorites` | auth — the caller's saved pets, newest saved first, each with its `status`; withdrawn (REMOVED) pets are left out, adopted ones kept |
+| GET | `/api/favorites/ids` | auth — the ids of the caller's saved pets, e.g. `[7, 12]`, for marking hearts in one call |
+| PUT | `/api/favorites/{petId}` | auth — saves the pet; 204. Idempotent: saving it again is also 204. 404 if the pet does not exist or is not AVAILABLE |
+| DELETE | `/api/favorites/{petId}` | auth — forgets the pet; 204. Idempotent: 204 even if it was not saved |
 
 Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, status
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as
@@ -247,9 +260,11 @@ curl -X PUT -H "Authorization: Bearer <token>" \
 ```
 
 A listing has up to five photographs, and once it has any, exactly one of them is main. The
-main one is the `imageUrl` of every pet the API returns, and the only one the gallery, the
-owner's listings and the admin table show; `GET /api/pets/{id}` also lists all of them in
-`images`, oldest first, for the details page. `imageUrl` is null for a pet with no photographs.
+main one is the `imageUrl` of every pet the API returns, and the one the owner's listings and
+the admin table show. Every pet in a list also carries `imageUrls`, all of them with the main
+one first, for the gallery card's carousel; `GET /api/pets/{id}` lists them in `images`, oldest
+first, for the details page. `imageUrl` is null, and `imageUrls` empty, for a pet with no
+photographs.
 
 `POST /api/pets/{id}/images` adds one photograph per request. The part must be a JPEG, PNG, GIF
 or WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400, and a
@@ -259,6 +274,17 @@ sixth photograph is a 409. A listing's first photograph becomes its main one:
 curl -H "Authorization: Bearer <token>" \
      -F "file=@rex.jpg;type=image/jpeg" \
      http://localhost:8080/pet-lee/api/pets/7/images
+```
+
+A member's favourites are theirs alone: every `/api/favorites` call acts for whoever the token
+or session belongs to, and no endpoint takes another user's id. They live in the `favorite`
+table, one row per member and pet, keyed by the pair, so saving twice cannot create a duplicate
+and two simultaneous saves both succeed. Deleting the member or the pet deletes the row with it.
+
+```bash
+curl -X PUT    -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/favorites/7
+curl           -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/favorites/ids
+curl -X DELETE -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/favorites/7
 ```
 
 Deleting the main photograph makes the oldest remaining one main. An `imageId` that belongs to

@@ -20,7 +20,8 @@ import java.util.logging.Logger;
 
 /**
  * Keeps guests off the pages that are not for them, by allow-list, so a page added later is
- * protected by default.
+ * protected by default. The members-only pages - addPet, editPet, profile and favorites - are
+ * therefore listed nowhere: not being in {@link #PUBLIC_VIEWS} is what sends a guest to log in.
  *
  * <p>Convenience, not enforcement: the services and {@code @Secured} already refuse the
  * operations behind these pages, and no REST check may be weakened because this filter exists.

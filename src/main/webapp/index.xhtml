@@ -8,6 +8,8 @@
 
     <f:metadata>
         <f:viewAction action="#{petBean.loadGallery}"/>
+        <!-- The saved pets for the "My favourites" card; does nothing for a guest. -->
+        <f:viewAction action="#{favoriteBean.load}"/>
     </f:metadata>
 
     <ui:define name="title">Pets looking for a home - Pet-Lee</ui:define>
@@ -30,78 +32,135 @@
 
         <div class="gallery-layout">
 
-            <h:form id="filterForm" styleClass="card-box filter-card">
-                <fieldset class="filter-fieldset">
-                    <legend class="filter-title">
-                        <svg class="icon" viewBox="0 0 24 24"
-                             width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"
-                             stroke-linecap="round" stroke-linejoin="round"
-                             aria-hidden="true" focusable="false">
-                            <path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>
-                        </svg>
-                        Smart filter
-                    </legend>
+            <div class="gallery-side">
+                <h:form id="filterForm" styleClass="card-box filter-card">
+                    <fieldset class="filter-fieldset">
+                        <legend class="filter-title">
+                            <svg class="icon" viewBox="0 0 24 24"
+                                 width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"
+                                 stroke-linecap="round" stroke-linejoin="round"
+                                 aria-hidden="true" focusable="false">
+                                <path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>
+                            </svg>
+                            Smart filter
+                        </legend>
 
-                    <div class="field">
-                        <h:outputLabel for="category" value="Category"/>
-                        <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
-                            <f:selectItem itemValue="#{null}" itemLabel="Any"/>
-                            <f:selectItems value="#{petBean.categories}" var="c"
-                                           itemValue="#{c.id}" itemLabel="#{c.name}"/>
-                        </h:selectOneMenu>
-                    </div>
+                        <div class="field">
+                            <h:outputLabel for="category" value="Category"/>
+                            <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
+                                <f:selectItem itemValue="#{null}" itemLabel="Any"/>
+                                <f:selectItems value="#{petBean.categories}" var="c"
+                                               itemValue="#{c.id}" itemLabel="#{c.name}"/>
+                            </h:selectOneMenu>
+                        </div>
 
-                    <div class="field">
-                        <h:outputLabel for="size" value="Size"/>
-                        <h:selectOneMenu id="size" value="#{petBean.selectedSize}">
-                            <f:selectItems value="#{petBean.sizeOptions}"/>
-                        </h:selectOneMenu>
-                    </div>
+                        <div class="field">
+                            <h:outputLabel for="size" value="Size"/>
+                            <h:selectOneMenu id="size" value="#{petBean.selectedSize}">
+                                <f:selectItems value="#{petBean.sizeOptions}"/>
+                            </h:selectOneMenu>
+                        </div>
 
-                    <div class="field">
-                        <h:outputLabel for="gender" value="Gender"/>
-                        <h:selectOneMenu id="gender" value="#{petBean.selectedGender}">
-                            <f:selectItems value="#{petBean.genderOptions}"/>
-                        </h:selectOneMenu>
-                    </div>
+                        <div class="field">
+                            <h:outputLabel for="gender" value="Gender"/>
+                            <h:selectOneMenu id="gender" value="#{petBean.selectedGender}">
+                                <f:selectItems value="#{petBean.genderOptions}"/>
+                            </h:selectOneMenu>
+                        </div>
 
-                    <div class="field">
-                        <h:outputLabel for="minAge" value="Age from"/>
-                        <h:inputText id="minAge" value="#{petBean.minAge}" type="number"
-                                     p:min="0" p:max="50"
-                                     converterMessage="An age is a whole number from 0 to 50."
-                                     validatorMessage="An age is a whole number from 0 to 50.">
-                            <f:validateLongRange minimum="0" maximum="50"/>
-                        </h:inputText>
-                        <h:message for="minAge" styleClass="field-error"/>
-                    </div>
+                        <div class="field">
+                            <h:outputLabel for="minAge" value="Age from"/>
+                            <h:inputText id="minAge" value="#{petBean.minAge}" type="number"
+                                         p:min="0" p:max="50"
+                                         converterMessage="An age is a whole number from 0 to 50."
+                                         validatorMessage="An age is a whole number from 0 to 50.">
+                                <f:validateLongRange minimum="0" maximum="50"/>
+                            </h:inputText>
+                            <h:message for="minAge" styleClass="field-error"/>
+                        </div>
 
-                    <div class="field">
-                        <h:outputLabel for="maxAge" value="Age to"/>
-                        <h:inputText id="maxAge" value="#{petBean.maxAge}" type="number"
-                                     p:min="0" p:max="50"
-                                     converterMessage="An age is a whole number from 0 to 50."
-                                     validatorMessage="An age is a whole number from 0 to 50.">
-                            <f:validateLongRange minimum="0" maximum="50"/>
-                        </h:inputText>
-                        <h:message for="maxAge" styleClass="field-error"/>
-                    </div>
+                        <div class="field">
+                            <h:outputLabel for="maxAge" value="Age to"/>
+                            <h:inputText id="maxAge" value="#{petBean.maxAge}" type="number"
+                                         p:min="0" p:max="50"
+                                         converterMessage="An age is a whole number from 0 to 50."
+                                         validatorMessage="An age is a whole number from 0 to 50.">
+                                <f:validateLongRange minimum="0" maximum="50"/>
+                            </h:inputText>
+                            <h:message for="maxAge" styleClass="field-error"/>
+                        </div>
 
-                    <!-- Apply re-renders @form so a field's validation message shows. Clear
-                         executes only itself, so an invalid age cannot block it, and resetValues
-                         makes the inputs show the cleared values rather than what was typed. -->
-                    <div class="actions actions-split">
-                        <h:commandButton id="apply" value="Apply" action="#{petBean.applyFilter}">
-                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
-                        </h:commandButton>
-                        <h:commandButton id="clear" value="Clear" action="#{petBean.clearFilters}"
-                                         styleClass="button-secondary">
-                            <f:ajax execute="@this" render=":globalMessages :galleryGrid @form"
-                                    resetValues="true"/>
-                        </h:commandButton>
-                    </div>
-                </fieldset>
-            </h:form>
+                        <!-- Apply re-renders @form so a field's validation message shows. Clear
+                             executes only itself, so an invalid age cannot block it, and resetValues
+                             makes the inputs show the cleared values rather than what was typed. -->
+                        <div class="actions actions-split">
+                            <h:commandButton id="apply" value="Apply" action="#{petBean.applyFilter}">
+                                <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
+                            </h:commandButton>
+                            <h:commandButton id="clear" value="Clear" action="#{petBean.clearFilters}"
+                                             styleClass="button-secondary">
+                                <f:ajax execute="@this" render=":globalMessages :galleryGrid @form"
+                                        resetValues="true"/>
+                            </h:commandButton>
+                        </div>
+                    </fieldset>
+                </h:form>
+
+                <!-- Always rendered, as the target the hearts refresh; its content is members only. -->
+                <h:panelGroup id="favPanel" layout="block">
+                    <ui:fragment rendered="#{userBean.loggedIn}">
+                        <section class="card-box fav-panel" aria-labelledby="favTitle">
+                            <div class="fav-panel-head">
+                                <h2 id="favTitle" class="fav-panel-title">
+                                    <svg class="icon" viewBox="0 0 24 24" width="20" height="20"
+                                         fill="currentColor" aria-hidden="true" focusable="false">
+                                        <path d="M12 20.5s-7.5-4.7-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.6-7.5 10.3-7.5 10.3z"/>
+                                    </svg>
+                                    My favourites
+                                </h2>
+                                <span class="count-badge">#{favoriteBean.count}<span class="sr-only"> saved</span></span>
+                            </div>
+
+                            <ui:fragment rendered="#{favoriteBean.loadFailed}">
+                                <p class="load-error" role="alert">Your favourites could not be loaded</p>
+                            </ui:fragment>
+
+                            <ui:fragment rendered="#{favoriteBean.noFavorites}">
+                                <p class="fav-empty">Tap the heart on a pet to save it here</p>
+                            </ui:fragment>
+
+                            <ui:fragment rendered="#{not empty favoriteBean.favorites}">
+                                <ul class="fav-list">
+                                    <ui:repeat value="#{favoriteBean.panelFavorites}" var="fav">
+                                        <li class="fav-row">
+                                            <a class="fav-link" href="#{request.contextPath}/petDetails.xhtml?id=#{fav.id}">
+                                                <img class="fav-thumb" src="#{request.contextPath}#{petBean.imageUrlOf(fav)}"
+                                                     alt="" width="48" height="48" loading="lazy"/>
+                                                <span class="fav-text">
+                                                    <span class="fav-name">#{fav.name}</span>
+                                                    <span class="fav-meta">#{fav.status == 'ADOPTED' ? 'Adopted' : petBean.ageOf(fav)}</span>
+                                                </span>
+                                            </a>
+                                            <h:form styleClass="fav-remove-form">
+                                                <h:commandButton value="&#215;" styleClass="fav-remove"
+                                                                 action="#{favoriteBean.remove(fav.id)}"
+                                                                 title="Remove #{fav.name} from favourites"
+                                                                 p:aria-label="Remove #{fav.name} from favourites">
+                                                    <f:ajax execute="@this"
+                                                            render=":favPanel :galleryGrid :navFavorites :globalMessages"/>
+                                                </h:commandButton>
+                                            </h:form>
+                                        </li>
+                                    </ui:repeat>
+                                </ul>
+                                <a class="fav-all" href="#{request.contextPath}/favorites.xhtml">
+                                    See all<span class="sr-only"> #{favoriteBean.count} favourites</span>
+                                </a>
+                            </ui:fragment>
+                        </section>
+                    </ui:fragment>
+                </h:panelGroup>
+            </div>
 
             <h:panelGroup id="galleryGrid" layout="block" styleClass="gallery-results">
 
@@ -123,80 +182,10 @@
                 <ui:fragment rendered="#{not petBean['empty']}">
                     <ul class="pet-grid">
                         <ui:repeat value="#{petBean.pets}" var="pet">
-                            <li class="pet-card">
-
-                                <!-- No contextPath: h:graphicImage prepends it itself for a "/" value. -->
-                                <!-- A compact carousel, set up by the same carousel.js as the details
-                                     page. The buttons and dots are type="button" and the script stops
-                                     their clicks, so browsing photos never opens the listing. With
-                                     one photo (or only the placeholder) no controls render. -->
-                                <div class="pet-card-media" data-carousel="card" role="group"
-                                     aria-label="Photos of #{pet.name}">
-                                    <ui:repeat value="#{petBean.photosOf(pet)}" var="photo" varStatus="loop">
-                                        <img class="pet-card-photo carousel-slide#{loop.first ? ' is-current' : ''}"
-                                             data-carousel-slide="" src="#{request.contextPath}#{photo}"
-                                             width="400" height="300" loading="#{loop.first ? 'eager' : 'lazy'}"
-                                             alt="#{petBean.photosOf(pet).size() gt 1 ? 'Photo ' += (loop.index + 1) += ' of ' += pet.name : pet.name}"/>
-                                    </ui:repeat>
-
-                                    <ui:fragment rendered="#{petBean.photosOf(pet).size() gt 1}">
-                                        <button type="button" class="card-nav card-nav-prev" data-carousel-prev=""
-                                                aria-label="Previous photo of #{pet.name}" hidden="hidden">
-                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-                                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                 stroke-linejoin="round" aria-hidden="true" focusable="false">
-                                                <path d="M15 5l-7 7 7 7"/>
-                                            </svg>
-                                        </button>
-                                        <button type="button" class="card-nav card-nav-next" data-carousel-next=""
-                                                aria-label="Next photo of #{pet.name}" hidden="hidden">
-                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-                                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                 stroke-linejoin="round" aria-hidden="true" focusable="false">
-                                                <path d="M9 5l7 7-7 7"/>
-                                            </svg>
-                                        </button>
-                                        <div class="card-dots" data-carousel-dots="" hidden="hidden">
-                                            <ui:repeat value="#{petBean.photosOf(pet)}" var="photo" varStatus="dot">
-                                                <button type="button" class="card-dot" data-carousel-dot=""
-                                                        aria-current="#{dot.first}"
-                                                        aria-label="Show photo #{dot.index + 1} of #{petBean.photosOf(pet).size()}"></button>
-                                            </ui:repeat>
-                                        </div>
-                                    </ui:fragment>
-
-                                    <!-- Reserved for the favourite (heart) button; empty on purpose. -->
-                                    <div class="pet-card-slot"></div>
-                                </div>
-
-                                <div class="pet-card-body">
-                                    <h3 class="pet-card-name">#{pet.name}</h3>
-                                    <p class="pet-card-desc" title="#{pet.shortDesc}">#{pet.shortDesc}</p>
-
-                                    <p class="pet-card-meta">
-                                        <svg class="icon" viewBox="0 0 24 24"
-                                             width="16" height="16" fill="currentColor"
-                                             aria-hidden="true" focusable="false">
-                                            <ellipse cx="6" cy="10" rx="2.2" ry="2.8"/>
-                                            <ellipse cx="10" cy="5.5" rx="2.2" ry="2.8"/>
-                                            <ellipse cx="14" cy="5.5" rx="2.2" ry="2.8"/>
-                                            <ellipse cx="18" cy="10" rx="2.2" ry="2.8"/>
-                                            <path d="M12 11c-3.5 0-6 4-6 6.5 0 2 1.6 3 3.2 3 1.2 0 1.8-.6 2.8-.6s1.6.6 2.8.6c1.6 0 3.2-1 3.2-3 0-2.5-2.5-6.5-6-6.5z"/>
-                                        </svg>
-                                        <ui:fragment rendered="#{not empty petBean.ageOf(pet)}">
-                                            <span class="meta-item">#{petBean.ageOf(pet)}</span>
-                                        </ui:fragment>
-                                        <span class="meta-item">#{pet.size == 'SMALL' ? 'Small' : (pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</span>
-                                        <span class="meta-item">#{pet.gender == 'MALE' ? 'Male' : 'Female'}</span>
-                                    </p>
-
-                                    <h:form styleClass="pet-card-action">
-                                        <h:commandLink value="See details" styleClass="button button-block"
-                                                       action="#{petBean.viewDetails(pet.id)}"/>
-                                    </h:form>
-                                </div>
-
-                            </li>
+                            <ui:include src="/WEB-INF/includes/petCard.xhtml">
+                                <ui:param name="pet" value="#{pet}"/>
+                                <ui:param name="heartRender" value=":favPanel :navFavorites"/>
+                            </ui:include>
                         </ui:repeat>
                     </ul>
                 </ui:fragment>

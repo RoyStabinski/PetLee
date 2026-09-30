@@ -4,9 +4,10 @@ Two scripts, applied in order to a database you create first. No migration tool 
 
 | File | What it does |
 |---|---|
-| `schema.sql` | Creates `users`, `category`, `pet` and `pet_image`, their constraints and indexes |
+| `schema.sql` | Creates `users`, `category`, `pet`, `pet_image` and `favorite`, their constraints and indexes |
 | `seed.sql` | Inserts the four categories and the `admin` account |
 | `migrate-001-pet-image.sql` | Upgrades an existing database from one photograph per pet to `pet_image` — see [Migrations](#migrations) |
+| `migrate-002-favorite.sql` | Adds the `favorite` table to an existing database — see [Migrations](#migrations) |
 
 Both are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
 provider never touches the schema — `persistence.xml` sets
@@ -78,6 +79,36 @@ are copied as they are.
 
 To undo it, restore the backup: `pg_restore -U postgres -d petlee --clean petlee-before-001.dump`.
 
+### 002 — `favorite`
+
+Needed if `\dt` does not list `favorite`. The script creates the table (primary key
+`(user_id, pet_id)`, both columns cascading on delete), the index `idx_favorite_pet`, and grants
+`petlee_app` `SELECT, INSERT, DELETE` on it — no `UPDATE`, since a favourite is only ever added
+or removed, and no sequence, since the key is the pair. It only adds, so nothing existing
+changes, and the old build keeps working against the migrated database.
+
+1. Back up first, as for 001:
+
+   ```bash
+   pg_dump -U postgres -Fc -f petlee-before-002.dump petlee
+   ```
+
+2. Run it as `postgres`. One transaction; every statement is `IF NOT EXISTS`, so running it
+   twice is harmless. It fails, changing nothing, if the `petlee_app` role does not exist.
+
+   ```bash
+   psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
+   ```
+
+3. Check, then deploy the build that has the favourites feature:
+
+   ```sql
+   \d favorite                              -- favorite_pkey (user_id, pet_id) and idx_favorite_pet
+   \dp favorite                             -- petlee_app=ard (INSERT, SELECT, DELETE)
+   ```
+
+To undo it: `DROP TABLE favorite;` — nothing else refers to it.
+
 ## The application's database role
 
 The server's connection pool should authenticate as `petlee_app`, not as `postgres`:
@@ -96,7 +127,7 @@ The password is stored only in the server's JDBC pool, never in this repository.
 ## Verifying
 
 ```sql
-\dt                                                    -- users, category, pet, pet_image
+\dt                                                    -- users, category, pet, pet_image, favorite
 SELECT count(*) FROM category;                         -- 4
 SELECT count(*) FROM users WHERE user_name = 'admin';  -- 1
 \d users                                               -- ux_users_email_lower present

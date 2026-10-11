@@ -162,7 +162,20 @@ svg { flex: none; }
 }
 
 .nav-link:hover { color: var(--teal); border-bottom-color: var(--teal); }
-.nav-user { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.875rem; color: var(--muted); }
+.nav-user {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-half) 12px var(--space-half) var(--space-half);
+    border-radius: var(--radius-pill);
+    font-size: 0.875rem;
+    color: var(--muted);
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-user:hover { background: var(--teal-tint); color: var(--teal-dark); }
+.nav-user:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .nav-form { margin: 0; }
 
 /* --- the full-width teal banner a page may put under the header --- */
@@ -513,6 +526,7 @@ span.button, span.button-secondary, span.button-danger {
 
 .actions-split { display: grid; grid-template-columns: 1fr 1fr; margin-top: var(--space-3); }
 .gallery-results { min-width: 0; }
+.result-count { margin: 0 0 var(--space-2); font-weight: 700; color: var(--text); }
 
 /* The card grid, shared by the gallery and the profile: 3, then 2, then 1 a row. */
 .pet-grid {
@@ -1025,6 +1039,8 @@ span.button, span.button-secondary, span.button-danger {
 .contact-list .icon { color: var(--brown-soft); }
 .contact-list a { color: var(--on-dark); font-weight: 600; }
 .contact-list a:hover { color: var(--brown-soft); }
+.contact-actions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.contact-actions > * { flex: 1 1 auto; }
 
 /* ------------------------------------------------------------------ profile */
 .profile-layout {

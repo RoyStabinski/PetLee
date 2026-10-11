@@ -121,6 +121,19 @@ public class PetDetailBean implements Serializable {
         return pet != null && pet.ownerEmail() != null;
     }
 
+    /** @return the Call button's {@code tel:} link, or null when there is no phone number */
+    public String getCallUrl() { return pet == null ? null : ContactLinks.call(pet.ownerPhone()); }
+
+    /** @return the Email button's {@code mailto:} link, or null when there is no address */
+    public String getEmailUrl() {
+        return pet == null ? null : ContactLinks.email(pet.ownerEmail(), pet.name());
+    }
+
+    /** @return the WhatsApp button's link, or null unless the owner's number is a mobile one */
+    public String getWhatsAppUrl() {
+        return pet == null ? null : ContactLinks.whatsApp(pet.ownerPhone(), pet.name());
+    }
+
     /** @return the owner's initials, for the contact card when the owner has no photo */
     public String getOwnerInitials() {
         return UserBean.initialsOf(pet == null ? null : pet.ownerName());

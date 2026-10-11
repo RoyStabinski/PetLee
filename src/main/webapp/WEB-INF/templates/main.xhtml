@@ -64,7 +64,7 @@
                 <ui:fragment rendered="#{userBean.loggedIn}">
                     <h:outputLink value="#{request.contextPath}/addPet.xhtml"
                                   styleClass="button button-accent">Add a pet</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="nav-link">My listings</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="nav-link">My profile</h:outputLink>
                 </ui:fragment>
 
                 <!-- Always rendered, even for a guest: every heart's ajax call names :navFavorites
@@ -82,7 +82,8 @@
                         <h:outputLink value="#{request.contextPath}/admin.xhtml" styleClass="nav-link">Admin panel</h:outputLink>
                     </ui:fragment>
 
-                    <span class="nav-user">
+                    <!-- The avatar and name together are one link to the profile page. -->
+                    <a class="nav-user" href="#{request.contextPath}/profile.xhtml" aria-label="My profile">
                         <!-- Decorative: the text beside it names the user. -->
                         <ui:fragment rendered="#{not empty userBean.avatarUrl}">
                             <h:graphicImage value="#{userBean.avatarUrl}" alt="" width="32" height="32"
@@ -94,7 +95,7 @@
                         <h:outputFormat value="Signed in as {0}">
                             <f:param value="#{userBean.displayName}"/>
                         </h:outputFormat>
-                    </span>
+                    </a>
 
                     <!-- A POST, not a link: a GET that changes server state can be triggered
                          by any image tag on any page the user visits. -->

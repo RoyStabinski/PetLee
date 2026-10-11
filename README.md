@@ -186,6 +186,9 @@ no database, server or network, and cover:
 - `TokenStoreTest`: issuing, resolving and revoking tokens, `revokeAllExcept`, the 30-minute idle
   expiry and its sliding renewal (on a test clock, so nothing waits), and 32 threads sharing one
   store without losing or reviving a token.
+- `PetRepositoryTest`: the search text's LIKE pattern, lower-cased with `\`, `%` and `_` escaped.
+- `ContactLinksTest`: the contact card's links; WhatsApp for mobile numbers only, never for a
+  landline or a missing number.
 
 `mvn package` runs the same tests before it builds the WAR, and builds nothing if one fails.
 
@@ -266,7 +269,7 @@ session if there is one.
 | GET | `/api/categories` | open |
 | POST | `/api/categories` | admin — body `{name}`; 201 Created with `Location: /api/categories/{id}` and the created category as the body |
 | DELETE | `/api/categories/{id}` | admin — 204; 409 while listings still use it |
-| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
+| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge`, `q` |
 | GET | `/api/pets/{id}` | open — owner contact fields (`ownerName`, `ownerPhone`, `ownerEmail`, `ownerAvatarUrl`) only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth — 201 Created with `Location: /api/pets/{id}` and the created listing as the body |
@@ -297,6 +300,22 @@ creation, and answers the same whether or not the pet was already saved.
 `minAge` and `maxAge` are whole numbers from 0 to 50, and either may be given alone; a listing
 whose age is unknown is left out once either is given. A value outside that range, or `minAge`
 greater than `maxAge`, is a 400 naming the problem.
+
+`q` is free-text search: a pet matches when its name or its breed contains the text, ignoring
+case. It is trimmed and ignored when blank, and more than 50 characters is a 400. `%` and `_`
+match only themselves, not any text, and the value is bound as a query parameter, never pasted
+into the query:
+
+```bash
+curl "http://localhost:8080/pet-lee/api/pets?q=shep&size=LARGE"
+```
+
+On a pet's page, a signed-in member sees Call (`tel:`) and Email (`mailto:`, with the subject
+"About <pet name> on Pet-Lee") buttons in the contact card, and a WhatsApp button when the
+owner's number is a mobile one (05X). That button opens `https://wa.me/9725XXXXXXXX` (the stored
+`05X-XXXXXXX` with the leading 0 dropped and 972 added) in a new tab, with a ready-made opening
+message. Landlines and 07X numbers get no WhatsApp button, and a button whose phone number or
+address is missing is not shown.
 
 `PUT /api/pets/{id}/status` accepts only AVAILABLE to ADOPTED and back. It is a 409 when an
 administrator has withdrawn the listing (only an administrator can restore it), when the

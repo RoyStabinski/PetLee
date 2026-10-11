@@ -45,6 +45,18 @@
                             Smart filter
                         </legend>
 
+                        <!-- The API trims the text, ignores it when blank and refuses more than 50
+                             characters; the length check here just says so beside the field. -->
+                        <div class="field">
+                            <h:outputLabel for="search" value="Search"/>
+                            <h:inputText id="search" value="#{petBean.search}" type="search"
+                                         p:placeholder="Name or breed" p:maxlength="50"
+                                         validatorMessage="Search is at most 50 characters.">
+                                <f:validateLength maximum="50"/>
+                            </h:inputText>
+                            <h:message for="search" styleClass="field-error"/>
+                        </div>
+
                         <div class="field">
                             <h:outputLabel for="category" value="Category"/>
                             <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
@@ -180,6 +192,7 @@
                 </ui:fragment>
 
                 <ui:fragment rendered="#{not petBean['empty']}">
+                    <p class="result-count" role="status">#{petBean.resultCountLabel}</p>
                     <ul class="pet-grid">
                         <ui:repeat value="#{petBean.pets}" var="pet">
                             <ui:include src="/WEB-INF/includes/petCard.xhtml">

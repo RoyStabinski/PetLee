@@ -48,6 +48,7 @@ public class PetBean implements Serializable {
     private String selectedGender;
     private Integer minAge;
     private Integer maxAge;
+    private String search;
 
     /** The owner's own listings, every status included; a serializable list, as above. */
     @SuppressWarnings("serial") private List<PetDTO> myListings;
@@ -90,12 +91,14 @@ public class PetBean implements Serializable {
         selectedGender = null;
         minAge = null;
         maxAge = null;
+        search = null;
         return load();
     }
 
     private String load() {
         try {
-            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender, minAge, maxAge);
+            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender, minAge, maxAge,
+                    search);
         } catch (ApiException e) {
             if (e.getStatus() == 401) {
                 return Messages.sessionExpired();
@@ -334,6 +337,12 @@ public class PetBean implements Serializable {
     /** @return whether no listing matches the gallery filters */
     public boolean isEmpty() { return pets.isEmpty(); }
 
+    /** @return the line above the gallery: "1 pet found" or "N pets found" */
+    public String getResultCountLabel() {
+        int count = pets.size();
+        return count + (count == 1 ? " pet found" : " pets found");
+    }
+
     /** @return the category filter, or null for any */
     public Integer getSelectedCategoryId() { return selectedCategoryId; }
 
@@ -363,4 +372,10 @@ public class PetBean implements Serializable {
 
     /** @param v the oldest age to show, or null for no upper bound */
     public void setMaxAge(Integer v) { this.maxAge = v; }
+
+    /** @return the text a name or breed must contain, or null for any */
+    public String getSearch() { return search; }
+
+    /** @param v the text a name or breed must contain, or null for any */
+    public void setSearch(String v) { this.search = v; }
 }

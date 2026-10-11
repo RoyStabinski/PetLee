@@ -28,7 +28,7 @@ public class ErrorMapper implements ExceptionMapper<Throwable> {
     @Override
     public Response toResponse(Throwable failure) {
         if (failure instanceof AppException app) {
-            return json(app.getStatus(), "ERROR", app.getMessage());
+            return json(app.getStatus(), app.getCode(), app.getMessage());
         }
         if (failure instanceof WebApplicationException web) {
             return json(web.getResponse().getStatus(), "ERROR", web.getMessage());

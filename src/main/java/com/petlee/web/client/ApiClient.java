@@ -19,6 +19,8 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -170,6 +172,43 @@ public class ApiClient {
      */
     public void delete(String path) {
         call("DELETE", path, Map.of(), null, new GenericType<>(Void.class));
+    }
+
+    /**
+     * {@code DELETE} a resource whose response carries a JSON body.
+     *
+     * @param path the path under {@code /api}
+     * @param type the type to read the response into
+     * @return the response body
+     * @throws ApiException on a non-2xx response or when the API cannot be reached
+     */
+    public <T> T delete(String path, Class<T> type) {
+        return call("DELETE", path, Map.of(), null, new GenericType<>(type));
+    }
+
+    /**
+     * Builds the multipart part named {@code file} that the photo endpoints expect. The stream
+     * is read when the request is sent, not here, and is not closed.
+     *
+     * @param content     the file's bytes
+     * @param fileName    the file name to send, may be null
+     * @param contentType its media type, such as {@code image/png}; null is sent as
+     *                    {@code application/octet-stream}, which the API refuses
+     * @return the part
+     * @throws ApiException 400 if the part cannot be built
+     */
+    public static EntityPart filePart(InputStream content, String fileName, String contentType) {
+        try {
+            EntityPart.Builder builder = EntityPart.withName("file").content(content)
+                    .mediaType(contentType == null ? "application/octet-stream" : contentType);
+            if (fileName != null && !fileName.isBlank()) {
+                builder.fileName(fileName);
+            }
+            return builder.build();
+        } catch (IOException | IllegalArgumentException unbuildable) {
+            // IllegalArgumentException: the browser sent a content type that does not parse.
+            throw new ApiException(400, "UPLOAD_FAILED", "The photo could not be read.", unbuildable);
+        }
     }
 
     private static Entity<?> json(Object body) {

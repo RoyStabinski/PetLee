@@ -162,7 +162,7 @@ svg { flex: none; }
 }
 
 .nav-link:hover { color: var(--teal); border-bottom-color: var(--teal); }
-.nav-user { font-size: 0.875rem; color: var(--muted); }
+.nav-user { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.875rem; color: var(--muted); }
 .nav-form { margin: 0; }
 
 /* --- the full-width teal banner a page may put under the header --- */
@@ -379,6 +379,9 @@ span.button, span.button-secondary, span.button-danger {
 }
 
 .field textarea { min-height: 140px; resize: vertical; }
+/* Shown but not editable, such as the username on the edit-profile page. */
+.field input[readonly] { background: var(--surface-alt); border-color: var(--line); }
+.field input[readonly]:hover { border-color: var(--line); }
 .field-hint { font-size: 0.8125rem; color: var(--muted); margin: 0; }
 .field-error { color: var(--danger); font-size: 0.8125rem; font-weight: 600; }
 
@@ -406,6 +409,11 @@ span.button, span.button-secondary, span.button-danger {
 .form-card { max-width: 900px; margin-inline: auto; padding: var(--space-4); }
 .form-card h1 { font-size: 1.75rem; margin-bottom: var(--space-3); }
 .form-actions { justify-content: flex-end; margin-top: 0; margin-bottom: var(--space-3); }
+/* For actions under the fields they submit, rather than above a further section. */
+.form-actions-bottom { margin-top: var(--space-3); margin-bottom: 0; }
+.form-card + .form-card { margin-top: var(--space-3); }
+.card-title { font-size: 1.375rem; margin: 0 0 var(--space-half); }
+.card-lead { margin-bottom: var(--space-2); }
 .photos-section { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 
 /* A Faces form that should not box its contents, so they join the surrounding row. */
@@ -926,6 +934,67 @@ span.button, span.button-secondary, span.button-danger {
 .fact-label { font-size: 0.75rem; color: var(--muted); }
 .fact dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 
+/* --- round profile photos: the header (32px), the contact card (48px), the profile (96px) --- */
+.avatar-img { display: block; flex: none; border-radius: 50%; object-fit: cover; background: var(--teal-tint); }
+.avatar-lg { width: 96px; height: 96px; margin: 0 auto 12px; }
+/* Doubled with .avatar, the initials circle defined under profile, so these win there too. */
+.avatar-sm, .avatar.avatar-sm { flex: none; width: 32px; height: 32px; margin: 0; font-size: 0.8125rem; }
+.avatar-md, .avatar.avatar-md { flex: none; width: 48px; height: 48px; margin: 0; font-size: 1.125rem; }
+.avatar.avatar-on-dark { background: var(--brown-soft); color: var(--brown); }
+
+/* The photo picker on the register and edit-profile pages: a 96px circle that is the hidden
+   file input's label, with a "+" badge, and a caption under it. */
+.avatar-picker { display: flex; flex-direction: column; align-items: center; gap: var(--space-half); margin-bottom: var(--space-3); text-align: center; }
+.avatar-picker-label { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); cursor: pointer; border-radius: var(--radius-sm); }
+.avatar-picker-label:focus-within .avatar-picker-frame { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+.avatar-picker-frame {
+    position: relative;
+    display: block;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--teal-tint);
+}
+
+.avatar-picker-placeholder {
+    display: grid;
+    place-items: center;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    color: var(--teal);
+}
+
+.avatar-picker-initials { background: var(--teal); color: var(--on-dark); font-size: 2rem; font-weight: 800; }
+.avatar-picker-img { display: block; width: 96px; height: 96px; border-radius: 50%; object-fit: cover; }
+
+.avatar-picker-badge {
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    background: var(--orange);
+    color: var(--text);
+    font-size: 1.125rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.avatar-picker-caption { font-size: 0.875rem; font-weight: 700; color: var(--teal-dark); }
+.avatar-picker-label:hover .avatar-picker-caption { text-decoration: underline; }
+.avatar-picker.has-error .avatar-picker-caption { color: var(--danger); }
+
+/* On the edit page the picker sits in a row with its buttons. */
+.avatar-editor { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1); }
+.avatar-editor-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
+.avatar-picker-inline { margin-bottom: 0; }
+
 /* The warm brown contact card. */
 .contact-card {
     background: var(--brown);
@@ -949,6 +1018,8 @@ span.button, span.button-secondary, span.button-danger {
     color: var(--brown);
 }
 
+.contact-owner { display: flex; align-items: center; gap: 12px; margin-bottom: var(--space-2); }
+.contact-owner-name { font-size: 1.125rem; font-weight: 700; overflow-wrap: anywhere; }
 .contact-list { display: flex; flex-direction: column; gap: 12px; list-style: none; margin: 0; padding: 0; }
 .contact-list li { display: flex; align-items: center; gap: 10px; overflow-wrap: anywhere; }
 .contact-list .icon { color: var(--brown-soft); }
@@ -1002,6 +1073,7 @@ span.button, span.button-secondary, span.button-danger {
     text-decoration: none;
 }
 
+.side-menu-item:hover { background: var(--surface-alt); color: var(--teal-dark); }
 .side-menu-item.is-current { background: var(--teal-tint); color: var(--teal-dark); }
 .side-menu-item.is-disabled { color: var(--muted); cursor: not-allowed; }
 .side-menu-note { font-size: 0.75rem; font-weight: 500; }

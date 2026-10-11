@@ -3,6 +3,7 @@ package com.petlee.repository;
 import com.petlee.model.User;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import java.util.Optional;
 
@@ -31,6 +32,57 @@ public class UserRepository {
         return email != null && em.createQuery(
                         "SELECT COUNT(u) FROM User u WHERE LOWER(u.email) = LOWER(:email)", Long.class)
                 .setParameter("email", email).getSingleResult() > 0;
+    }
+
+    // The same check for a profile update: the member's own row does not count against them.
+    public boolean existsByEmailForOtherUser(String email, Long userId) {
+        return email != null && em.createQuery(
+                        "SELECT COUNT(u) FROM User u WHERE LOWER(u.email) = LOWER(:email)"
+                                + " AND u.userId <> :id", Long.class)
+                .setParameter("email", email).setParameter("id", userId)
+                .getSingleResult() > 0;
+    }
+
+    /**
+     * Loads a user and locks the row until the transaction ends, so two photo changes for the
+     * same member run one after the other and neither leaves the other's file orphaned.
+     *
+     * @param id the user's id, may be null
+     * @return the locked user, or empty
+     */
+    public Optional<User> lockById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(em.find(User.class, id, LockModeType.PESSIMISTIC_WRITE));
+    }
+
+    /**
+     * Sets the profile photo with a bulk update, which leaves {@code version} alone: a new photo
+     * must not make an open profile form stale. The entity is refreshed afterwards, since a bulk
+     * update bypasses the persistence context.
+     *
+     * @param user a managed user
+     * @param url  the new URL, or null to remove the photo
+     */
+    public void updateAvatarUrl(User user, String url) {
+        em.createQuery("UPDATE User u SET u.avatarUrl = :url WHERE u.userId = :id")
+                .setParameter("url", url).setParameter("id", user.getUserId())
+                .executeUpdate();
+        em.refresh(user);
+    }
+
+    /**
+     * Replaces the password digest with a bulk update, leaving {@code version} alone for the
+     * same reason as {@link #updateAvatarUrl}.
+     *
+     * @param userId the user's id
+     * @param digest the new PBKDF2 digest, never a password
+     */
+    public void updatePassword(Long userId, String digest) {
+        em.createQuery("UPDATE User u SET u.password = :digest WHERE u.userId = :id")
+                .setParameter("digest", digest).setParameter("id", userId)
+                .executeUpdate();
     }
 
     public boolean existsByUsername(String username) {

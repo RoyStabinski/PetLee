@@ -48,12 +48,16 @@ how to create the least-privileged `petlee_app` role the server's connection poo
 Create that role before the next step.
 
 **Upgrading an existing database** instead of creating one: apply the migrations it has not had
-yet, in number order, as described in `src/main/resources/db/README.md#migrations`. The latest,
-`migrate-002-favorite.sql`, adds the `favorite` table behind the favourites feature; a build
-with that feature fails on the favourites pages and hearts until it has been run:
+yet, in number order, as described in `src/main/resources/db/README.md#migrations`.
+`migrate-002-favorite.sql` adds the `favorite` table behind the favourites feature. The latest,
+`migrate-003-user-profile.sql`, adds `users.avatar_url` (the profile photo) and `users.version`
+(optimistic locking for the edit-profile form); a build with the profile feature fails on every
+query that loads a user until it has been run. It only adds columns, needs no new grant, and
+does not rewrite existing rows:
 
 ```bash
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
 ```
 
 ### 3. WildFly: JDBC driver and DataSource
@@ -182,8 +186,8 @@ Register through `/register.xhtml` to try the flow as a first-time user.
 ## Architecture
 
 The JSF tier (`com.petlee.web`) reaches the logic tier only through the REST API. Its managed
-beans call `com.petlee.web.client` (`AuthApi`, `PetApi`, `CategoryApi` and `AdminApi` over one
-shared `ApiClient`), exchange the records in `com.petlee.dto`, and authenticate with the bearer
+beans call `com.petlee.web.client` (`AuthApi`, `UserApi`, `PetApi`, `CategoryApi`, `FavoriteApi`
+and `AdminApi` over one shared `ApiClient`), exchange the records in `com.petlee.dto`, and authenticate with the bearer
 token that login returns, kept in the session-scoped `ApiCredentials`; nothing in the JSF tier
 touches a service, an entity or a repository. The same holds for photographs: the pages send
 the files to `POST /api/pets/{id}/images` and show the URLs the API returns. This gives security
@@ -218,13 +222,18 @@ session if there is one.
 | Method | Path | Access |
 |---|---|---|
 | POST | `/api/users/register` | open |
+| GET | `/api/users/me` | auth — the caller's own account, with `region`, `avatarUrl` and `version` |
+| PUT | `/api/users/me?version=N` | auth — body `{fullName, email, phone, region}`; the username cannot change. `N` is the `version` from `GET /api/users/me`; a stale or missing one is 409 (`code` `STALE_VERSION`), and so is an email address another account has |
+| PUT | `/api/users/me/password` | auth — body `{currentPassword, newPassword}`; a wrong current password is 400, a new one under 8 characters is 400. Revokes every other bearer token of the caller and keeps the one sent; 204 |
+| POST | `/api/users/me/avatar` | auth — multipart/form-data, one part named `file`, the same formats and 5 MB limit as pet photographs; replaces the profile photo and deletes the old file; returns the account |
+| DELETE | `/api/users/me/avatar` | auth — removes the profile photo and its file; returns the account |
 | POST | `/api/auth/login` | open |
 | POST | `/api/auth/logout` | auth |
 | GET | `/api/categories` | open |
 | POST | `/api/categories` | admin |
 | DELETE | `/api/categories/{id}` | admin |
 | GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
-| GET | `/api/pets/{id}` | open — owner contact fields only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
+| GET | `/api/pets/{id}` | open — owner contact fields (`ownerName`, `ownerPhone`, `ownerEmail`, `ownerAvatarUrl`) only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth |
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
@@ -275,6 +284,38 @@ curl -H "Authorization: Bearer <token>" \
      -F "file=@rex.jpg;type=image/jpeg" \
      http://localhost:8080/pet-lee/api/pets/7/images
 ```
+
+Every `/api/users/me` endpoint acts for whoever the token or session belongs to; none takes a
+user id, so a member can neither read nor change another's account. A user carries a `version`,
+like a pet: send back the one `GET /api/users/me` returned, and a save based on an older read is
+a 409 whose `code` is `STALE_VERSION`. A taken email address is also a 409, with the ordinary
+`ERROR` code, decided by the case-insensitive unique index if two saves race. Changing the
+profile photo or the password does not move the `version`, so a profile form open at the same
+time can still be saved.
+
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/users/me
+curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+     -d '{"fullName":"Dana Levi","email":"dana@example.com","phone":"+972 50 123 4567","region":"Haifa"}' \
+     "http://localhost:8080/pet-lee/api/users/me?version=0"
+curl -H "Authorization: Bearer <token>" -F "file=@me.jpg;type=image/jpeg" \
+     http://localhost:8080/pet-lee/api/users/me/avatar
+```
+
+A password change signs the member out everywhere else: every other bearer token of theirs is
+revoked, and the token the request carried stays valid. Browser sessions that call `/api` with
+the session cookie are not tracked per user and are not ended; they expire on their own.
+
+**Telephone numbers** must be Israeli, at registration and on every profile save. Accepted:
+mobile numbers, 05X and seven digits; landlines 02, 03, 04, 08 and 09 and seven digits; and the
+07X numbers, 07X and seven digits. Spaces, dashes and parentheses are ignored, and the leading 0
+may be written `+972` or `972`. The number is stored normalised, `0XX-XXXXXXX` for mobile and
+07X numbers and `0X-XXXXXXX` for the other landlines, so `+972 (54) 123-4567` is stored as
+`054-1234567` and `021234567` as `02-1234567`. The field stays optional; a non-empty number that
+does not fit is a 400, "Enter a valid Israeli phone number, for example 050-1234567". The rule
+lives in `com.petlee.util.PhoneNumbers`; the register and edit-profile pages carry a matching
+regular expression for a quicker answer, and the server still decides. Numbers stored before
+the rule are left as they are until their owner next saves the profile.
 
 A member's favourites are theirs alone: every `/api/favorites` call acts for whoever the token
 or session belongs to, and no endpoint takes another user's id. They live in the `favorite`

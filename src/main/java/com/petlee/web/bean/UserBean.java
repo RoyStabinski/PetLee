@@ -5,6 +5,7 @@ import com.petlee.dto.UserDTO;
 import com.petlee.web.client.ApiCredentials;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.AuthApi;
+import com.petlee.web.client.UserApi;
 
 import jakarta.enterprise.context.SessionScoped;
 import jakarta.faces.context.ExternalContext;
@@ -12,14 +13,17 @@ import jakarta.faces.context.FacesContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Holds the signed-in user for the JSF tier and performs login, registration and logout, all
- * through the REST API. The authority is the bearer token in {@link ApiCredentials}; this bean
+ * Holds the signed-in user for the JSF tier and performs login, registration (with the optional
+ * profile photo) and logout, all through the REST API. The authority is the bearer token in {@link ApiCredentials}; this bean
  * reads the user from there rather than keeping a second copy.
  */
 @Named("userBean")
@@ -35,9 +39,7 @@ public class UserBean implements Serializable {
 
     private static final String HOME = "/index.xhtml?faces-redirect=true";
     private static final String LOGIN = "/login.xhtml?faces-redirect=true";
-
-    /** The code {@code ConstraintViolationExceptionMapper} answers a bean-validation failure with. */
-    private static final String VALIDATION_FAILED = "VALIDATION_FAILED";
+    private static final String PROFILE = "/profile.xhtml?faces-redirect=true";
 
     /**
      * Not transient: CDI injects a serializable proxy, and transient would leave null behind
@@ -50,7 +52,11 @@ public class UserBean implements Serializable {
     @Inject
     private ApiCredentials credentials;
 
-    // Form backing. The passwords are cleared by each submission's finally block.
+    /** For the photo chosen at registration. Not transient, for the same reason. */
+    @Inject
+    private UserApi userApi;
+
+    // Form backing. The passwords and the photo are cleared after each submission.
     private String username;
     private transient String password;
     private transient String confirmPassword;
@@ -58,6 +64,9 @@ public class UserBean implements Serializable {
     private String email;
     private String phone;
     private String region;
+
+    /** The registration form's photo, if one was chosen. */
+    private transient Part avatarFile;
 
     // ------------------------------------------------------------------------------- the actions
 
@@ -86,10 +95,14 @@ public class UserBean implements Serializable {
     }
 
     /**
-     * Creates an account through {@code POST /api/users/register}. Registration does not sign
-     * anybody in.
+     * Creates an account through {@code POST /api/users/register}, signs the new member in with
+     * the credentials just submitted, and uploads the chosen photo if there is one.
      *
-     * @return the login page, or null to stay on the registration page
+     * <p>The account exists once the first call returns, so nothing after it sends the user
+     * back to the form: a failed sign-in sends them to log in, and a failed upload is a warning
+     * on the profile page, since the photo can be added from Edit profile.
+     *
+     * @return My profile, the login page, or null to stay on the registration page
      */
     public String register() {
         try {
@@ -101,17 +114,54 @@ public class UserBean implements Serializable {
             authApi.register(new RegisterForm(trimmed(username), password, trimmed(fullName),
                     trimmed(email), trimmed(phone), trimmed(region)));
 
-            Messages.info("Your account has been created. Please log in.");
-            return Messages.keep(LOGIN);
+            try {
+                authApi.login(trimmed(username), password);
+            } catch (ApiException loginFailed) {
+                LOGGER.log(Level.WARNING, () -> "sign-in after registration failed ("
+                        + loginFailed.getStatus() + ")");
+                Messages.info("Your account has been created. Please log in.");
+                return Messages.keep(LOGIN);
+            }
+            rotateSessionId();
+
+            Messages.info("Welcome to Pet-Lee!");
+            String photoProblem = uploadChosenAvatar();
+            if (photoProblem != null) {
+                Messages.warn("Your account is ready, but your photo could not be added: "
+                        + photoProblem + " You can add one from Edit profile.");
+            }
+            return Messages.keep(PROFILE);
 
         } catch (ApiException failure) {
-            Messages.error(VALIDATION_FAILED.equals(failure.getCode())
-                    ? violationText(failure.getMessage())
-                    : failure.getMessage());
+            // Only registration itself can land here; the calls after it catch their own.
+            Messages.error(Messages.text(failure));
             return null;
 
         } finally {
             clearPasswords();
+            avatarFile = null;
+        }
+    }
+
+    /**
+     * Uploads the photo chosen on the registration form, for the member just signed in.
+     *
+     * @return null if there was no photo or it was stored, otherwise why it was not
+     */
+    private String uploadChosenAvatar() {
+        if (avatarFile == null || avatarFile.getSize() <= 0) {
+            return null;
+        }
+        try (InputStream content = avatarFile.getInputStream()) {
+            userApi.uploadAvatar(content, avatarFile.getSubmittedFileName(),
+                    avatarFile.getContentType());
+            return null;
+        } catch (ApiException | IOException failure) {
+            String reason = failure.getMessage();
+            if (reason == null || reason.isBlank()) {
+                return "the upload failed.";
+            }
+            return reason.endsWith(".") ? reason : reason + ".";
         }
     }
 
@@ -164,15 +214,29 @@ public class UserBean implements Serializable {
     }
 
     /**
-     * @return up to two initials from the full name, for the profile's avatar circle: the first
-     *         letter of the first and last words, or of the username, or "?" when signed out
+     * @return up to two initials from the full name, for the avatar circle: the first letter of
+     *         the first and last words, or of the username, or "?" when signed out
      */
     public String getInitials() {
         UserDTO user = getCurrentUser();
         if (user == null) {
             return "?";
         }
-        String name = user.fullName() == null || user.fullName().isBlank() ? user.username() : user.fullName();
+        return initialsOf(user.fullName() == null || user.fullName().isBlank()
+                ? user.username() : user.fullName());
+    }
+
+    /** @return the signed-in user's profile photo URL, or null for the initials circle */
+    public String getAvatarUrl() {
+        UserDTO user = getCurrentUser();
+        return user == null ? null : user.avatarUrl();
+    }
+
+    /**
+     * @param name a full name, may be null or blank
+     * @return the first letters of its first and last words, upper case, or "?" for none
+     */
+    static String initialsOf(String name) {
         if (name == null || name.isBlank()) {
             return "?";
         }
@@ -203,15 +267,6 @@ public class UserBean implements Serializable {
         if (external.getSession(false) != null) {
             ((HttpServletRequest) external.getRequest()).changeSessionId();
         }
-    }
-
-    /**
-     * The mapper writes a violation as {@code "<field> <message>"}; the page shows only the
-     * message, since the registration messages already name their field.
-     */
-    private static String violationText(String message) {
-        int space = message.indexOf(' ');
-        return space < 0 ? message : message.substring(space + 1);
     }
 
     private void clearPasswords() {
@@ -252,4 +307,8 @@ public class UserBean implements Serializable {
     public String getRegion() { return region; }
 
     public void setRegion(String region) { this.region = region; }
+
+    public Part getAvatarFile() { return avatarFile; }
+
+    public void setAvatarFile(Part avatarFile) { this.avatarFile = avatarFile; }
 }

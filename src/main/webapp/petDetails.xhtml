@@ -209,16 +209,18 @@
                         </div>
 
                         <h:panelGroup layout="block" rendered="#{petDetailBean.contactVisible}">
+                            <!-- The photo is decorative: the name beside it says who it is. -->
+                            <div class="contact-owner">
+                                <ui:fragment rendered="#{not empty petDetailBean.pet.ownerAvatarUrl}">
+                                    <img class="avatar-img avatar-md" src="#{request.contextPath}#{petDetailBean.pet.ownerAvatarUrl}"
+                                         alt="" width="48" height="48"/>
+                                </ui:fragment>
+                                <ui:fragment rendered="#{empty petDetailBean.pet.ownerAvatarUrl}">
+                                    <span class="avatar avatar-md avatar-on-dark" aria-hidden="true">#{petDetailBean.ownerInitials}</span>
+                                </ui:fragment>
+                                <span class="contact-owner-name"><span class="sr-only">Posted by </span>#{petDetailBean.pet.ownerName}</span>
+                            </div>
                             <ul class="contact-list">
-                                <li>
-                                    <svg class="icon" viewBox="0 0 24 24"
-                                         width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                                         stroke-linecap="round" aria-hidden="true" focusable="false">
-                                        <circle cx="12" cy="8" r="4"/>
-                                        <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>
-                                    </svg>
-                                    <span class="sr-only">Posted by </span>#{petDetailBean.pet.ownerName}
-                                </li>
                                 <li>
                                     <svg class="icon" viewBox="0 0 24 24"
                                          width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"

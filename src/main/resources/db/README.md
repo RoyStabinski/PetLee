@@ -1,6 +1,7 @@
 # Database setup
 
-Two scripts, applied in order to a database you create first. No migration tool — plain SQL.
+Two scripts, applied in order to a database you create first, and numbered migrations for
+upgrading an older one. No migration tool — plain SQL.
 
 | File | What it does |
 |---|---|
@@ -8,8 +9,9 @@ Two scripts, applied in order to a database you create first. No migration tool 
 | `seed.sql` | Inserts the four categories and the `admin` account |
 | `migrate-001-pet-image.sql` | Upgrades an existing database from one photograph per pet to `pet_image` — see [Migrations](#migrations) |
 | `migrate-002-favorite.sql` | Adds the `favorite` table to an existing database — see [Migrations](#migrations) |
+| `migrate-003-user-profile.sql` | Adds `users.avatar_url` and `users.version` to an existing database — see [Migrations](#migrations) |
 
-Both are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
+`schema.sql` and `seed.sql` are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
 provider never touches the schema — `persistence.xml` sets
 `jakarta.persistence.schema-generation.database.action=none`, so what is in these files is what the
 database has.
@@ -108,6 +110,42 @@ changes, and the old build keeps working against the migrated database.
    ```
 
 To undo it: `DROP TABLE favorite;` — nothing else refers to it.
+
+### 003 — profile photo and profile editing
+
+Needed if `\d users` lists neither `avatar_url` nor `version`. The script adds `avatar_url
+VARCHAR(512) NULL` (the profile photo's URL, `NULL` meaning the initials circle) and `version
+BIGINT NOT NULL DEFAULT 0` (optimistic locking for the edit-profile form; the default fills every
+existing row with 0). Nothing else changes: existing rows keep their values, including telephone
+numbers stored before the Israeli-number rule, which are only normalised when their owner next
+saves the profile.
+
+No `GRANT` this time. 001 and 002 created tables, which the original grants could not name;
+these are columns of an existing table, and `petlee_app`'s table-level privileges cover every
+column the table has or gains.
+
+1. Back up first, as for 001:
+
+   ```bash
+   pg_dump -U postgres -Fc -f petlee-before-003.dump petlee
+   ```
+
+2. Run it as `postgres`. One transaction; both statements are `ADD COLUMN IF NOT EXISTS`, so
+   running it twice is harmless. The old build ignores both columns, so it may keep running.
+
+   ```bash
+   psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
+   ```
+
+3. Check, then deploy the build that has the profile feature:
+
+   ```sql
+   \d users                                 -- avatar_url varchar(512), version bigint not null default 0
+   SELECT count(*) FROM users WHERE version IS NULL;   -- 0
+   ```
+
+To undo it: `ALTER TABLE users DROP COLUMN avatar_url, DROP COLUMN version;` — the uploaded
+profile photos stay in the upload directory and can be deleted by hand.
 
 ## The application's database role
 

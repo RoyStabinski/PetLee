@@ -30,6 +30,20 @@ public class ApiCredentials implements Serializable {
         this.user = user;
     }
 
+    /**
+     * Replaces the remembered user after a profile change, keeping the token, so the header
+     * and the profile page show the new details at once. Ignored when nobody is signed in, or
+     * when the user is not the one signed in.
+     *
+     * @param user the user as the API just returned it
+     */
+    public void refreshUser(UserDTO user) {
+        if (token != null && this.user != null && user != null
+                && this.user.id() != null && this.user.id().equals(user.id())) {
+            this.user = user;
+        }
+    }
+
     /** Forgets the token and the user. */
     public void clear() {
         token = null;

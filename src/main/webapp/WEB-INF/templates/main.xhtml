@@ -83,6 +83,14 @@
                     </ui:fragment>
 
                     <span class="nav-user">
+                        <!-- Decorative: the text beside it names the user. -->
+                        <ui:fragment rendered="#{not empty userBean.avatarUrl}">
+                            <h:graphicImage value="#{userBean.avatarUrl}" alt="" width="32" height="32"
+                                            styleClass="avatar-img avatar-sm"/>
+                        </ui:fragment>
+                        <ui:fragment rendered="#{empty userBean.avatarUrl}">
+                            <span class="avatar avatar-sm" aria-hidden="true">#{userBean.initials}</span>
+                        </ui:fragment>
                         <h:outputFormat value="Signed in as {0}">
                             <f:param value="#{userBean.displayName}"/>
                         </h:outputFormat>

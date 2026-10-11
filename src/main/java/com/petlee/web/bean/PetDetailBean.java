@@ -119,6 +119,11 @@ public class PetDetailBean implements Serializable {
         return pet != null && pet.ownerEmail() != null;
     }
 
+    /** @return the owner's initials, for the contact card when the owner has no photo */
+    public String getOwnerInitials() {
+        return UserBean.initialsOf(pet == null ? null : pet.ownerName());
+    }
+
     public Long getPetId() { return petId; }
 
     public void setPetId(Long petId) { this.petId = petId; }

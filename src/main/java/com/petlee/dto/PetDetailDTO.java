@@ -6,7 +6,8 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * A pet in full. The three owner fields are null for a caller who is not logged in.
+ * A pet in full. The four owner fields are null for a caller who is not logged in, and
+ * {@code ownerAvatarUrl} is also null when the owner has no profile photo.
  * {@code version} is what a client sends back with {@code PUT /api/pets/{id}?version=},
  * so a save based on stale data is refused rather than silently overwriting a newer one.
  * {@code categoryId} and {@code ownedByCaller} are for an edit form: the value to preselect,
@@ -18,14 +19,14 @@ public record PetDetailDTO(Long id, String name, String breed, Integer age, Stri
                            String gender, String shortDesc, String longDesc, String status,
                            Integer categoryId, String categoryName, String imageUrl,
                            String ownerName, String ownerPhone, String ownerEmail,
-                           boolean ownedByCaller, Long version, List<PetImageDTO> images)
+                           String ownerAvatarUrl, boolean ownedByCaller, Long version, List<PetImageDTO> images)
         implements Serializable {
 
     /**
      * @param p             the pet
      * @param authenticated whether the caller is logged in
      * @param ownedByCaller whether the caller is the pet's owner; false for a guest
-     * @return the pet; a guest gets the same shape with three nulls, not a different one
+     * @return the pet; a guest gets the same shape with four nulls, not a different one
      */
     public static PetDetailDTO of(Pet p, boolean authenticated, boolean ownedByCaller) {
         return new PetDetailDTO(p.getPetId(), p.getPetName(), p.getBreed(), p.getAge(),
@@ -35,6 +36,7 @@ public record PetDetailDTO(Long id, String name, String breed, Integer age, Stri
                 authenticated ? p.getOwner().getFullName() : null,
                 authenticated ? p.getOwner().getPhoneNumber() : null,
                 authenticated ? p.getOwner().getEmail() : null,
+                authenticated ? p.getOwner().getAvatarUrl() : null,
                 ownedByCaller, p.getVersion(),
                 p.getImages().stream().map(PetImageDTO::of).toList());
     }

@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS users (
     region        VARCHAR(100),
     role          VARCHAR(20)  NOT NULL DEFAULT 'USER',
     created_at    TIMESTAMP    NOT NULL,
+    -- The profile photo's URL under /images/, or NULL for the initials circle.
+    avatar_url    VARCHAR(512),
+    -- Optimistic locking, for @Version on the User entity.
+    version       BIGINT       NOT NULL DEFAULT 0,
     CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
 

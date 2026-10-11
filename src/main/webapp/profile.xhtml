@@ -26,7 +26,13 @@
 
             <!-- The user's own details, so no privacy gate applies here. -->
             <aside class="card-box profile-card" aria-label="Your account">
-                <div class="avatar" aria-hidden="true">#{userBean.initials}</div>
+                <ui:fragment rendered="#{not empty userBean.avatarUrl}">
+                    <h:graphicImage value="#{userBean.avatarUrl}" alt="" width="96" height="96"
+                                    styleClass="avatar-img avatar-lg"/>
+                </ui:fragment>
+                <ui:fragment rendered="#{empty userBean.avatarUrl}">
+                    <div class="avatar" aria-hidden="true">#{userBean.initials}</div>
+                </ui:fragment>
                 <p class="profile-name">#{userBean.currentUser.fullName}</p>
                 <p class="profile-counts">
                     <h:outputFormat value="{0} {1} · {2} active">
@@ -39,9 +45,8 @@
                 <nav class="side-menu" aria-label="Profile">
                     <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="side-menu-item is-current"
                                   p:aria-current="page">My listings</h:outputLink>
-                    <span class="side-menu-item is-disabled" aria-disabled="true">
-                        Edit profile <span class="side-menu-note">coming soon</span>
-                    </span>
+                    <h:outputLink value="#{request.contextPath}/editProfile.xhtml"
+                                  styleClass="side-menu-item">Edit profile</h:outputLink>
                 </nav>
 
                 <dl class="profile-details">
@@ -50,7 +55,9 @@
                     <dt>Email</dt>
                     <dd>#{userBean.currentUser.email}</dd>
                     <dt>Telephone</dt>
-                    <dd>#{userBean.currentUser.phone}</dd>
+                    <dd>#{empty userBean.currentUser.phone ? 'Not given' : userBean.currentUser.phone}</dd>
+                    <dt>Region</dt>
+                    <dd>#{empty userBean.currentUser.region ? 'Not given' : userBean.currentUser.region}</dd>
                     <dt>Status</dt>
                     <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
                 </dl>

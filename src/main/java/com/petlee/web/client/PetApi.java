@@ -7,10 +7,8 @@ import com.petlee.dto.PetImageDTO;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.EntityPart;
 import jakarta.ws.rs.core.GenericType;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
@@ -141,19 +139,8 @@ public class PetApi {
      *                      owner, 409 if the listing already has five photographs
      */
     public PetImageDTO addImage(Long id, InputStream content, String fileName, String contentType) {
-        EntityPart part;
-        try {
-            EntityPart.Builder builder = EntityPart.withName("file").content(content)
-                    .mediaType(contentType == null ? "application/octet-stream" : contentType);
-            if (fileName != null && !fileName.isBlank()) {
-                builder.fileName(fileName);
-            }
-            part = builder.build();
-        } catch (IOException | IllegalArgumentException unbuildable) {
-            // IllegalArgumentException: the browser sent a content type that does not parse.
-            throw new ApiException(400, "UPLOAD_FAILED", "The photo could not be read.", unbuildable);
-        }
-        return api.postMultipart("/pets/" + id + "/images", List.of(part), PetImageDTO.class);
+        return api.postMultipart("/pets/" + id + "/images",
+                List.of(ApiClient.filePart(content, fileName, contentType)), PetImageDTO.class);
     }
 
     /**

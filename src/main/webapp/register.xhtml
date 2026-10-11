@@ -12,6 +12,11 @@
 
     <ui:define name="title">Create an account - Pet-Lee</ui:define>
 
+    <ui:define name="head">
+        <script src="#{request.contextPath}/resources/js/avatar.js?v=#{initParam['petlee.ASSET_VERSION']}"
+                defer="defer"></script>
+    </ui:define>
+
     <ui:define name="content">
 
         <div class="auth-card">
@@ -20,7 +25,34 @@
             <div class="auth-form">
                 <h1>Create an account</h1>
 
-                <h:form id="registerForm">
+                <!-- Multipart for the photo: enctype is not optional for h:inputFile. -->
+                <h:form id="registerForm" enctype="multipart/form-data">
+
+                    <!-- The optional photo. The round tile is the file input's label; avatar.js
+                         previews the chosen file in it. Without JavaScript the upload still
+                         works, the tile just keeps its silhouette. -->
+                    <div class="avatar-picker" data-avatar-picker="">
+                        <h:outputLabel for="avatarFile" styleClass="avatar-picker-label">
+                            <span class="avatar-picker-frame">
+                                <span class="avatar-picker-placeholder" data-avatar-placeholder="">
+                                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor"
+                                         aria-hidden="true" focusable="false">
+                                        <circle cx="12" cy="8.5" r="4.5"/>
+                                        <path d="M3 22c.8-4.6 4.4-7.5 9-7.5s8.2 2.9 9 7.5z"/>
+                                    </svg>
+                                </span>
+                                <img class="avatar-picker-img" data-avatar-img="" alt="" width="96" height="96"
+                                     hidden="hidden"/>
+                                <span class="avatar-picker-badge" aria-hidden="true">+</span>
+                            </span>
+                            <span class="avatar-picker-caption" data-avatar-caption="">Add photo</span>
+                            <h:inputFile id="avatarFile" value="#{userBean.avatarFile}"
+                                         accept="image/jpeg,image/png,image/gif,image/webp"
+                                         styleClass="upload-input"/>
+                        </h:outputLabel>
+                        <span class="field-hint">Optional. JPEG, PNG, GIF or WebP, up to 5 MB.</span>
+                    </div>
+
                     <!-- Two fields a row: full name and username, email and telephone, the two
                          passwords, then region across the row. -->
                     <div class="form-grid form-grid-2">
@@ -58,14 +90,15 @@
 
                         <div class="field">
                             <h:outputLabel for="phone" value="Telephone"/>
-                            <!-- 20, not 10: the contract's own example "050-1234567" is 11 characters. -->
-                            <h:inputText id="phone" value="#{userBean.phone}" maxlength="20"
+                            <!-- The regex mirrors com.petlee.util.PhoneNumbers, which decides. -->
+                            <h:inputText id="phone" value="#{userBean.phone}" type="tel" maxlength="20"
                                          p:placeholder="050-1234567" autocomplete="tel"
-                                         validatorMessage="A telephone number is at most 20 characters.">
+                                         validatorMessage="Enter a valid Israeli phone number, for example 050-1234567">
                                 <f:validateLength maximum="20"/>
+                                <f:validateRegex pattern="^(?:\s*|[\s()-]*(?:\+[\s()-]*9[\s()-]*7[\s()-]*2|9[\s()-]*7[\s()-]*2|0)[\s()-]*(?:[57](?:[\s()-]*\d){8}|[23489](?:[\s()-]*\d){7})[\s()-]*)$"/>
                             </h:inputText>
                             <h:message for="phone" styleClass="field-error"/>
-                            <span class="field-hint">Up to 20 characters, for example 050-1234567</span>
+                            <span class="field-hint">Optional. A mobile (05X) or landline number, for example 050-1234567 or 02-1234567</span>
                         </div>
 
                         <div class="field">

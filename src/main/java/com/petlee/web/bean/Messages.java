@@ -1,5 +1,7 @@
 package com.petlee.web.bean;
 
+import com.petlee.web.client.ApiException;
+
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
 
@@ -7,6 +9,9 @@ import jakarta.faces.context.FacesContext;
 final class Messages {
 
     private static final String LOGIN = "/login.xhtml?faces-redirect=true";
+
+    /** The code {@code ConstraintViolationExceptionMapper} answers a bean-validation failure with. */
+    private static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
     private Messages() {
     }
@@ -21,6 +26,23 @@ final class Messages {
 
     private static void add(String clientId, FacesMessage.Severity severity, String text) {
         FacesContext.getCurrentInstance().addMessage(clientId, new FacesMessage(severity, text, null));
+    }
+
+    /**
+     * The text to show for a failed API call. The mapper writes a bean-validation failure as
+     * {@code "<field> <message>"}; the forms show only the message, since their messages already
+     * name their field. Anything else is shown as the server wrote it.
+     *
+     * @param failure the failed call
+     * @return the text for the page
+     */
+    static String text(ApiException failure) {
+        String message = failure.getMessage();
+        if (!VALIDATION_FAILED.equals(failure.getCode()) || message == null) {
+            return message;
+        }
+        int space = message.indexOf(' ');
+        return space < 0 ? message : message.substring(space + 1);
     }
 
     /**

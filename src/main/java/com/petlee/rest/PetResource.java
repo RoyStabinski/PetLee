@@ -227,7 +227,7 @@ public class PetResource {
      * @return the version, or null when absent — which the service refuses with 409
      * @throws AppException 400 if the value is present but not a whole number
      */
-    private static Long parseVersion(String value) {
+    static Long parseVersion(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }

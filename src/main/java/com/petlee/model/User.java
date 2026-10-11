@@ -36,7 +36,6 @@ public class User {
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
-    // Accepted at registration; deliberately absent from UserDTO, which the contract fixes.
     @Column(name = "region", length = 100)
     private String region;
 
@@ -46,6 +45,16 @@ public class User {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // A URL under /images/, or null for the initials circle. Changed by a bulk update in
+    // UserRepository, so a new photo does not move the version and stale an open profile form.
+    @Column(name = "avatar_url", length = 512)
+    private String avatarUrl;
+
+    // Optimistic locking for the profile form, as on Pet.
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     /** For JPA. */
     public User() {
@@ -89,6 +98,12 @@ public class User {
     public void setRole(Role role) { this.role = role; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    // No setter: see the field.
+    public String getAvatarUrl() { return avatarUrl; }
+
+    // Long, not long: null until the row is first written. No setter — JPA owns this field.
+    public Long getVersion() { return version; }
 
     public boolean isAdmin() { return role == Role.ADMIN; }
 }

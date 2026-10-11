@@ -41,20 +41,16 @@ public class UserBean implements Serializable {
     private static final String LOGIN = "/login.xhtml?faces-redirect=true";
     private static final String PROFILE = "/profile.xhtml?faces-redirect=true";
 
-    /**
-     * Not transient: CDI injects a serializable proxy, and transient would leave null behind
-     * after the container passivates and restores the session.
-     */
-    @Inject
-    private AuthApi authApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private AuthApi authApi;
 
-    /** The token and the signed-in user. Not transient, for the same reason. */
-    @Inject
-    private ApiCredentials credentials;
+    /** For the photo chosen at registration. */
+    @SuppressWarnings("serial") @Inject private UserApi userApi;
 
-    /** For the photo chosen at registration. Not transient, for the same reason. */
-    @Inject
-    private UserApi userApi;
+    /** The token and the signed-in user. */
+    @Inject private ApiCredentials credentials;
 
     // Form backing. The passwords and the photo are cleared after each submission.
     private String username;
@@ -195,6 +191,7 @@ public class UserBean implements Serializable {
 
     // -------------------------------------------------------------------- what the shell reads
 
+    /** @return whether this browser session holds a live login */
     public boolean isLoggedIn() { return credentials.isLoggedIn(); }
 
     /**
@@ -248,12 +245,6 @@ public class UserBean implements Serializable {
         return initials.toUpperCase();
     }
 
-    /** @return the signed-in user's id, or null */
-    public Long getCurrentUserId() {
-        UserDTO user = getCurrentUser();
-        return user == null ? null : user.id();
-    }
-
     /** @return the signed-in user, or null. Carries no password material. */
     public UserDTO getCurrentUser() {
         return credentials.isLoggedIn() ? credentials.getUser() : null;
@@ -280,35 +271,51 @@ public class UserBean implements Serializable {
 
     // ------------------------------------------------------------------------ form properties
 
+    /** @return the username typed into the login or registration form */
     public String getUsername() { return username; }
 
+    /** @param username the username typed into the login or registration form */
     public void setUsername(String username) { this.username = username; }
 
+    /** @return the password; null except during a submission */
     public String getPassword() { return password; }
 
+    /** @param password the password */
     public void setPassword(String password) { this.password = password; }
 
+    /** @return the password repeated on the registration form; null except during a submission */
     public String getConfirmPassword() { return confirmPassword; }
 
+    /** @param confirmPassword the password repeated on the registration form */
     public void setConfirmPassword(String confirmPassword) { this.confirmPassword = confirmPassword; }
 
+    /** @return the registration form's full name */
     public String getFullName() { return fullName; }
 
+    /** @param fullName the registration form's full name */
     public void setFullName(String fullName) { this.fullName = fullName; }
 
+    /** @return the registration form's email address */
     public String getEmail() { return email; }
 
+    /** @param email the registration form's email address */
     public void setEmail(String email) { this.email = email; }
 
+    /** @return the registration form's telephone number, may be blank */
     public String getPhone() { return phone; }
 
+    /** @param phone the registration form's telephone number, may be blank */
     public void setPhone(String phone) { this.phone = phone; }
 
+    /** @return the registration form's region, may be blank */
     public String getRegion() { return region; }
 
+    /** @param region the registration form's region, may be blank */
     public void setRegion(String region) { this.region = region; }
 
+    /** @return the photo chosen on the registration form, or null */
     public Part getAvatarFile() { return avatarFile; }
 
+    /** @param avatarFile the photo chosen on the registration form */
     public void setAvatarFile(Part avatarFile) { this.avatarFile = avatarFile; }
 }

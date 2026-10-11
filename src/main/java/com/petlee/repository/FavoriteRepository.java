@@ -18,6 +18,11 @@ public class FavoriteRepository {
     @PersistenceContext(unitName = "petlee-pu")
     private EntityManager em;
 
+    /**
+     * @param userId the member
+     * @param petId  the pet
+     * @return whether the member has saved the pet
+     */
     public boolean exists(Long userId, Long petId) {
         return em.find(Favorite.class, new FavoriteId(userId, petId)) != null;
     }
@@ -35,6 +40,9 @@ public class FavoriteRepository {
      *
      * <p>DISTINCT folds the image rows back into one favourite each. ORDER BY names a field of the
      * selected entity, which both JPQL and PostgreSQL require alongside DISTINCT.
+     *
+     * @param userId the member
+     * @return the member's visible favourites, newest saved first
      */
     public List<Favorite> findVisibleByUser(Long userId) {
         EntityGraph<Favorite> graph = em.createEntityGraph(Favorite.class);
@@ -50,7 +58,10 @@ public class FavoriteRepository {
                 .getResultList();
     }
 
-    /** @return the ids of the member's saved pets, with the same REMOVED rule as the list */
+    /**
+     * @param userId the member
+     * @return the ids of the member's saved pets, with the same REMOVED rule as the list
+     */
     public List<Long> findVisiblePetIds(Long userId) {
         return em.createQuery(
                         "SELECT f.id.petId FROM Favorite f"
@@ -63,6 +74,9 @@ public class FavoriteRepository {
     /**
      * Inserts now rather than at commit, so a duplicate key surfaces here, inside the
      * transaction that caused it, where the service can catch it.
+     *
+     * @param userId the member, from a verified token
+     * @param pet    the pet to save
      */
     public void persistNow(Long userId, Pet pet) {
         // A reference, not a load: the id came from a verified token, and the foreign key
@@ -72,7 +86,11 @@ public class FavoriteRepository {
         em.flush();
     }
 
-    /** @return how many rows were deleted: 0 or 1 */
+    /**
+     * @param userId the member
+     * @param petId  the pet
+     * @return how many rows were deleted: 0 or 1
+     */
     public int delete(Long userId, Long petId) {
         return em.createQuery("DELETE FROM Favorite f"
                         + " WHERE f.id.userId = :userId AND f.id.petId = :petId")

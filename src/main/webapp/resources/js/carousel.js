@@ -2,7 +2,7 @@
  * Pet-Lee's one photo carousel, used by the details page and by every gallery card. Plain
  * JavaScript, no library, served from the application with a ?v= version like the stylesheet.
  *
- * Markup contract - everything is found through data attributes inside a [data-carousel] root;
+ * The markup it expects: everything is found through data attributes inside a [data-carousel] root;
  * only the slides are required, the rest is optional:
  *   [data-carousel-slide]    the photos, in order; the one with class is-current is shown
  *   [data-carousel-prev]     previous button   } start with the hidden attribute: this script

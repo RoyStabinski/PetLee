@@ -29,7 +29,9 @@ import java.util.logging.Logger;
 
 /**
  * The presentation tier's only way into the logic tier: JSON over HTTP to {@code /api}, with the
- * caller's bearer token from {@link ApiCredentials} when there is one.
+ * caller's bearer token from {@link ApiCredentials} when there is one. Every 2xx status is a
+ * success, so a 201 Created or a 204 No Content reads like a 200; anything else becomes an
+ * {@link ApiException}.
  *
  * <p>One {@link Client} for the whole application, created at startup and closed at shutdown,
  * never one per request. A {@code Client} is heavyweight — it owns a connection pool and its
@@ -215,6 +217,10 @@ public class ApiClient {
         return body == null ? null : Entity.json(body);
     }
 
+    /**
+     * Sends one request. Success is the whole 2xx family, so the API's 201 and 204 answers need
+     * no special case here.
+     */
     private <T> T call(String method, String path, Map<String, ?> query, Entity<?> body,
                        GenericType<T> type) {
         WebTarget target = client.target(baseUrl()).path(path);

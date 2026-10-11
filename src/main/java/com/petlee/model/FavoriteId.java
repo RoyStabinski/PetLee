@@ -27,10 +27,6 @@ public class FavoriteId implements Serializable {
         this.petId = petId;
     }
 
-    public Long getUserId() { return userId; }
-
-    public Long getPetId() { return petId; }
-
     @Override
     public boolean equals(Object other) {
         if (this == other) {

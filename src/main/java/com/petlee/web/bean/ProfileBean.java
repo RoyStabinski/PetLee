@@ -39,8 +39,10 @@ public class ProfileBean implements Serializable {
     /** The code the API gives a 409 for a stale version, as opposed to a taken email address. */
     private static final String STALE_VERSION = "STALE_VERSION";
 
-    /** Not transient: application-scoped proxies are serializable. */
-    @Inject private UserApi userApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private UserApi userApi;
 
     private String username;
     private String fullName;
@@ -95,9 +97,8 @@ public class ProfileBean implements Serializable {
      */
     public String save() {
         try {
-            UserDTO saved = userApi.updateProfile(new ProfileForm(trimmed(fullName),
-                    trimmed(email), trimmed(phone), trimmed(region)), version);
-            version = saved.version();
+            userApi.updateProfile(new ProfileForm(trimmed(fullName), trimmed(email),
+                    trimmed(phone), trimmed(region)), version);
             Messages.info("Your profile has been saved.");
             return Messages.keep(PROFILE);
 
@@ -199,10 +200,13 @@ public class ProfileBean implements Serializable {
 
     // -------------------------------------------------------------------- what the page reads
 
+    /** @return whether the profile loaded, so the page renders the forms */
     public boolean isLoaded() { return loaded; }
 
+    /** @return the username, shown read-only */
     public String getUsername() { return username; }
 
+    /** @return the profile photo's URL, or null for the initials circle */
     public String getAvatarUrl() { return avatarUrl; }
 
     /** @return whether there is a photo to show and to remove */
@@ -221,37 +225,51 @@ public class ProfileBean implements Serializable {
 
     // ------------------------------------------------------------------------ form properties
 
+    /** @return the full name */
     public String getFullName() { return fullName; }
 
+    /** @param fullName the full name */
     public void setFullName(String fullName) { this.fullName = fullName; }
 
+    /** @return the email address */
     public String getEmail() { return email; }
 
+    /** @param email the email address */
     public void setEmail(String email) { this.email = email; }
 
+    /** @return the telephone number, may be blank */
     public String getPhone() { return phone; }
 
+    /** @param phone the telephone number, may be blank */
     public void setPhone(String phone) { this.phone = phone; }
 
+    /** @return the region, may be blank */
     public String getRegion() { return region; }
 
+    /** @param region the region, may be blank */
     public void setRegion(String region) { this.region = region; }
 
-    public Long getVersion() { return version; }
-
+    /** @return the photo chosen in the photo form, or null */
     public Part getAvatarFile() { return avatarFile; }
 
+    /** @param avatarFile the photo chosen in the photo form */
     public void setAvatarFile(Part avatarFile) { this.avatarFile = avatarFile; }
 
+    /** @return the current password; null except during a submission */
     public String getCurrentPassword() { return currentPassword; }
 
+    /** @param currentPassword the current password */
     public void setCurrentPassword(String currentPassword) { this.currentPassword = currentPassword; }
 
+    /** @return the new password; null except during a submission */
     public String getNewPassword() { return newPassword; }
 
+    /** @param newPassword the new password */
     public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
 
+    /** @return the new password repeated; null except during a submission */
     public String getConfirmPassword() { return confirmPassword; }
 
+    /** @param confirmPassword the new password repeated */
     public void setConfirmPassword(String confirmPassword) { this.confirmPassword = confirmPassword; }
 }

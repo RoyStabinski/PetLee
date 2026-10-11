@@ -72,7 +72,7 @@ public class SecurityFilter implements ContainerRequestFilter {
 
         boolean adminRequired = matched(AdminOnly.class);
         if (!matched(Secured.class) && !adminRequired) {
-            return; // open endpoint: neither annotation present, nothing to enforce
+            return;
         }
 
         if (caller.isEmpty()) {

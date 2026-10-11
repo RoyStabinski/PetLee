@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@code /api/admin} — the moderation endpoints, an extension to the frozen contract.
- * {@code @AdminOnly} sits on the class, so no method can be added without it.
+ * {@code /api/admin} — the moderation endpoints. {@code @AdminOnly} sits on the class, so no
+ * method can be added without it.
  */
 @Path("admin")
 @AdminOnly
@@ -33,6 +33,7 @@ public class AdminResource {
     public AdminResource() {
     }
 
+    /** @param pets the listing rules */
     @Inject
     public AdminResource(PetService pets) {
         this.pets = pets;

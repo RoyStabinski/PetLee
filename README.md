@@ -47,15 +47,20 @@ Both are idempotent. `src/main/resources/db/README.md` covers the schema in more
 how to create the least-privileged `petlee_app` role the server's connection pool authenticates as.
 Create that role before the next step.
 
-**Upgrading an existing database** instead of creating one: apply the migrations it has not had
-yet, in number order, as described in `src/main/resources/db/README.md#migrations`.
-`migrate-002-favorite.sql` adds the `favorite` table behind the favourites feature. The latest,
-`migrate-003-user-profile.sql`, adds `users.avatar_url` (the profile photo) and `users.version`
-(optimistic locking for the edit-profile form); a build with the profile feature fails on every
-query that loads a user until it has been run. It only adds columns, needs no new grant, and
-does not rewrite existing rows:
+**Upgrading an existing database** instead of creating one: a fresh install needs no migration,
+but a database created by an earlier version of `schema.sql` needs the ones it has not had yet,
+in number order, as described in `src/main/resources/db/README.md#migrations`:
+
+- `migrate-001-pet-image.sql` moves each pet's single `pet.image_url` into the `pet_image` table
+  and drops the column. Back up first and stop the application while it runs.
+- `migrate-002-favorite.sql` adds the `favorite` table behind the favourites feature.
+- `migrate-003-user-profile.sql` adds `users.avatar_url` (the profile photo) and `users.version`
+  (optimistic locking for the edit-profile form). It only adds columns, needs no new grant, and
+  does not rewrite existing rows. A build with the profile feature fails on every query that
+  loads a user until it has been run.
 
 ```bash
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
 ```
@@ -83,6 +88,15 @@ data-source add --name=PetleeDS --jndi-name=java:/jdbc/petlee --driver-name=post
 ```
 
 The last command should answer `"outcome" => "success"`.
+
+Then raise Undertow's request-size limit, so the add-pet form can send five full-size
+photographs in one request (see [Uploaded photographs](#uploaded-photographs) for why), and
+reload the server:
+
+```
+/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size,value=27262976)
+reload
+```
 
 `--min-pool-size=8 --max-pool-size=32` is the connection pool: WildFly keeps at least 8 open
 connections to PostgreSQL ready and never opens more than 32, and every request borrows one from
@@ -134,14 +148,12 @@ directory on WildFly, run in the CLI:
 /system-property=petlee.upload.dir:add(value=C:/petlee/uploads)
 ```
 
-The add-pet form sends all its photographs in one request, up to five of up to 5 MB each.
-WildFly refuses a request body over its `max-post-size`, 10 MB unless configured, before the
-application sees it. To allow five full-size photographs at once, raise it in the CLI and reload:
-
-```
-/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size,value=27262976)
-reload
-```
+Two limits apply to uploads. `ImageStore` refuses any single photograph over 5 MB, pet photographs
+and profile photos alike, with a 400. Undertow, WildFly's web server, refuses a whole request body
+over its `max-post-size`, 10 MB unless configured, before the application sees it. The add-pet
+form sends all its photographs in one request, up to five of up to 5 MB each, so step 3 raises
+`max-post-size` to 26 MB (27262976 bytes). Nothing in `web.xml` limits uploads: Mojarra ignores
+the `jakarta.faces.UPLOADER_*` parameters.
 
 The API itself receives one photograph per request, so it is not affected.
 
@@ -221,25 +233,25 @@ session if there is one.
 
 | Method | Path | Access |
 |---|---|---|
-| POST | `/api/users/register` | open |
+| POST | `/api/users/register` | open — 201 Created with `Location: /api/users/me` (where the new member reads the account once logged in) and the created user as the body |
 | GET | `/api/users/me` | auth — the caller's own account, with `region`, `avatarUrl` and `version` |
 | PUT | `/api/users/me?version=N` | auth — body `{fullName, email, phone, region}`; the username cannot change. `N` is the `version` from `GET /api/users/me`; a stale or missing one is 409 (`code` `STALE_VERSION`), and so is an email address another account has |
 | PUT | `/api/users/me/password` | auth — body `{currentPassword, newPassword}`; a wrong current password is 400, a new one under 8 characters is 400. Revokes every other bearer token of the caller and keeps the one sent; 204 |
 | POST | `/api/users/me/avatar` | auth — multipart/form-data, one part named `file`, the same formats and 5 MB limit as pet photographs; replaces the profile photo and deletes the old file; returns the account |
 | DELETE | `/api/users/me/avatar` | auth — removes the profile photo and its file; returns the account |
 | POST | `/api/auth/login` | open |
-| POST | `/api/auth/logout` | auth |
+| POST | `/api/auth/logout` | auth — 204 |
 | GET | `/api/categories` | open |
-| POST | `/api/categories` | admin |
-| DELETE | `/api/categories/{id}` | admin |
+| POST | `/api/categories` | admin — body `{name}`; 201 Created with `Location: /api/categories/{id}` and the created category as the body |
+| DELETE | `/api/categories/{id}` | admin — 204; 409 while listings still use it |
 | GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
 | GET | `/api/pets/{id}` | open — owner contact fields (`ownerName`, `ownerPhone`, `ownerEmail`, `ownerAvatarUrl`) only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
 | GET | `/api/pets/mine` | auth |
-| POST | `/api/pets` | auth |
+| POST | `/api/pets` | auth — 201 Created with `Location: /api/pets/{id}` and the created listing as the body |
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
-| DELETE | `/api/pets/{id}` | owner or admin |
+| DELETE | `/api/pets/{id}` | owner or admin — 204 |
 | PUT | `/api/pets/{id}/status?status=ADOPTED\|AVAILABLE&version=N` | owner only — marks a listing adopted or available again; `N` is the `version` from the pet as last read |
-| POST | `/api/pets/{id}/images` | owner only — multipart/form-data, one part named `file`; adds one photograph (at most 5); returns `{id, url, main}` |
+| POST | `/api/pets/{id}/images` | owner only — multipart/form-data, one part named `file`; adds one photograph (at most 5); 201 Created with `Location: /api/pets/{id}/images/{imageId}` and `{id, url, main}` as the body |
 | DELETE | `/api/pets/{id}/images/{imageId}` | owner only — deletes the photograph and its file; 204 |
 | PUT | `/api/pets/{id}/images/{imageId}/main` | owner only — makes it the main photograph; 204 |
 | GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
@@ -253,6 +265,12 @@ session if there is one.
 Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, status
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as
 `{"code": "...", "message": "..."}`.
+
+The four endpoints that create something (`POST /api/users/register`, `POST /api/pets`,
+`POST /api/pets/{id}/images` and `POST /api/categories`) answer 201 Created, with a `Location`
+header naming the new resource and the same body as before. Every other success is 200 with a
+body or 204 without one. `PUT /api/favorites/{petId}` stays 204: it is an idempotent put, not a
+creation, and answers the same whether or not the pet was already saved.
 
 `minAge` and `maxAge` are whole numbers from 0 to 50, and either may be given alone; a listing
 whose age is unknown is left out once either is given. A value outside that range, or `minAge`

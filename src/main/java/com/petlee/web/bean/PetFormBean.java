@@ -48,9 +48,11 @@ public class PetFormBean implements Serializable {
     private static final String[] SIZES = {"SMALL", "MEDIUM", "LARGE"};
     private static final String[] GENDERS = {"MALE", "FEMALE"};
 
-    /** Not transient: application-scoped proxies are serializable. */
-    @Inject private PetApi petApi;
-    @Inject private CategoryApi categoryApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private PetApi petApi;
+    @SuppressWarnings("serial") @Inject private CategoryApi categoryApi;
 
     private String name;
     private String breed;
@@ -61,7 +63,9 @@ public class PetFormBean implements Serializable {
     private String longDesc;
     private Integer categoryId;
 
-    private List<CategoryDTO> categories = Collections.emptyList();
+    // Always a serializable implementation (List.of, toList(), emptyList() or the ArrayList
+    // JSON-B builds); javac sees only the interface.
+    @SuppressWarnings("serial") private List<CategoryDTO> categories = Collections.emptyList();
 
     /** Set by the edit page's view parameter; null means "creating". */
     private Long petId;
@@ -73,8 +77,8 @@ public class PetFormBean implements Serializable {
     /** The files chosen in either page's {@code <h:inputFile multiple="true">}. */
     private transient List<Part> uploadedFiles;
 
-    /** The edit page's photographs, main included, oldest first. */
-    private List<PetImageDTO> images = Collections.emptyList();
+    /** The edit page's photographs, main included, oldest first; a serializable list, as above. */
+    @SuppressWarnings("serial") private List<PetImageDTO> images = Collections.emptyList();
 
     /**
      * The add page's view action: fills the category menu.
@@ -136,7 +140,8 @@ public class PetFormBean implements Serializable {
     }
 
     /**
-     * Creates or updates the listing, then uploads the photograph if one was chosen.
+     * Creates or updates the listing. On the add page it then uploads every chosen photograph;
+     * the edit page changes photographs through its own forms.
      *
      * @return the dashboard, or null to stay on the form
      */
@@ -326,14 +331,14 @@ public class PetFormBean implements Serializable {
 
     // ------------------------------------------------------------------------------ the menus
 
+    /** @return every category, for the category menu */
     public List<CategoryDTO> getCategories() { return categories; }
 
+    /** @return the size menu */
     public List<SelectItem> getSizeOptions() { return options(SIZES); }
 
+    /** @return the gender menu */
     public List<SelectItem> getGenderOptions() { return options(GENDERS); }
-
-    /** @return whether the form is editing an existing listing rather than creating one */
-    public boolean isEditing() { return petId != null; }
 
     /** @return the upload limits, shown before the user picks files */
     public String getUploadLimits() {
@@ -388,43 +393,63 @@ public class PetFormBean implements Serializable {
 
     // ------------------------------------------------------------------------ form properties
 
+    /** @return the pet's name */
     public String getName() { return name; }
 
+    /** @param name the pet's name */
     public void setName(String name) { this.name = name; }
 
+    /** @return the breed, may be blank */
     public String getBreed() { return breed; }
 
+    /** @param breed the breed, may be blank */
     public void setBreed(String breed) { this.breed = breed; }
 
+    /** @return the age in whole years, or null when unknown */
     public Integer getAge() { return age; }
 
+    /** @param age the age in whole years, or null when unknown */
     public void setAge(Integer age) { this.age = age; }
 
+    /** @return SMALL, MEDIUM or LARGE */
     public String getSize() { return size; }
 
+    /** @param size SMALL, MEDIUM or LARGE */
     public void setSize(String size) { this.size = size; }
 
+    /** @return MALE or FEMALE */
     public String getGender() { return gender; }
 
+    /** @param gender MALE or FEMALE */
     public void setGender(String gender) { this.gender = gender; }
 
+    /** @return the one-line description the gallery card shows */
     public String getShortDesc() { return shortDesc; }
 
+    /** @param shortDesc the one-line description the gallery card shows */
     public void setShortDesc(String shortDesc) { this.shortDesc = shortDesc; }
 
+    /** @return the full description the details page shows, may be blank */
     public String getLongDesc() { return longDesc; }
 
+    /** @param longDesc the full description the details page shows, may be blank */
     public void setLongDesc(String longDesc) { this.longDesc = longDesc; }
 
+    /** @return the chosen category's id */
     public Integer getCategoryId() { return categoryId; }
 
+    /** @param categoryId the chosen category's id */
     public void setCategoryId(Integer categoryId) { this.categoryId = categoryId; }
 
+    /** @return the listing being edited, or null on the add page */
     public Long getPetId() { return petId; }
 
+    /** @param petId the listing to edit, from the {@code id} view parameter */
     public void setPetId(Long petId) { this.petId = petId; }
 
+    /** @return the files chosen in the photo input, or null */
     public List<Part> getUploadedFiles() { return uploadedFiles; }
 
+    /** @param uploadedFiles the files chosen in the photo input */
     public void setUploadedFiles(List<Part> uploadedFiles) { this.uploadedFiles = uploadedFiles; }
 }

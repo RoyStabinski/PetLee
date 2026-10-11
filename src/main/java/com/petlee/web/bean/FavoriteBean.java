@@ -35,15 +35,18 @@ public class FavoriteBean implements Serializable {
 
     private static final String LOGIN = "/login.xhtml?faces-redirect=true";
 
-    /** Not transient: see UserBean's own field for why. */
-    @Inject private FavoriteApi favoriteApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private FavoriteApi favoriteApi;
     @Inject private UserBean userBean;
 
-    /** The saved pet ids; null until first needed. */
-    private Set<Long> ids;
+    /** The saved pet ids, always a HashSet; null until first needed. */
+    @SuppressWarnings("serial") private Set<Long> ids;
 
-    /** The saved pets, newest first; null until first needed, and after any change. */
-    private List<PetDTO> favorites;
+    // Always a serializable implementation (List.of, toList(), emptyList() or the ArrayList
+    // JSON-B builds); javac sees only the interface.
+    @SuppressWarnings("serial") private List<PetDTO> favorites;
 
     /**
      * Whether the last attempt to read the list failed. Kept apart from an empty list, so a

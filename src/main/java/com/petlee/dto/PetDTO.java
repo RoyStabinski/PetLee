@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A pet as the gallery lists it: no owner contact details, enums as the contract's strings.
+ * A pet as the gallery lists it: no owner contact details, enums as their constant names.
  * {@code imageUrl} is the main image, or null when the pet has none. {@code imageUrls} lists
  * every photograph for the gallery card's carousel, the main one first and the rest oldest
  * first; empty when the pet has none. {@code version} is what the owner sends back with

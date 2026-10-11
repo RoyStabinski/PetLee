@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 
 /**
  * A pet a member has saved. The key is the pair itself, so saving the same pet twice is refused
- * by the database; {@link #getCreatedAt()} orders the member's list, newest first. Only ever
- * inserted or deleted, never updated.
+ * by the database; {@code createdAt} orders the member's list, newest first. Only ever inserted
+ * or deleted, never updated.
  */
 @Entity
 @Table(name = "favorite")
@@ -44,11 +44,5 @@ public class Favorite {
         this.createdAt = LocalDateTime.now();
     }
 
-    public FavoriteId getId() { return id; }
-
-    public User getUser() { return user; }
-
     public Pet getPet() { return pet; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
 }

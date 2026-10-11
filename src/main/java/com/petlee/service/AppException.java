@@ -16,20 +16,36 @@ public class AppException extends RuntimeException {
     private final int status;
     private final String code;
 
+    /**
+     * @param status  the HTTP status for the response
+     * @param message the text shown to the user
+     */
     public AppException(int status, String message) {
         this(status, DEFAULT_CODE, message, null);
     }
 
+    /**
+     * @param status  the HTTP status for the response
+     * @param message the text shown to the user
+     * @param cause   the underlying failure, kept for the log
+     */
     public AppException(int status, String message, Throwable cause) {
         this(status, DEFAULT_CODE, message, cause);
     }
 
+    /**
+     * @param status  the HTTP status for the response
+     * @param code    the code for the error body, such as {@link #STALE_VERSION}
+     * @param message the text shown to the user
+     * @param cause   the underlying failure, or null
+     */
     public AppException(int status, String code, String message, Throwable cause) {
         super(message, cause);
         this.status = status;
         this.code = code;
     }
 
+    /** @return the HTTP status the boundary answers with */
     public int getStatus() {
         return status;
     }

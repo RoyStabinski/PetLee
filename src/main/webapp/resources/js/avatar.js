@@ -1,8 +1,9 @@
 /*
  * The round profile-photo tiles on register.xhtml and editProfile.xhtml. The file input inside
  * each tile is visually hidden; this previews the chosen file in the circle before anything is
- * uploaded, and refuses a file over the 5 MB limit at once, because the server would refuse the
- * whole form for it. Without JavaScript the upload still works, there is just no preview.
+ * uploaded, and refuses a file that is not an image or is over 5 MB at once, rather than after
+ * the whole form has been sent. Without JavaScript the upload still works, there is just no
+ * preview, and the server refuses such a file instead.
  */
 (function () {
     "use strict";

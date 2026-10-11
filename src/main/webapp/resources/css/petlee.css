@@ -1075,8 +1075,6 @@ span.button, span.button-secondary, span.button-danger {
 
 .side-menu-item:hover { background: var(--surface-alt); color: var(--teal-dark); }
 .side-menu-item.is-current { background: var(--teal-tint); color: var(--teal-dark); }
-.side-menu-item.is-disabled { color: var(--muted); cursor: not-allowed; }
-.side-menu-note { font-size: 0.75rem; font-weight: 500; }
 
 .profile-details {
     display: grid;

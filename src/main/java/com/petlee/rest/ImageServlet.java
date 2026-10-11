@@ -19,12 +19,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Serves uploaded photographs at {@code /images/...}. Open, since a guest browsing the gallery
- * has to see them.
+ * Serves uploaded photographs at {@code /images/...}: pets' photographs and members' profile
+ * photos. Open, since a guest browsing the gallery has to see them.
  *
  * <p>Part of the server tier, beside the REST resources, not the JSF presentation tier: it reads
  * the upload store directly and serves the files over plain HTTP. They arrive through
- * {@code POST /api/pets/{id}/image} in {@link PetResource}.
+ * {@code POST /api/pets/{id}/images} in {@link PetResource} and {@code POST /api/users/me/avatar}
+ * in {@link UserResource}.
  *
  * <p>The path is attacker-controlled, so two guards stand in front of the filesystem:
  * {@link ImageStore#resolve} normalises and re-checks containment in the upload root, and the
@@ -55,17 +56,21 @@ public class ImageServlet extends HttpServlet {
     /** One day — safe, because every upload gets a fresh filename, so a URL never changes. */
     private static final String CACHE_CONTROL = "public, max-age=86400";
 
+    // A servlet is never serialized, whatever HttpServlet declares.
+    @SuppressWarnings("serial")
     private ImageStore images;
 
     /** For the container, which instantiates a servlet with a no-argument constructor. */
     public ImageServlet() {
     }
 
+    /** @param images the upload store, injected by the container */
     @Inject
     public void setImages(ImageStore images) {
         this.images = images;
     }
 
+    /** Serves one file, or a bare 404. */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {

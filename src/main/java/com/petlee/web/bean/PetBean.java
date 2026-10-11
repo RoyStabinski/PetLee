@@ -33,20 +33,24 @@ public class PetBean implements Serializable {
     /** Shown for a listing with no photograph. Bundled, so it cannot 404. */
     static final String PLACEHOLDER_IMAGE = "/resources/images/placeholder-pet.png";
 
-    /** Not transient: application-scoped proxies are serializable. */
-    @Inject private PetApi petApi;
-    @Inject private CategoryApi categoryApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private PetApi petApi;
+    @SuppressWarnings("serial") @Inject private CategoryApi categoryApi;
 
-    private List<PetDTO> pets = List.of();
-    private List<CategoryDTO> categories = List.of();
+    // Always a serializable implementation (List.of, toList(), emptyList() or the ArrayList
+    // JSON-B builds); javac sees only the interface.
+    @SuppressWarnings("serial") private List<PetDTO> pets = List.of();
+    @SuppressWarnings("serial") private List<CategoryDTO> categories = List.of();
     private Integer selectedCategoryId;
     private String selectedSize;
     private String selectedGender;
     private Integer minAge;
     private Integer maxAge;
 
-    /** The owner's own listings, every status included; loaded on first use. */
-    private List<PetDTO> myListings;
+    /** The owner's own listings, every status included; a serializable list, as above. */
+    @SuppressWarnings("serial") private List<PetDTO> myListings;
 
     /**
      * The gallery's view action: the filter's categories, then the unfiltered gallery.
@@ -101,10 +105,18 @@ public class PetBean implements Serializable {
         return null;
     }
 
+    /**
+     * @param petId a listing
+     * @return the details page for it, as a redirect
+     */
     public String viewDetails(Long petId) {
         return "/petDetails.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
+    /**
+     * @param pet a gallery listing
+     * @return its main photograph, or the placeholder
+     */
     public String imageUrlOf(PetDTO pet) { return imageOf(pet == null ? null : pet.imageUrl()); }
 
     /**
@@ -157,12 +169,18 @@ public class PetBean implements Serializable {
         return age == 1 ? "1 yr" : age + " yrs";
     }
 
+    /**
+     * @param pet a gallery listing
+     * @return its age chip, or "" when unknown
+     */
     public String ageOf(PetDTO pet) { return ageLabelOf(pet == null ? null : pet.age()); }
 
+    /** @return the size filter's menu: "Any size" plus each size */
     public List<SelectItem> getSizeOptions() {
         return options("Any size", "SMALL", "MEDIUM", "LARGE");
     }
 
+    /** @return the gender filter's menu: "Any gender" plus each gender */
     public List<SelectItem> getGenderOptions() {
         return options("Any gender", "MALE", "FEMALE");
     }
@@ -213,6 +231,7 @@ public class PetBean implements Serializable {
         return myListings;
     }
 
+    /** @return whether the owner has no listings at all */
     public boolean isNoListings() {
         return getMyListings().isEmpty();
     }
@@ -290,25 +309,58 @@ public class PetBean implements Serializable {
         }
     }
 
+    /**
+     * @param petId one of the owner's listings
+     * @return its edit page, as a redirect
+     */
     public String edit(Long petId) {
         return "/editPet.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
+    /**
+     * @param pet a listing
+     * @return the CSS classes of its status badge
+     */
     public String statusStyle(PetDTO pet) { return statusClassOf(pet == null ? null : pet.status()); }
 
     // -------------------------------------------------------------------------------- properties
 
+    /** @return the gallery, after the filters */
     public List<PetDTO> getPets() { return pets; }
+
+    /** @return every category, for the gallery filter */
     public List<CategoryDTO> getCategories() { return categories; }
+
+    /** @return whether no listing matches the gallery filters */
     public boolean isEmpty() { return pets.isEmpty(); }
+
+    /** @return the category filter, or null for any */
     public Integer getSelectedCategoryId() { return selectedCategoryId; }
+
+    /** @param v the category filter, or null for any */
     public void setSelectedCategoryId(Integer v) { this.selectedCategoryId = v; }
+
+    /** @return the size filter, or null for any */
     public String getSelectedSize() { return selectedSize; }
+
+    /** @param v the size filter, or null for any */
     public void setSelectedSize(String v) { this.selectedSize = v; }
+
+    /** @return the gender filter, or null for any */
     public String getSelectedGender() { return selectedGender; }
+
+    /** @param v the gender filter, or null for any */
     public void setSelectedGender(String v) { this.selectedGender = v; }
+
+    /** @return the youngest age to show, or null for no lower bound */
     public Integer getMinAge() { return minAge; }
+
+    /** @param v the youngest age to show, or null for no lower bound */
     public void setMinAge(Integer v) { this.minAge = v; }
+
+    /** @return the oldest age to show, or null for no upper bound */
     public Integer getMaxAge() { return maxAge; }
+
+    /** @param v the oldest age to show, or null for no upper bound */
     public void setMaxAge(Integer v) { this.maxAge = v; }
 }

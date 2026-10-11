@@ -50,6 +50,10 @@ public class PageAccessFilter implements Filter {
     @Inject
     private UserBean userBean;
 
+    /**
+     * Lets a public page through, sends a guest on a members-only page to the login page, and
+     * answers 403 to a member on an administrator's page.
+     */
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {

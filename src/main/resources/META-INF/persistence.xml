@@ -31,7 +31,7 @@
             <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
 
             <!-- Validation belongs to the service layer, where a violation can be turned into
-                 the contract's error shape; one thrown from flush() cannot be. -->
+                 the API's JSON error body; one thrown from flush() cannot be. -->
             <property name="jakarta.persistence.validation.mode" value="NONE"/>
         </properties>
 

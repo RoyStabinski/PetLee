@@ -23,6 +23,10 @@ import jakarta.ws.rs.ext.Provider;
 public class ConstraintViolationExceptionMapper
         implements ExceptionMapper<ConstraintViolationException> {
 
+    /**
+     * @param violations the bean-validation failure
+     * @return 400 with code {@code VALIDATION_FAILED} and the first violation as the message
+     */
     @Override
     public Response toResponse(ConstraintViolationException violations) {
         String message = violations.getConstraintViolations().stream().findFirst()

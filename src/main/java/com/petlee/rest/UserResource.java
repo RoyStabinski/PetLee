@@ -28,6 +28,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.EntityPart;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,10 +53,19 @@ public class UserResource {
     @Context
     private HttpServletRequest request;
 
+    /** For the Location header of a 201 Created. */
+    @Context
+    private UriInfo uriInfo;
+
     /** For the container. Public, as Jakarta REST requires of a root resource class. */
     public UserResource() {
     }
 
+    /**
+     * @param users       the account rules
+     * @param currentUser resolves the caller from the bearer token or the session
+     * @param tokens      the bearer tokens, for revoking them on a password change
+     */
     @Inject
     public UserResource(UserService users, CurrentUser currentUser, TokenStore tokens) {
         this.users = users;
@@ -67,19 +77,23 @@ public class UserResource {
      * {@code POST /api/users/register} — open. Creates no session; registration does not log
      * anybody in. {@link UserDTO} has no password field, so none can be echoed back.
      *
+     * <p>There is no endpoint that reads a user by id, so the Location header names
+     * {@code /api/users/me}, where the new member reads the account once logged in.
+     *
      * @param form the registration body
-     * @return the created user
+     * @return 201 Created, with {@code Location: /api/users/me} and the created user as the body
      */
     @POST
     @Path("register")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public UserDTO register(RegisterForm form) {
+    public Response register(RegisterForm form) {
         if (form == null) {
             throw new AppException(400, "A request body is required");
         }
         User user = users.register(form);
-        return UserDTO.of(user);
+        return Response.created(uriInfo.getBaseUriBuilder().path(UserResource.class).path("me").build())
+                .entity(UserDTO.of(user)).build();
     }
 
     /**

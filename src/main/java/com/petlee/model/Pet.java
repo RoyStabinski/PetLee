@@ -93,8 +93,6 @@ public class Pet {
 
     public Long getPetId(){ return petId; }
 
-    public void setPetId(Long petId){ this.petId = petId; }
-
     public String getPetName(){ return petName; }
 
     public void setPetName(String petName){ this.petName = petName; }

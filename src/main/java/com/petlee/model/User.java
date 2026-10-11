@@ -67,8 +67,6 @@ public class User {
 
     public Long getUserId() { return userId; }
 
-    public void setUserId(Long userId) { this.userId = userId; }
-
     public String getUserName() { return userName; }
 
     public void setUserName(String userName) { this.userName = userName; }
@@ -97,13 +95,8 @@ public class User {
 
     public void setRole(Role role) { this.role = role; }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-
-    // No setter: see the field.
     public String getAvatarUrl() { return avatarUrl; }
 
     // Long, not long: null until the row is first written. No setter — JPA owns this field.
     public Long getVersion() { return version; }
-
-    public boolean isAdmin() { return role == Role.ADMIN; }
 }

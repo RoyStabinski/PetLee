@@ -27,8 +27,10 @@ public class PetDetailBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** Not transient: see UserBean's own field for why. */
-    @Inject private PetApi petApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private PetApi petApi;
 
     private Long petId;
     private PetDetailDTO pet;
@@ -124,9 +126,12 @@ public class PetDetailBean implements Serializable {
         return UserBean.initialsOf(pet == null ? null : pet.ownerName());
     }
 
+    /** @return the listing's id, from the {@code id} view parameter */
     public Long getPetId() { return petId; }
 
+    /** @param petId the listing's id, from the {@code id} view parameter */
     public void setPetId(Long petId) { this.petId = petId; }
 
+    /** @return the listing as the API returned it, or null before it loads or on a failure */
     public PetDetailDTO getPet() { return pet; }
 }

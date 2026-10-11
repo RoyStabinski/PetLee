@@ -14,13 +14,15 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 
 import java.util.List;
 
 /**
- * {@code /api/categories} — the fixed vocabulary the gallery filter and the add-pet form read.
+ * {@code /api/categories} — the category vocabulary the gallery filter and the add-pet form read.
  * Reading is open, since a guest needs the filter panel; writing is the administrator's.
  */
 @Path("categories")
@@ -29,10 +31,15 @@ public class CategoryResource {
 
     private CategoryService categories;
 
+    /** For the Location header of a 201 Created. */
+    @Context
+    private UriInfo uriInfo;
+
     /** For the container. Public, as Jakarta REST requires of a root resource class. */
     public CategoryResource() {
     }
 
+    /** @param categories the category rules */
     @Inject
     public CategoryResource(CategoryService categories) {
         this.categories = categories;
@@ -53,17 +60,20 @@ public class CategoryResource {
      * {@code POST /api/categories} — admin.
      *
      * @param body the new category; only {@code name} is read, since the database assigns the id
-     * @return the created category
+     * @return 201 Created, with {@code Location: /api/categories/{id}} and the created category
+     *         as the body
      */
     @POST
     @AdminOnly
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public CategoryDTO create(CategoryDTO body) {
+    public Response create(CategoryDTO body) {
         if (body == null) {
             throw new AppException(400, "A category name is required");
         }
-        return CategoryDTO.of(categories.create(body.name()));
+        CategoryDTO created = CategoryDTO.of(categories.create(body.name()));
+        return Response.created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build())
+                .entity(created).build();
     }
 
     /**

@@ -53,12 +53,4 @@ public final class PhoneNumbers {
                 ? "0" + m.group(1) + "-" + m.group(2)
                 : "0" + m.group(3) + "-" + m.group(4);
     }
-
-    /**
-     * @param raw the number as typed, may be null
-     * @return whether {@link #normalize} accepts it; false for null and blank
-     */
-    public static boolean isValid(String raw) {
-        return normalize(raw) != null;
-    }
 }

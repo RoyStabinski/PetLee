@@ -30,14 +30,14 @@ public class UserService {
     private UserRepository users;
     private ImageStore images;
 
-    /** Self-reference, so the scalar overload reaches {@code @Valid} through the CDI proxy. */
-    @Inject
-    private UserService self;
-
     /** For CDI only. */
     protected UserService() {
     }
 
+    /**
+     * @param users  the accounts
+     * @param images the profile photo files
+     */
     @Inject
     public UserService(UserRepository users, ImageStore images) {
         this.users = users;
@@ -84,12 +84,6 @@ public class UserService {
         }
     }
 
-    /** Scalar overload for the JSF tier, which cannot bind a record. */
-    public User register(String username, String password, String fullName, String email,
-                         String phone, String region) {
-        return self.register(new RegisterForm(username, password, fullName, email, phone, region));
-    }
-
     /**
      * Checks a username and password. An unknown user and a wrong password fail identically,
      * so this cannot be used to discover which accounts exist.
@@ -109,17 +103,6 @@ public class UserService {
         }
 
         return found.get();
-    }
-
-    /**
-     * Looks a user up by id.
-     *
-     * @param id the user id, may be null
-     * @return the user, or empty for a null or unknown id
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public Optional<User> findById(Long id) {
-        return users.findById(id);
     }
 
     /**

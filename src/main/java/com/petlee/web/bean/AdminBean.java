@@ -44,18 +44,23 @@ public class AdminBean implements Serializable {
     private static final String[] STATUSES = {"AVAILABLE", "ADOPTED", "REMOVED"};
     private static final String[] STATUS_LABELS = {"Available", "Adopted", "Withdrawn"};
 
-    /** Not transient: application-scoped proxies are serializable. */
-    @Inject private AdminApi adminApi;
-    @Inject private CategoryApi categoryApi;
+    // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
+    // serializable; javac sees only the declared type. Transient would leave null after
+    // the session or view is passivated and restored.
+    @SuppressWarnings("serial") @Inject private AdminApi adminApi;
+    @SuppressWarnings("serial") @Inject private CategoryApi categoryApi;
 
-    private List<AdminPetDTO> listings = Collections.emptyList();
-    private List<CategoryDTO> categories = Collections.emptyList();
+    // Always a serializable implementation (List.of, toList(), emptyList() or the ArrayList
+    // JSON-B builds); javac sees only the interface.
+    @SuppressWarnings("serial") private List<AdminPetDTO> listings = Collections.emptyList();
+    @SuppressWarnings("serial") private List<CategoryDTO> categories = Collections.emptyList();
 
     /**
      * How many listings each category holds, keyed by id — the delete guard's evidence.
-     * Counted over every listing, so the table's filters cannot distort it.
+     * Counted over every listing, so the table's filters cannot distort it. Map.of() or the
+     * HashMap JSON-B builds, both serializable.
      */
-    private Map<Integer, Long> listingsPerCategory = Map.of();
+    @SuppressWarnings("serial") private Map<Integer, Long> listingsPerCategory = Map.of();
 
     private Integer selectedCategoryId;
     private String selectedSize;
@@ -119,7 +124,7 @@ public class AdminBean implements Serializable {
     }
 
     /**
-     * Deletes a listing permanently, with its photograph. The page confirms first.
+     * Deletes a listing permanently, with its photographs. The page confirms first.
      *
      * @param petId the listing
      * @return null
@@ -219,10 +224,13 @@ public class AdminBean implements Serializable {
 
     // --------------------------------------------------------------------------- presentation
 
+    /** @return the moderation table's rows, after the filters */
     public List<AdminPetDTO> getListings() { return listings; }
 
+    /** @return whether no listing matches the filters */
     public boolean isNoListings() { return listings.isEmpty(); }
 
+    /** @return every category, for the category table */
     public List<CategoryDTO> getCategories() { return categories; }
 
     /**
@@ -233,10 +241,18 @@ public class AdminBean implements Serializable {
         return pet != null && "REMOVED".equals(pet.status());
     }
 
+    /**
+     * @param pet a listing
+     * @return the CSS classes of its status badge
+     */
     public String statusStyle(AdminPetDTO pet) {
         return PetBean.statusClassOf(pet == null ? null : pet.status());
     }
 
+    /**
+     * @param pet a listing
+     * @return its main photograph, or the placeholder
+     */
     public String thumbnailOf(AdminPetDTO pet) {
         return PetBean.imageOf(pet == null ? null : pet.imageUrl());
     }
@@ -276,10 +292,13 @@ public class AdminBean implements Serializable {
         return items;
     }
 
+    /** @return the size filter's menu: "Any" plus each size */
     public List<SelectItem> getSizeOptions() { return options(SIZES, SIZE_LABELS); }
 
+    /** @return the gender filter's menu: "Any" plus each gender */
     public List<SelectItem> getGenderOptions() { return options(GENDERS, GENDER_LABELS); }
 
+    /** @return the status filter's menu: "Any" plus each status */
     public List<SelectItem> getStatusOptions() { return options(STATUSES, STATUS_LABELS); }
 
     /** Builds a filter menu of "Any" plus each raw value under the label a moderator reads. */
@@ -294,26 +313,36 @@ public class AdminBean implements Serializable {
 
     // -------------------------------------------------------------------------------- properties
 
+    /** @return the category filter, or null for any */
     public Integer getSelectedCategoryId() { return selectedCategoryId; }
 
+    /** @param selectedCategoryId the category filter, or null for any */
     public void setSelectedCategoryId(Integer selectedCategoryId) { this.selectedCategoryId = selectedCategoryId; }
 
+    /** @return the size filter, or null for any */
     public String getSelectedSize() { return selectedSize; }
 
+    /** @param selectedSize the size filter, or null for any */
     public void setSelectedSize(String selectedSize) { this.selectedSize = selectedSize; }
 
+    /** @return the gender filter, or null for any */
     public String getSelectedGender() { return selectedGender; }
 
+    /** @param selectedGender the gender filter, or null for any */
     public void setSelectedGender(String selectedGender) { this.selectedGender = selectedGender; }
 
+    /** @return the status filter, upper case, or null for any */
     public String getSelectedStatus() { return selectedStatus; }
 
+    /** @param selectedStatus the status filter in any case, or null for any */
     public void setSelectedStatus(String selectedStatus) {
         this.selectedStatus = selectedStatus == null ? null
                 : selectedStatus.trim().toUpperCase(Locale.ROOT);
     }
 
+    /** @return the name typed into the "add category" field */
     public String getNewCategoryName() { return newCategoryName; }
 
+    /** @param newCategoryName the name typed into the "add category" field */
     public void setNewCategoryName(String newCategoryName) { this.newCategoryName = newCategoryName; }
 }

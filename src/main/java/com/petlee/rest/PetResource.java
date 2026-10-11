@@ -28,6 +28,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.EntityPart;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,18 +49,22 @@ public class PetResource {
 
     private CurrentUser currentUser;
 
-    /**
-     * For the Authorization header and the session, which Jakarta REST has none of its own.
-     */
+    /** For the Authorization header and the session, which Jakarta REST has none of its own. */
     @Context
     private HttpServletRequest request;
 
-    /**
-     * For the container. Public, as Jakarta REST requires of a root resource class.
-     */
+    /** For the Location header of a 201 Created. */
+    @Context
+    private UriInfo uriInfo;
+
+    /** For the container. Public, as Jakarta REST requires of a root resource class. */
     public PetResource() {
     }
 
+    /**
+     * @param pets        the listing rules
+     * @param currentUser resolves the caller from the bearer token or the session
+     */
     @Inject
     public PetResource(PetService pets, CurrentUser currentUser) {
         this.pets = pets;
@@ -107,8 +112,8 @@ public class PetResource {
     }
 
     /**
-     * {@code GET /api/pets/mine} — auth. An extension to the contract, for the dashboard.
-     * The owner is the session user and never a parameter.
+     * {@code GET /api/pets/mine} — auth. The owner's dashboard. The owner is the caller and never
+     * a parameter.
      *
      * @return this user's listings, newest first, in every status
      */
@@ -121,20 +126,22 @@ public class PetResource {
     }
 
     /**
-     * {@code POST /api/pets} — auth. Answers 200, not 201: the contract is frozen.
+     * {@code POST /api/pets} — auth. The owner is the caller.
      *
      * @param form the listing to create
-     * @return the created listing
+     * @return 201 Created, with {@code Location: /api/pets/{id}} and the created listing as the body
      */
     @POST
     @Secured
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetDTO create(PetForm form) {
+    public Response create(PetForm form) {
         if (form == null) {
             throw new AppException(400, "A request body is required");
         }
-        return PetDTO.of(pets.create(form, caller().userId()));
+        PetDTO created = PetDTO.of(pets.create(form, caller().userId()));
+        return Response.created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build())
+                .entity(created).build();
     }
 
     /**
@@ -261,14 +268,15 @@ public class PetResource {
      *
      * @param id   the pet
      * @param file the {@code file} part, or null when the request has none
-     * @return the stored photograph
+     * @return 201 Created, with {@code Location: /api/pets/{id}/images/{imageId}} and the stored
+     *         photograph as the body
      */
     @POST
     @Path("{id: \\d+}/images")
     @Secured
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetImageDTO addImage(@PathParam("id") Long id, @FormParam("file") EntityPart file) {
+    public Response addImage(@PathParam("id") Long id, @FormParam("file") EntityPart file) {
         if (file == null) {
             throw new AppException(400, "A photo file is required, as the multipart part \"file\"");
         }
@@ -277,7 +285,9 @@ public class PetResource {
 
         InputStream content = file.getContent();
         try {
-            return PetImageDTO.of(pets.addImage(id, content, contentType, caller().userId()));
+            PetImageDTO stored = PetImageDTO.of(pets.addImage(id, content, contentType, caller().userId()));
+            return Response.created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(stored.id())).build())
+                    .entity(stored).build();
         } finally {
             try {
                 content.close();

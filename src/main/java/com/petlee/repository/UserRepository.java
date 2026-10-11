@@ -7,16 +7,25 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import java.util.Optional;
 
+/** The accounts: lookups, the uniqueness checks behind registration and profile edits, and writes. */
 @ApplicationScoped
 public class UserRepository {
 
     @PersistenceContext(unitName = "petlee-pu")
     private EntityManager em;
 
+    /**
+     * @param id the user's id, may be null
+     * @return the user, or empty for a null or unknown id
+     */
     public Optional<User> findById(Long id) {
         return id == null ? Optional.empty() : Optional.ofNullable(em.find(User.class, id));
     }
 
+    /**
+     * @param username the exact username, may be null
+     * @return the user, or empty for a null or unknown username
+     */
     public Optional<User> findByUsername(String username) {
         if (username == null) {
             return Optional.empty();
@@ -26,15 +35,26 @@ public class UserRepository {
                 .getResultStream().findFirst();
     }
 
-    // LOWER() on both sides, matching ux_users_email_lower: one mailbox, one account,
-    // whatever case it is typed in.
+    /**
+     * Compares with LOWER() on both sides, matching ux_users_email_lower: one mailbox, one
+     * account, whatever case it is typed in.
+     *
+     * @param email the address, may be null
+     * @return whether any account uses it; false for null
+     */
     public boolean existsByEmail(String email) {
         return email != null && em.createQuery(
                         "SELECT COUNT(u) FROM User u WHERE LOWER(u.email) = LOWER(:email)", Long.class)
                 .setParameter("email", email).getSingleResult() > 0;
     }
 
-    // The same check for a profile update: the member's own row does not count against them.
+    /**
+     * The same check for a profile update: the member's own row does not count against them.
+     *
+     * @param email  the address, may be null
+     * @param userId the member saving the profile
+     * @return whether another account uses the address; false for null
+     */
     public boolean existsByEmailForOtherUser(String email, Long userId) {
         return email != null && em.createQuery(
                         "SELECT COUNT(u) FROM User u WHERE LOWER(u.email) = LOWER(:email)"
@@ -85,12 +105,23 @@ public class UserRepository {
                 .executeUpdate();
     }
 
+    /**
+     * @param username the exact username, may be null
+     * @return whether an account has it; false for null
+     */
     public boolean existsByUsername(String username) {
         return username != null && em.createQuery(
                         "SELECT COUNT(u) FROM User u WHERE u.userName = :name", Long.class)
                 .setParameter("name", username).getSingleResult() > 0;
     }
 
+    /**
+     * Inserts a new user or merges a detached one, and flushes, so a unique-index violation or
+     * an optimistic-lock failure surfaces here, where the service turns it into a 409.
+     *
+     * @param user the user to save
+     * @return the managed user
+     */
     public User save(User user) {
         if (user.getUserId() == null) {
             em.persist(user);

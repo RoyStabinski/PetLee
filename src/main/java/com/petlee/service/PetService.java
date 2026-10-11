@@ -35,14 +35,17 @@ public class PetService {
     private CategoryService categories;
     private ImageStore images;
 
-    /** Self-reference, so the scalar overloads reach {@code @Valid} through the CDI proxy. */
-    @Inject
-    private PetService self;
-
     /** For CDI only. */
     protected PetService() {
     }
 
+    /**
+     * @param pets       the listings
+     * @param petImages  the listings' photograph rows
+     * @param users      the owners
+     * @param categories the category lookup
+     * @param images     the photograph files
+     */
     @Inject
     public PetService(PetRepository pets, PetImageRepository petImages, UserRepository users,
                       CategoryService categories, ImageStore images) {
@@ -217,13 +220,6 @@ public class PetService {
         return pets.save(pet);
     }
 
-    /** Scalar overload for the JSF tier, which cannot bind a record. */
-    public Pet create(String name, String breed, Integer age, String size, String gender,
-                      String shortDesc, String longDesc, Integer categoryId, Long ownerUserId) {
-        return self.create(new PetForm(name, breed, age, size, gender, shortDesc, longDesc, categoryId),
-                ownerUserId);
-    }
-
     /**
      * Edits a listing. Only its owner may do so — not an administrator.
      *
@@ -260,14 +256,6 @@ public class PetService {
         } catch (OptimisticLockException e) {
             throw concurrentEdit(e);
         }
-    }
-
-    /** Scalar overload for the JSF tier, which cannot bind a record. */
-    public Pet update(Long petId, String name, String breed, Integer age, String size,
-                      String gender, String shortDesc, String longDesc, Integer categoryId,
-                      Long expectedVersion, Long callerUserId) {
-        return self.update(petId, new PetForm(name, breed, age, size, gender, shortDesc, longDesc,
-                categoryId), expectedVersion, callerUserId);
     }
 
     /**
@@ -440,23 +428,6 @@ public class PetService {
             return List.of();
         }
         return pets.find(null, null, null, null, null, ownerUserId, false);
-    }
-
-    /**
-     * Whether a user owns a listing, so the views can decide what to draw.
-     *
-     * @param petId  the pet's id, may be null
-     * @param userId the user's id, may be null
-     * @return true only when both ids are present, the pet exists, and it belongs to that user
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public boolean isOwner(Long petId, Long userId) {
-        if (petId == null || userId == null) {
-            return false;
-        }
-        return pets.findById(petId)
-                .map(pet -> isSameUser(pet.getOwner(), userId))
-                .orElse(false);
     }
 
     /**

@@ -46,13 +46,9 @@ public class PetImage {
 
     public Long getImageId() { return imageId; }
 
-    public Pet getPet() { return pet; }
-
     public String getImageUrl() { return imageUrl; }
 
     public boolean isMain() { return main; }
 
     public void setMain(boolean main) { this.main = main; }
-
-    public LocalDateTime getUploadedAt() { return uploadedAt; }
 }

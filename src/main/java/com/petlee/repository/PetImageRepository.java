@@ -17,7 +17,10 @@ public class PetImageRepository {
     @PersistenceContext(unitName = "petlee-pu")
     private EntityManager em;
 
-    /** @return the pet's images, oldest first */
+    /**
+     * @param petId the pet
+     * @return the pet's images, oldest first
+     */
     public List<PetImage> findByPet(Long petId) {
         return em.createQuery("SELECT i FROM PetImage i WHERE i.pet.petId = :petId"
                         + " ORDER BY i.uploadedAt ASC, i.imageId ASC", PetImage.class)
@@ -25,7 +28,11 @@ public class PetImageRepository {
                 .getResultList();
     }
 
-    /** @return the image, only if it belongs to that pet */
+    /**
+     * @param petId   the pet
+     * @param imageId the image
+     * @return the image, only if it belongs to that pet; empty if either id is null
+     */
     public Optional<PetImage> findInPet(Long petId, Long imageId) {
         if (petId == null || imageId == null) {
             return Optional.empty();
@@ -37,10 +44,12 @@ public class PetImageRepository {
                 .getResultStream().findFirst();
     }
 
+    /** @param image a new image row, written at the next flush */
     public void persist(PetImage image) {
         em.persist(image);
     }
 
+    /** @param image a managed image row, deleted at the next flush */
     public void remove(PetImage image) {
         em.remove(image);
     }

@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/** The listings: the gallery and dashboard query, single loads, row locks and writes. */
 @ApplicationScoped
 public class PetRepository {
 
@@ -27,8 +28,14 @@ public class PetRepository {
      * <p>Every filter is a named parameter; no value is ever concatenated into the JPQL. An age
      * bound excludes listings whose age is unknown, since SQL compares null as unknown.
      *
-     * @param minAge the youngest age to include, or null for no lower bound
-     * @param maxAge the oldest age to include, or null for no upper bound
+     * @param categoryId    the category, or null for any
+     * @param size          the size, or null for any
+     * @param gender        the gender, or null for any
+     * @param minAge        the youngest age to include, or null for no lower bound
+     * @param maxAge        the oldest age to include, or null for no upper bound
+     * @param ownerId       the owner, or null for anyone's
+     * @param availableOnly whether to keep AVAILABLE listings only
+     * @return the matching pets, newest first
      */
     public List<Pet> find(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
                           Integer minAge, Integer maxAge, Long ownerId, boolean availableOnly) {
@@ -72,6 +79,13 @@ public class PetRepository {
         return query.getResultList();
     }
 
+    /**
+     * Loads one pet with its category, owner and images, which the callers read after the
+     * transaction has ended.
+     *
+     * @param id the pet's id, may be null
+     * @return the pet, or empty for a null or unknown id
+     */
     public Optional<Pet> findById(Long id) {
         if (id == null) {
             return Optional.empty();
@@ -100,8 +114,9 @@ public class PetRepository {
     }
 
     /**
-     * Counts listings per category in every status, independent of any filter. Categories
-     * holding no listings are absent from the map.
+     * Counts listings per category in every status, independent of any filter.
+     *
+     * @return listing counts keyed by category id; a category with no listings is absent
      */
     public Map<Integer, Long> countByCategory() {
         return em.createQuery(
@@ -111,6 +126,13 @@ public class PetRepository {
                 .collect(Collectors.toMap(row -> (Integer) row[0], row -> (Long) row[1]));
     }
 
+    /**
+     * Inserts a new pet or merges a detached one, and flushes, so an optimistic-lock failure
+     * surfaces here, where the service turns it into a 409.
+     *
+     * @param pet the pet to save
+     * @return the managed pet
+     */
     public Pet save(Pet pet) {
         if (pet.getPetId() == null) {
             em.persist(pet);
@@ -122,6 +144,11 @@ public class PetRepository {
         return merged;
     }
 
+    /**
+     * Deletes a pet, its image rows going with it through the cascade, and flushes.
+     *
+     * @param pet the pet, managed or detached
+     */
     public void delete(Pet pet) {
         em.remove(em.contains(pet) ? pet : em.merge(pet));
         em.flush();

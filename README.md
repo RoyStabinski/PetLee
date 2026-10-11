@@ -167,6 +167,28 @@ The API itself receives one photograph per request, so it is not affected.
   hides the real deployment state. `deploy ... --force` reports success or the actual error
   directly. If you did use the folder, delete any `pet-lee.war.*` marker files it contains.
 
+## Running the tests
+
+From the project root:
+
+```bash
+mvn test
+```
+
+(add `-q` for quiet output, or run **test** from IntelliJ's Maven Lifecycle). The JUnit tests need
+no database, server or network, and cover:
+
+- `PasswordHasherTest`: hashing and verifying, wrong passwords, a fresh random salt per hash, the
+  `pbkdf2_sha256$` format, and null, empty or malformed stored values failing without an exception.
+- `PhoneNumbersTest`: valid mobile, landline and 07X numbers in many spellings (spaces, dashes,
+  parentheses, `+972`, `972`) and their stored form; too short, too long, wrong-prefix and
+  lettered numbers refused.
+- `TokenStoreTest`: issuing, resolving and revoking tokens, `revokeAllExcept`, the 30-minute idle
+  expiry and its sliding renewal (on a test clock, so nothing waits), and 32 threads sharing one
+  store without losing or reviving a token.
+
+`mvn package` runs the same tests before it builds the WAR, and builds nothing if one fails.
+
 ## Alternative servers
 
 Any Jakarta EE 10 server works, as long as it provides a DataSource named `jdbc/petlee`. On Payara 6

@@ -3,7 +3,11 @@ package com.petlee.rest.security;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,6 +39,22 @@ public class TokenStore {
 
     private final ConcurrentHashMap<String, Entry> entries = new ConcurrentHashMap<>();
 
+    private final Clock clock;
+
+    /** The store the container creates, timed by the system's monotonic clock. */
+    public TokenStore() {
+        this(new MonotonicClock());
+    }
+
+    /**
+     * A store timed by the given clock, so tests can move time forward instead of waiting.
+     *
+     * @param clock the source of "now"; must not be null
+     */
+    TokenStore(Clock clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
     /**
      * Issues a new token for an authenticated user. Also sweeps out tokens that expired without
      * ever being presented again, which a lookup-only cleanup would keep forever.
@@ -44,7 +64,7 @@ public class TokenStore {
      */
     public String issue(SessionUser user) {
         Objects.requireNonNull(user, "user");
-        long now = System.nanoTime();
+        Instant now = clock.instant();
         entries.values().removeIf(entry -> entry.expiredAt(now));
 
         byte[] bytes = new byte[TOKEN_BYTES];
@@ -66,7 +86,7 @@ public class TokenStore {
         if (token == null || token.isEmpty()) {
             return Optional.empty();
         }
-        long now = System.nanoTime();
+        Instant now = clock.instant();
         Entry live = entries.computeIfPresent(token,
                 (key, entry) -> entry.expiredAt(now) ? null : new Entry(entry.user(), now));
         return live == null ? Optional.empty() : Optional.of(live.user());
@@ -103,11 +123,34 @@ public class TokenStore {
         });
     }
 
-    /** A user and when their token was last used, on the monotonic clock. */
-    private record Entry(SessionUser user, long lastUsedNanos) {
+    /** A user and when their token was last used. */
+    private record Entry(SessionUser user, Instant lastUsed) {
 
-        boolean expiredAt(long nowNanos) {
-            return nowNanos - lastUsedNanos > IDLE_TIMEOUT.toNanos();
+        boolean expiredAt(Instant now) {
+            return Duration.between(lastUsed, now).compareTo(IDLE_TIMEOUT) > 0;
+        }
+    }
+
+    /**
+     * {@link System#nanoTime()} as a {@link Clock}. Only differences between its instants mean
+     * anything, which is all an idle timeout needs, and unlike the wall clock it never jumps when
+     * the system time is adjusted.
+     */
+    private static final class MonotonicClock extends Clock {
+
+        @Override
+        public Instant instant() {
+            return Instant.EPOCH.plusNanos(System.nanoTime());
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            throw new UnsupportedOperationException("a monotonic clock has no zone");
         }
     }
 }

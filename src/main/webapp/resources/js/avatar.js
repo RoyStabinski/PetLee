@@ -4,6 +4,10 @@
  * uploaded, and refuses a file that is not an image or is over 5 MB at once, rather than after
  * the whole form has been sent. Without JavaScript the upload still works, there is just no
  * preview, and the server refuses such a file instead.
+ *
+ * A chosen file is previewed centred, since an upload resets the focal point; the saved photo's
+ * own crop (its inline object-position) comes back if the choice is undone. After a Faces ajax
+ * update that replaced a tile (the focus editor re-renders it), the new tile is set up again.
  */
 (function () {
     "use strict";
@@ -16,11 +20,13 @@
         var img = picker.querySelector("[data-avatar-img]");
         var placeholder = picker.querySelector("[data-avatar-placeholder]");
         var caption = picker.querySelector("[data-avatar-caption]");
-        if (!input || !img || !caption) {
+        if (!input || !img || !caption || picker.hasAttribute("data-avatar-ready")) {
             return;
         }
+        picker.setAttribute("data-avatar-ready", "");
 
         var originalSrc = img.getAttribute("src");
+        var originalPosition = img.style.objectPosition;
         var originalCaption = caption.textContent;
         var objectUrl = null;
 
@@ -35,6 +41,7 @@
             release();
             if (originalSrc) {
                 img.src = originalSrc;
+                img.style.objectPosition = originalPosition;
                 img.hidden = false;
             } else {
                 img.removeAttribute("src");
@@ -67,6 +74,7 @@
             release();
             objectUrl = URL.createObjectURL(file);
             img.src = objectUrl;
+            img.style.objectPosition = "";
             img.hidden = false;
             if (placeholder) {
                 placeholder.hidden = true;
@@ -81,9 +89,21 @@
         Array.prototype.forEach.call(document.querySelectorAll("[data-avatar-picker]"), initPicker);
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initAll);
-    } else {
+    function start() {
         initAll();
+        // faces.js is on the page only where there is ajax.
+        if (window.faces && faces.ajax && faces.ajax.addOnEvent) {
+            faces.ajax.addOnEvent(function (data) {
+                if (data.status === "success") {
+                    initAll();
+                }
+            });
+        }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", start);
+    } else {
+        start();
     }
 }());

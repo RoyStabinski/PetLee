@@ -146,7 +146,8 @@
                                     <ui:repeat value="#{favoriteBean.panelFavorites}" var="fav">
                                         <li class="fav-row">
                                             <a class="fav-link" href="#{request.contextPath}/petDetails.xhtml?id=#{fav.id}">
-                                                <img class="fav-thumb" src="#{request.contextPath}#{petBean.imageUrlOf(fav)}"
+                                                <img class="fav-thumb" src="#{request.contextPath}#{petBean.mainPhotoOf(fav).url}"
+                                                     style="#{focus.style(petBean.mainPhotoOf(fav).focusX, petBean.mainPhotoOf(fav).focusY)}"
                                                      alt="" width="48" height="48" loading="lazy"/>
                                                 <span class="fav-text">
                                                     <span class="fav-name">#{fav.name}</span>

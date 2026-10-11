@@ -16,6 +16,8 @@
     <ui:define name="head">
         <script src="#{request.contextPath}/resources/js/avatar.js?v=#{initParam['petlee.ASSET_VERSION']}"
                 defer="defer"></script>
+        <script src="#{request.contextPath}/resources/js/focus.js?v=#{initParam['petlee.ASSET_VERSION']}"
+                defer="defer"></script>
     </ui:define>
 
     <ui:define name="content">
@@ -46,6 +48,7 @@
                                         <ui:fragment rendered="#{profileBean.hasAvatar}">
                                             <img class="avatar-picker-img" data-avatar-img=""
                                                  src="#{request.contextPath}#{profileBean.avatarUrl}"
+                                                 style="#{profileBean.avatarStyle}"
                                                  alt="" width="96" height="96"/>
                                         </ui:fragment>
                                         <span class="avatar-picker-badge" aria-hidden="true">+</span>
@@ -61,6 +64,13 @@
                         </h:form>
 
                         <h:form id="removeAvatarForm" rendered="#{profileBean.hasAvatar}" styleClass="avatar-editor-form">
+                            <!-- Opens the focus editor below; focus.js reveals it. In this form so
+                                 that saving a new focus re-renders it with the new values. -->
+                            <button type="button" class="button-secondary button-small" hidden="hidden"
+                                    data-focus-open=""
+                                    data-focus-src="#{request.contextPath}#{profileBean.avatarUrl}"
+                                    data-focus-x="#{profileBean.avatarFocusX}" data-focus-y="#{profileBean.avatarFocusY}"
+                                    aria-controls="focusPanel" aria-expanded="false">Adjust focus</button>
                             <!-- Confirmed first: the file is deleted, not hidden. -->
                             <h:commandButton id="remove" value="Remove" action="#{profileBean.removeAvatar}"
                                              styleClass="button-danger button-small"
@@ -68,6 +78,44 @@
                         </h:form>
                     </div>
                     <p class="field-hint">JPEG, PNG, GIF or WebP, up to 5 MB. Uploading replaces the current photo.</p>
+
+                    <!-- The focus editor (focus.js). Save is ajax: it re-renders the round tile,
+                         its buttons and the header avatar, and a 401 is a redirect to log in. -->
+                    <h:form id="focusForm" rendered="#{profileBean.hasAvatar}">
+                        <section id="focusPanel" class="focus-panel" data-focus-panel="" hidden="hidden"
+                                 aria-labelledby="focusTitle">
+                            <h2 id="focusTitle" class="form-section-title">Adjust focus</h2>
+                            <p id="focusHelp" class="field-hint">
+                                Drag the ring, or click, onto your face, so the round crop centres on it.
+                                With the ring selected, the arrow keys move it 5%, or 1% with Shift. The
+                                photo itself is not changed.
+                            </p>
+                            <div class="focus-body">
+                                <div class="focus-stage" data-focus-stage="">
+                                    <img class="focus-image" data-focus-image="" alt="Your whole profile photo"/>
+                                    <button type="button" class="focus-marker" data-focus-marker=""
+                                            aria-label="Focal point" aria-describedby="focusHelp"></button>
+                                </div>
+                                <div>
+                                    <p class="focus-preview-label" aria-hidden="true">Preview</p>
+                                    <div class="focus-preview focus-preview-round">
+                                        <img data-focus-preview="" alt="" width="96" height="96"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="sr-only" role="status" data-focus-status=""></p>
+                            <h:inputHidden id="focusX" value="#{profileBean.focusX}" p:data-focus-field="x"/>
+                            <h:inputHidden id="focusY" value="#{profileBean.focusY}" p:data-focus-field="y"/>
+                            <div class="actions">
+                                <button type="button" class="button-secondary" data-focus-cancel="">Cancel</button>
+                                <h:commandButton id="saveFocus" value="Save" action="#{profileBean.saveAvatarFocus}">
+                                    <f:ajax execute="@form"
+                                            render=":avatarForm :removeAvatarForm :navUser :globalMessages"
+                                            onevent="PetLeeFocus.onSave"/>
+                                </h:commandButton>
+                            </div>
+                        </section>
+                    </h:form>
                 </section>
 
                 <section class="form-section photos-section" aria-labelledby="detailsTitle">

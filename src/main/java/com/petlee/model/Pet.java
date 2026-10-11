@@ -138,9 +138,15 @@ public class Pet {
 
     /** @return the main image's URL, or null when the pet has no images */
     public String getMainImageUrl(){
+        PetImage main = getMainImage();
+        return main == null ? null : main.getImageUrl();
+    }
+
+    /** @return the main image, or null when the pet has no images */
+    public PetImage getMainImage(){
         for (PetImage image : images) {
             if (image.isMain()) {
-                return image.getImageUrl();
+                return image;
             }
         }
         return null;

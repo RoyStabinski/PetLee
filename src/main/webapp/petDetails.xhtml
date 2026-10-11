@@ -57,9 +57,10 @@
                      tabindex="#{petDetailBean.photoCount gt 1 ? '0' : '-1'}">
 
                     <div class="carousel-stage">
-                        <ui:repeat value="#{petDetailBean.photoUrls}" var="photo" varStatus="loop">
+                        <ui:repeat value="#{petDetailBean.photos}" var="photo" varStatus="loop">
                             <img class="carousel-slide#{loop.first ? ' is-current' : ''}" data-carousel-slide=""
-                                 src="#{request.contextPath}#{photo}" width="800" height="600"
+                                 src="#{request.contextPath}#{photo.url}" width="800" height="600"
+                                 style="#{focus.style(photo.focusX, photo.focusY)}"
                                  loading="#{loop.first ? 'eager' : 'lazy'}"
                                  alt="#{petDetailBean.photoCount gt 1 ? 'Photo ' += (loop.index + 1) += ' of ' += petDetailBean.photoCount += ' of ' : 'Photo of '}#{petDetailBean.pet.name}"/>
                         </ui:repeat>
@@ -90,11 +91,12 @@
                     <ui:fragment rendered="#{petDetailBean.photoCount gt 1}">
                         <div class="carousel-thumbs-row">
                             <ul class="carousel-thumbs" data-carousel-track="">
-                                <ui:repeat value="#{petDetailBean.photoUrls}" var="photo" varStatus="loop">
+                                <ui:repeat value="#{petDetailBean.photos}" var="photo" varStatus="loop">
                                     <li class="carousel-thumb-item">
-                                        <a class="carousel-thumb" data-carousel-thumb="" href="#{request.contextPath}#{photo}"
+                                        <a class="carousel-thumb" data-carousel-thumb="" href="#{request.contextPath}#{photo.url}"
                                            target="_blank" rel="noopener" aria-current="#{loop.first}">
-                                            <img src="#{request.contextPath}#{photo}" width="120" height="90"
+                                            <img src="#{request.contextPath}#{photo.url}" width="120" height="90"
+                                                 style="#{focus.style(photo.focusX, photo.focusY)}"
                                                  loading="lazy"
                                                  alt="Show photo #{loop.index + 1} of #{petDetailBean.photoCount}"/>
                                         </a>
@@ -213,7 +215,8 @@
                             <div class="contact-owner">
                                 <ui:fragment rendered="#{not empty petDetailBean.pet.ownerAvatarUrl}">
                                     <img class="avatar-img avatar-md" src="#{request.contextPath}#{petDetailBean.pet.ownerAvatarUrl}"
-                                         alt="" width="48" height="48"/>
+                                         alt="" width="48" height="48"
+                                         style="#{focus.style(petDetailBean.pet.ownerAvatarFocusX, petDetailBean.pet.ownerAvatarFocusY)}"/>
                                 </ui:fragment>
                                 <ui:fragment rendered="#{empty petDetailBean.pet.ownerAvatarUrl}">
                                     <span class="avatar avatar-md avatar-on-dark" aria-hidden="true">#{petDetailBean.ownerInitials}</span>

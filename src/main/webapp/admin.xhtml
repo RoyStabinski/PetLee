@@ -96,7 +96,8 @@
                                 <tr>
                                     <td class="cell-thumb">
                                         <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.name}"
-                                                        width="48" height="48"/>
+                                                        width="48" height="48"
+                                                        style="#{focus.style(pet.imageFocusX, pet.imageFocusY)}"/>
                                     </td>
                                     <td class="cell-strong">#{pet.name}</td>
                                     <td>#{pet.ownerName}</td>

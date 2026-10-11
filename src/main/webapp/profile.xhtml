@@ -28,7 +28,7 @@
             <aside class="card-box profile-card" aria-label="Your account">
                 <ui:fragment rendered="#{not empty userBean.avatarUrl}">
                     <h:graphicImage value="#{userBean.avatarUrl}" alt="" width="96" height="96"
-                                    styleClass="avatar-img avatar-lg"/>
+                                    styleClass="avatar-img avatar-lg" style="#{userBean.avatarStyle}"/>
                 </ui:fragment>
                 <ui:fragment rendered="#{empty userBean.avatarUrl}">
                     <div class="avatar" aria-hidden="true">#{userBean.initials}</div>
@@ -82,8 +82,9 @@
                             <ui:repeat id="rows" value="#{petBean.myListings}" var="pet">
                                 <li class="pet-card">
                                     <div class="pet-card-media">
-                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"
-                                                        width="400" height="300"/>
+                                        <h:graphicImage value="#{petBean.mainPhotoOf(pet).url}" alt="#{pet.name}"
+                                                        width="400" height="300" styleClass="pet-card-photo"
+                                                        style="#{focus.style(petBean.mainPhotoOf(pet).focusX, petBean.mainPhotoOf(pet).focusY)}"/>
                                     </div>
                                     <div class="pet-card-body">
                                         <div class="pet-card-heading">

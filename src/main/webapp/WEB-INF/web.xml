@@ -24,7 +24,7 @@
          a CSS or JS file changes, so browsers fetch the new copy instead of a cached one. -->
     <context-param>
         <param-name>petlee.ASSET_VERSION</param-name>
-        <param-value>8</param-value>
+        <param-value>9</param-value>
     </context-param>
 
     <!-- No upload limits here: Mojarra ignores the jakarta.faces.UPLOADER_* parameters. The real

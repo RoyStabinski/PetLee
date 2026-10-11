@@ -51,6 +51,14 @@ public class User {
     @Column(name = "avatar_url", length = 512)
     private String avatarUrl;
 
+    // The profile photo's focal point, in percent; changed by bulk updates for the same reason
+    // as avatarUrl. Set here as well as by the column DEFAULT, since the provider inserts it.
+    @Column(name = "avatar_focus_x", nullable = false)
+    private short avatarFocusX = 50;
+
+    @Column(name = "avatar_focus_y", nullable = false)
+    private short avatarFocusY = 50;
+
     // Optimistic locking for the profile form, as on Pet.
     @Version
     @Column(name = "version")
@@ -96,6 +104,10 @@ public class User {
     public void setRole(Role role) { this.role = role; }
 
     public String getAvatarUrl() { return avatarUrl; }
+
+    public int getAvatarFocusX() { return avatarFocusX; }
+
+    public int getAvatarFocusY() { return avatarFocusY; }
 
     // Long, not long: null until the row is first written. No setter — JPA owns this field.
     public Long getVersion() { return version; }

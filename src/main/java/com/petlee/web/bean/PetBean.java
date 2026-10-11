@@ -2,6 +2,7 @@ package com.petlee.web.bean;
 
 import com.petlee.dto.CategoryDTO;
 import com.petlee.dto.PetDTO;
+import com.petlee.dto.PhotoDTO;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.CategoryApi;
 import com.petlee.web.client.PetApi;
@@ -32,6 +33,9 @@ public class PetBean implements Serializable {
 
     /** Shown for a listing with no photograph. Bundled, so it cannot 404. */
     static final String PLACEHOLDER_IMAGE = "/resources/images/placeholder-pet.png";
+
+    /** The placeholder as a card photo, centred. */
+    static final PhotoDTO PLACEHOLDER_PHOTO = new PhotoDTO(PLACEHOLDER_IMAGE, 50, 50);
 
     // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
     // serializable; javac sees only the declared type. Transient would leave null after
@@ -117,21 +121,21 @@ public class PetBean implements Serializable {
     }
 
     /**
-     * @param pet a gallery listing
-     * @return its main photograph, or the placeholder
+     * @param pet a listing
+     * @return its main photograph with its focal point, or the placeholder
      */
-    public String imageUrlOf(PetDTO pet) { return imageOf(pet == null ? null : pet.imageUrl()); }
+    public PhotoDTO mainPhotoOf(PetDTO pet) { return photosOf(pet).get(0); }
 
     /**
      * @param pet a gallery listing
-     * @return its photographs for the card's carousel, main first; just the placeholder when it
-     *         has none, so the card always has one photo to show
+     * @return its photographs with their focal points for the card's carousel, main first; just
+     *         the placeholder when it has none, so the card always has one photo to show
      */
-    public List<String> photosOf(PetDTO pet) {
-        if (pet == null || pet.imageUrls() == null || pet.imageUrls().isEmpty()) {
-            return List.of(imageUrlOf(pet));
+    public List<PhotoDTO> photosOf(PetDTO pet) {
+        if (pet == null || pet.images() == null || pet.images().isEmpty()) {
+            return List.of(PLACEHOLDER_PHOTO);
         }
-        return pet.imageUrls();
+        return pet.images();
     }
 
     /**

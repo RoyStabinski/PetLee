@@ -14,7 +14,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:h="jakarta.faces.html"
       xmlns:f="jakarta.faces.core"
-      xmlns:ui="jakarta.faces.facelets">
+      xmlns:ui="jakarta.faces.facelets"
+      xmlns:p="jakarta.faces.passthrough">
 
 <h:head>
     <meta charset="utf-8"/>
@@ -82,12 +83,16 @@
                         <h:outputLink value="#{request.contextPath}/admin.xhtml" styleClass="nav-link">Admin panel</h:outputLink>
                     </ui:fragment>
 
-                    <!-- The avatar and name together are one link to the profile page. -->
-                    <a class="nav-user" href="#{request.contextPath}/profile.xhtml" aria-label="My profile">
+                    <!-- The avatar and name together are one link to the profile page. Its name
+                         starts with the visible words, so a voice command that says what it sees
+                         still finds it. A component with an id, so the profile photo's focus
+                         editor can re-render it. -->
+                    <h:outputLink id="navUser" value="#{request.contextPath}/profile.xhtml" styleClass="nav-user"
+                                  p:aria-label="Signed in as #{userBean.displayName}, my profile">
                         <!-- Decorative: the text beside it names the user. -->
                         <ui:fragment rendered="#{not empty userBean.avatarUrl}">
                             <h:graphicImage value="#{userBean.avatarUrl}" alt="" width="32" height="32"
-                                            styleClass="avatar-img avatar-sm"/>
+                                            styleClass="avatar-img avatar-sm" style="#{userBean.avatarStyle}"/>
                         </ui:fragment>
                         <ui:fragment rendered="#{empty userBean.avatarUrl}">
                             <span class="avatar avatar-sm" aria-hidden="true">#{userBean.initials}</span>
@@ -95,7 +100,7 @@
                         <h:outputFormat value="Signed in as {0}">
                             <f:param value="#{userBean.displayName}"/>
                         </h:outputFormat>
-                    </a>
+                    </h:outputLink>
 
                     <!-- A POST, not a link: a GET that changes server state can be triggered
                          by any image tag on any page the user visits. -->

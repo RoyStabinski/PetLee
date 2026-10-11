@@ -397,6 +397,22 @@ public class PetService {
     }
 
     /**
+     * Moves a photograph's focal point. Like the other image changes it writes the
+     * {@link PetImage} row alone, so the pet's version does not move.
+     *
+     * @param petId        the pet's id
+     * @param imageId      the photograph
+     * @param focus        the new focal point
+     * @param callerUserId the caller's id
+     * @throws AppException 404 if no such pet, or no such image on it; 403 if not the owner
+     */
+    @Transactional
+    public void setImageFocus(Long petId, Long imageId, FocalPoint focus, Long callerUserId) {
+        requireOwnedAndLocked(petId, callerUserId);
+        requireImage(petId, imageId).setFocus(focus.x(), focus.y());
+    }
+
+    /**
      * Locks the pet for an image change and checks the caller owns it.
      *
      * @return the locked pet

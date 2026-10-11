@@ -1,6 +1,7 @@
 package com.petlee.rest;
 
 import com.petlee.dto.ChangePasswordForm;
+import com.petlee.dto.FocusForm;
 import com.petlee.dto.ProfileForm;
 import com.petlee.dto.RegisterForm;
 import com.petlee.dto.UserDTO;
@@ -10,6 +11,7 @@ import com.petlee.rest.security.Secured;
 import com.petlee.rest.security.SessionUser;
 import com.petlee.rest.security.TokenStore;
 import com.petlee.service.AppException;
+import com.petlee.service.FocalPoint;
 import com.petlee.service.UserService;
 
 import jakarta.enterprise.context.RequestScoped;
@@ -197,6 +199,23 @@ public class UserResource {
     @Produces(MediaType.APPLICATION_JSON)
     public UserDTO removeAvatar() {
         return UserDTO.of(users.removeAvatar(caller().userId()));
+    }
+
+    /**
+     * {@code PUT /api/users/me/avatar/focus} — auth. Moves the point a cropped view of the
+     * profile photo centres on. The file is not changed, and neither is the account's version.
+     *
+     * @param form {@code {x, y}}, whole percent of the width and height, each 0 to 100
+     * @return 204 No Content
+     */
+    @PUT
+    @Path("me/avatar/focus")
+    @Secured
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response setAvatarFocus(FocusForm form) {
+        users.setAvatarFocus(caller().userId(), FocalPoint.from(form));
+        return Response.noContent().build();
     }
 
     /**

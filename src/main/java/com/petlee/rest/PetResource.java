@@ -2,6 +2,7 @@ package com.petlee.rest;
 
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
+import com.petlee.dto.FocusForm;
 import com.petlee.dto.PetForm;
 import com.petlee.dto.PetImageDTO;
 import com.petlee.model.Pet;
@@ -9,6 +10,7 @@ import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
 import com.petlee.rest.security.SessionUser;
 import com.petlee.service.AppException;
+import com.petlee.service.FocalPoint;
 import com.petlee.service.PetService;
 
 import jakarta.enterprise.context.RequestScoped;
@@ -352,6 +354,27 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response setMainImage(@PathParam("id") Long id, @PathParam("imageId") Long imageId) {
         pets.setMainImage(id, imageId, caller().userId());
+        return Response.noContent().build();
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/images/{imageId}/focus} — auth, owner only. Moves the point a
+     * cropped view of the photograph centres on. The file is not changed, and neither is the
+     * listing's version.
+     *
+     * @param id      the pet
+     * @param imageId the photograph, which must belong to that pet
+     * @param form    {@code {x, y}}, whole percent of the width and height, each 0 to 100
+     * @return 204 No Content
+     */
+    @PUT
+    @Path("{id: \\d+}/images/{imageId: \\d+}/focus")
+    @Secured
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response setImageFocus(@PathParam("id") Long id, @PathParam("imageId") Long imageId,
+                                  FocusForm form) {
+        pets.setImageFocus(id, imageId, FocalPoint.from(form), caller().userId());
         return Response.noContent().build();
     }
 

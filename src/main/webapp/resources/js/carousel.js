@@ -16,6 +16,10 @@
  *   [data-carousel-more]     its "scroll on" button, shown only while the row overflows
  *
  * With fewer than two slides the script does nothing, and the server renders no controls.
+ *
+ * Each slide and thumbnail carries its own focal point as an inline style="object-position: X% Y%",
+ * rendered by the server from the photo's focus. The script only switches which slide is current
+ * and never touches styles, so every photo keeps its own crop as the carousel moves.
  */
 (function () {
     "use strict";

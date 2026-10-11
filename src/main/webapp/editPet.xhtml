@@ -3,7 +3,8 @@
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:f="jakarta.faces.core"
-                xmlns:ui="jakarta.faces.facelets">
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
 
     <f:metadata>
         <f:viewParam name="id" value="#{petFormBean.petId}"/>
@@ -14,6 +15,8 @@
 
     <ui:define name="head">
         <script src="#{request.contextPath}/resources/js/upload.js?v=#{initParam['petlee.ASSET_VERSION']}"
+                defer="defer"></script>
+        <script src="#{request.contextPath}/resources/js/focus.js?v=#{initParam['petlee.ASSET_VERSION']}"
                 defer="defer"></script>
     </ui:define>
 
@@ -49,12 +52,19 @@
                                 <li class="photo-tile">
                                     <div class="photo-tile-media">
                                         <h:graphicImage value="#{image.url}" alt="Photograph of #{petFormBean.name}"
-                                                        width="120" height="120"/>
+                                                        width="120" height="120"
+                                                        style="#{focus.style(image.focusX, image.focusY)}"/>
                                         <ui:fragment rendered="#{image.main}">
                                             <span class="photo-main-badge">Main photograph</span>
                                         </ui:fragment>
                                     </div>
                                     <div class="button-stack">
+                                        <!-- Opens the focus editor below; focus.js reveals it. -->
+                                        <button type="button" class="button-secondary button-small" hidden="hidden"
+                                                data-focus-open="" data-focus-id="#{image.id}"
+                                                data-focus-src="#{request.contextPath}#{image.url}"
+                                                data-focus-x="#{image.focusX}" data-focus-y="#{image.focusY}"
+                                                aria-controls="focusPanel" aria-expanded="false">Adjust focus</button>
                                         <h:commandLink id="setMain" value="Set as main" styleClass="button-secondary button-small"
                                                        rendered="#{not image.main}"
                                                        action="#{petFormBean.setMainPhoto(image.id)}"/>
@@ -99,6 +109,45 @@
                 <ui:fragment rendered="#{not petFormBean.roomForPhotos}">
                     <p class="field-hint">A listing can have at most 5 photographs. Delete one to add another.</p>
                 </ui:fragment>
+
+                <!-- The focus editor (focus.js), for whichever photograph's button opened it. Save
+                     is ajax: it re-renders the tiles with the stored crop, and a 401 is a redirect
+                     to the login page, as elsewhere. -->
+                <h:form id="focusForm" rendered="#{not empty petFormBean.images}">
+                    <section id="focusPanel" class="focus-panel" data-focus-panel="" hidden="hidden"
+                             aria-labelledby="focusTitle">
+                        <h2 id="focusTitle" class="form-section-title">Adjust focus</h2>
+                        <p id="focusHelp" class="field-hint">
+                            Drag the ring, or click, onto the part of the photograph that should stay in
+                            view when it is cropped, such as the pet's face. With the ring selected, the
+                            arrow keys move it 5%, or 1% with Shift. The photograph itself is not changed.
+                        </p>
+                        <div class="focus-body">
+                            <div class="focus-stage" data-focus-stage="">
+                                <img class="focus-image" data-focus-image="" alt="The whole photograph"/>
+                                <button type="button" class="focus-marker" data-focus-marker=""
+                                        aria-label="Focal point" aria-describedby="focusHelp"></button>
+                            </div>
+                            <div>
+                                <p class="focus-preview-label" aria-hidden="true">Preview</p>
+                                <div class="focus-preview focus-preview-card">
+                                    <img data-focus-preview="" alt="" width="240" height="180"/>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="sr-only" role="status" data-focus-status=""></p>
+                        <h:inputHidden id="imageId" value="#{petFormBean.focusImageId}" p:data-focus-field="id"/>
+                        <h:inputHidden id="focusX" value="#{petFormBean.focusX}" p:data-focus-field="x"/>
+                        <h:inputHidden id="focusY" value="#{petFormBean.focusY}" p:data-focus-field="y"/>
+                        <div class="actions">
+                            <button type="button" class="button-secondary" data-focus-cancel="">Cancel</button>
+                            <h:commandButton id="saveFocus" value="Save" action="#{petFormBean.saveFocus}">
+                                <f:ajax execute="@form" render=":photosForm :globalMessages"
+                                        onevent="PetLeeFocus.onSave"/>
+                            </h:commandButton>
+                        </div>
+                    </section>
+                </h:form>
             </section>
         </div>
     </ui:define>

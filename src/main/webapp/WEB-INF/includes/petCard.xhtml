@@ -17,7 +17,8 @@
              aria-label="Photos of #{pet.name}">
             <ui:repeat value="#{petBean.photosOf(pet)}" var="photo" varStatus="loop">
                 <img class="pet-card-photo carousel-slide#{loop.first ? ' is-current' : ''}"
-                     data-carousel-slide="" src="#{request.contextPath}#{photo}"
+                     data-carousel-slide="" src="#{request.contextPath}#{photo.url}"
+                     style="#{focus.style(photo.focusX, photo.focusY)}"
                      width="400" height="300" loading="#{loop.first ? 'eager' : 'lazy'}"
                      alt="#{petBean.photosOf(pet).size() gt 1 ? 'Photo ' += (loop.index + 1) += ' of ' += pet.name : pet.name}"/>
             </ui:repeat>

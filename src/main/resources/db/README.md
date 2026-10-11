@@ -10,6 +10,7 @@ upgrading an older one. No migration tool — plain SQL.
 | `migrate-001-pet-image.sql` | Upgrades an existing database from one photograph per pet to `pet_image` — see [Migrations](#migrations) |
 | `migrate-002-favorite.sql` | Adds the `favorite` table to an existing database — see [Migrations](#migrations) |
 | `migrate-003-user-profile.sql` | Adds `users.avatar_url` and `users.version` to an existing database — see [Migrations](#migrations) |
+| `migrate-004-image-focus.sql` | Adds the photo focal points (`pet_image.focus_x`/`focus_y`, `users.avatar_focus_x`/`avatar_focus_y`) to an existing database — see [Migrations](#migrations) |
 
 `schema.sql` and `seed.sql` are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
 provider never touches the schema — `persistence.xml` sets
@@ -146,6 +147,43 @@ column the table has or gains.
 
 To undo it: `ALTER TABLE users DROP COLUMN avatar_url, DROP COLUMN version;` — the uploaded
 profile photos stay in the upload directory and can be deleted by hand.
+
+### 004 — photo focal points
+
+Needed if `\d pet_image` does not list `focus_x`. The script adds four columns, all `SMALLINT
+NOT NULL DEFAULT 50`: `pet_image.focus_x` and `focus_y`, and `users.avatar_focus_x` and
+`avatar_focus_y`. Each is the point a cropped view of the photo centres on, in percent of its
+width or height, and each has a named `CHECK (… BETWEEN 0 AND 100)`. The default fills every
+existing row with 50/50, the centre, which is how every photo was shown before. The image files
+are not touched.
+
+No `GRANT`, for the same reason as 003: new columns of existing tables are covered by
+`petlee_app`'s table-level privileges.
+
+1. Back up first, as for 001:
+
+   ```bash
+   pg_dump -U postgres -Fc -f petlee-before-004.dump petlee
+   ```
+
+2. Run it as `postgres`. One transaction; the columns are `ADD COLUMN IF NOT EXISTS` and each
+   constraint is added only when it is missing, so running it twice is harmless. The old build
+   ignores the new columns, so it may keep running.
+
+   ```bash
+   psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-004-image-focus.sql
+   ```
+
+3. Check, then deploy the build that has the focal-point editor:
+
+   ```sql
+   \d pet_image        -- focus_x, focus_y smallint not null default 50; ck_pet_image_focus_x and _y
+   \d users            -- avatar_focus_x, avatar_focus_y; ck_users_avatar_focus_x and _y
+   ```
+
+To undo it: `ALTER TABLE pet_image DROP COLUMN focus_x, DROP COLUMN focus_y;` and
+`ALTER TABLE users DROP COLUMN avatar_focus_x, DROP COLUMN avatar_focus_y;` (each column's
+constraint goes with it).
 
 ## The application's database role
 

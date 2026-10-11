@@ -237,6 +237,21 @@ public class UserService {
         return user;
     }
 
+    /**
+     * Moves the focal point of the caller's profile photo. The version does not move, as with a
+     * new photo, so an open profile form stays saveable. Allowed without a photo too: it is
+     * harmless, and the next upload resets it to the centre.
+     *
+     * @param callerUserId the caller's id
+     * @param focus        the new focal point
+     * @throws AppException 401 if the account no longer exists
+     */
+    @Transactional
+    public void setAvatarFocus(Long callerUserId, FocalPoint focus) {
+        User user = users.lockById(callerUserId).orElseThrow(UserService::accountGone);
+        users.updateAvatarFocus(user, focus.x(), focus.y());
+    }
+
     /** The one 409 for a profile save that lost a race with another save of the same profile. */
     private static AppException concurrentEdit(Throwable cause) {
         return new AppException(409, AppException.STALE_VERSION,

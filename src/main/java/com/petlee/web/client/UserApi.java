@@ -1,6 +1,7 @@
 package com.petlee.web.client;
 
 import com.petlee.dto.ChangePasswordForm;
+import com.petlee.dto.FocusForm;
 import com.petlee.dto.ProfileForm;
 import com.petlee.dto.UserDTO;
 
@@ -88,6 +89,21 @@ public class UserApi {
      */
     public UserDTO removeAvatar() {
         return remember(api.delete("/users/me/avatar", UserDTO.class));
+    }
+
+    /**
+     * {@code PUT /api/users/me/avatar/focus}, then {@code GET /api/users/me}: the first answers
+     * 204 with no body, so the account is read back for {@link ApiCredentials}, as the other
+     * profile calls do, and the header shows the new crop on the next render.
+     *
+     * @param x percent of the width, 0 to 100
+     * @param y percent of the height, 0 to 100
+     * @return the account with its new focal point
+     * @throws ApiException 400 if a value is missing or outside 0 to 100, 401 if not logged in
+     */
+    public UserDTO setAvatarFocus(Integer x, Integer y) {
+        api.put("/users/me/avatar/focus", new FocusForm(x, y), Void.class);
+        return me();
     }
 
     private UserDTO remember(UserDTO user) {

@@ -229,6 +229,12 @@ public class UserBean implements Serializable {
         return user == null ? null : user.avatarUrl();
     }
 
+    /** @return the inline style that crops the profile photo around its focal point, or null */
+    public String getAvatarStyle() {
+        UserDTO user = getCurrentUser();
+        return user == null ? null : FocusBean.styleOf(user.avatarFocusX(), user.avatarFocusY());
+    }
+
     /**
      * @param name a full name, may be null or blank
      * @return the first letters of its first and last words, upper case, or "?" for none

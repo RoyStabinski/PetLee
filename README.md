@@ -58,11 +58,16 @@ in number order, as described in `src/main/resources/db/README.md#migrations`:
   (optimistic locking for the edit-profile form). It only adds columns, needs no new grant, and
   does not rewrite existing rows. A build with the profile feature fails on every query that
   loads a user until it has been run.
+- `migrate-004-image-focus.sql` adds the photo focal points: `pet_image.focus_x`/`focus_y` and
+  `users.avatar_focus_x`/`avatar_focus_y`, `SMALLINT NOT NULL DEFAULT 50` with a 0–100 check.
+  Only adds columns, needs no new grant; every existing photo starts centred. A build with the
+  focal-point editor fails on every query that loads a user or a photograph until it has been run.
 
 ```bash
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-004-image-focus.sql
 ```
 
 ### 3. WildFly: JDBC driver and DataSource
@@ -157,6 +162,15 @@ the `jakarta.faces.UPLOADER_*` parameters.
 
 The API itself receives one photograph per request, so it is not affected.
 
+**Focal points.** Every pet photograph and profile photo has a focal point, stored as two whole
+percentages of its width and height (50/50, the centre, by default). The files are never cropped
+or rewritten: wherever a photo is shown cropped (`object-fit: cover` in the stylesheet: gallery
+cards, the details carousel and its thumbnails, My listings, favourites, the admin table, the
+edit-page tiles and every avatar), the page draws it with `object-position: X% Y%`, so the crop
+moves towards the chosen spot. Owners set it with "Adjust focus" on the edit-listing and
+edit-profile pages: drag or click the ring on the whole photo, or move it with the arrow keys,
+and watch a preview of the crop. Uploading a new profile photo puts its focus back in the centre.
+
 ### Troubleshooting
 
 - **`Required services that are not installed: jboss.naming.context.java.jdbc.petlee`** on deploy
@@ -189,6 +203,9 @@ no database, server or network, and cover:
 - `PetRepositoryTest`: the search text's LIKE pattern, lower-cased with `\`, `%` and `_` escaped.
 - `ContactLinksTest`: the contact card's links; WhatsApp for mobile numbers only, never for a
   landline or a missing number.
+- `FocalPointTest`: a focal point's values; 0 and 100 accepted, -1, 101, a missing value and a
+  missing body refused with 400.
+- `FocusBeanTest`: the `object-position` style a focal point becomes.
 
 `mvn package` runs the same tests before it builds the WAR, and builds nothing if one fails.
 
@@ -264,6 +281,7 @@ session if there is one.
 | PUT | `/api/users/me/password` | auth — body `{currentPassword, newPassword}`; a wrong current password is 400, a new one under 8 characters is 400. Revokes every other bearer token of the caller and keeps the one sent; 204 |
 | POST | `/api/users/me/avatar` | auth — multipart/form-data, one part named `file`, the same formats and 5 MB limit as pet photographs; replaces the profile photo and deletes the old file; returns the account |
 | DELETE | `/api/users/me/avatar` | auth — removes the profile photo and its file; returns the account |
+| PUT | `/api/users/me/avatar/focus` | auth — body `{x, y}`, whole numbers 0 to 100 (percent of width and height); moves the profile photo's focal point; 204, and the `version` does not move |
 | POST | `/api/auth/login` | open |
 | POST | `/api/auth/logout` | auth — 204 |
 | GET | `/api/categories` | open |
@@ -279,6 +297,7 @@ session if there is one.
 | POST | `/api/pets/{id}/images` | owner only — multipart/form-data, one part named `file`; adds one photograph (at most 5); 201 Created with `Location: /api/pets/{id}/images/{imageId}` and `{id, url, main}` as the body |
 | DELETE | `/api/pets/{id}/images/{imageId}` | owner only — deletes the photograph and its file; 204 |
 | PUT | `/api/pets/{id}/images/{imageId}/main` | owner only — makes it the main photograph; 204 |
+| PUT | `/api/pets/{id}/images/{imageId}/focus` | owner only — body `{x, y}`, whole numbers 0 to 100; moves the photograph's focal point; 204, and the listing's `version` does not move. A missing or out-of-range value is 400; a photograph of another pet is 404 |
 | GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
 | GET | `/api/admin/category-counts` | admin — listings per category id, e.g. `{"1": 4}`; unused categories are absent |
@@ -329,10 +348,10 @@ curl -X PUT -H "Authorization: Bearer <token>" \
 
 A listing has up to five photographs, and once it has any, exactly one of them is main. The
 main one is the `imageUrl` of every pet the API returns, and the one the owner's listings and
-the admin table show. Every pet in a list also carries `imageUrls`, all of them with the main
-one first, for the gallery card's carousel; `GET /api/pets/{id}` lists them in `images`, oldest
-first, for the details page. `imageUrl` is null, and `imageUrls` empty, for a pet with no
-photographs.
+the admin table show. Every pet in a list also carries `images`, all of them with the main one
+first and each as `{url, focusX, focusY}`, for the gallery card's carousel; `GET /api/pets/{id}`
+lists them in `images` too, oldest first and with their ids, for the details page. `imageUrl` is
+null, and `images` empty, for a pet with no photographs.
 
 `POST /api/pets/{id}/images` adds one photograph per request. The part must be a JPEG, PNG, GIF
 or WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400, and a
@@ -359,7 +378,15 @@ curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/jso
      "http://localhost:8080/pet-lee/api/users/me?version=0"
 curl -H "Authorization: Bearer <token>" -F "file=@me.jpg;type=image/jpeg" \
      http://localhost:8080/pet-lee/api/users/me/avatar
+curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+     -d '{"x":40,"y":25}' http://localhost:8080/pet-lee/api/users/me/avatar/focus
 ```
+
+Every image the API returns carries its focal point: `focusX` and `focusY` on each of a pet's
+`images` (in the gallery list and in full), `imageFocusX` and `imageFocusY` in the admin list,
+`avatarFocusX` and `avatarFocusY` on an account, and `ownerAvatarFocusX` and `ownerAvatarFocusY`
+on a pet in full. In the gallery list, `images` replaces the old `imageUrls`: a list of
+`{url, focusX, focusY}`.
 
 A password change signs the member out everywhere else: every other bearer token of theirs is
 revoked, and the token the request carried stays valid. Browser sessions that call `/api` with

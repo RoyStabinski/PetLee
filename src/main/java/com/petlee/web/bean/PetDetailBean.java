@@ -81,21 +81,21 @@ public class PetDetailBean implements Serializable {
     public String getImageUrl() { return PetBean.imageOf(pet == null ? null : pet.imageUrl()); }
 
     /**
-     * @return every photograph's URL for the carousel, the main one first and the rest oldest
-     *         first; just the placeholder when the listing has none
+     * @return every photograph, with its focal point, for the carousel: the main one first and
+     *         the rest oldest first; just the placeholder, centred, when the listing has none
      */
-    public List<String> getPhotoUrls() {
+    public List<PetImageDTO> getPhotos() {
         if (pet == null || pet.images() == null || pet.images().isEmpty()) {
-            return List.of(getImageUrl());
+            return List.of(new PetImageDTO(null, getImageUrl(), true, 50, 50));
         }
-        List<String> urls = new ArrayList<>();
-        pet.images().stream().filter(PetImageDTO::main).forEach(image -> urls.add(image.url()));
-        pet.images().stream().filter(image -> !image.main()).forEach(image -> urls.add(image.url()));
-        return urls;
+        List<PetImageDTO> photos = new ArrayList<>();
+        pet.images().stream().filter(PetImageDTO::main).forEach(photos::add);
+        pet.images().stream().filter(image -> !image.main()).forEach(photos::add);
+        return photos;
     }
 
     /** @return how many photographs the carousel shows; at least one, the placeholder */
-    public int getPhotoCount() { return getPhotoUrls().size(); }
+    public int getPhotoCount() { return getPhotos().size(); }
 
     /** @return the age as the gallery shows it, or "Unknown" */
     public String getAgeLabel() {

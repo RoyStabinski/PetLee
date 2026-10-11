@@ -1,5 +1,6 @@
 package com.petlee.web.client;
 
+import com.petlee.dto.FocusForm;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
@@ -167,5 +168,20 @@ public class PetApi {
      */
     public void setMainImage(Long id, Long imageId) {
         api.put("/pets/" + id + "/images/" + imageId + "/main", null, Void.class);
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/images/{imageId}/focus}: moves the point a cropped view of the
+     * photograph centres on. The listing's version does not change.
+     *
+     * @param id      the listing
+     * @param imageId the photograph
+     * @param x       percent of the width, 0 to 100
+     * @param y       percent of the height, 0 to 100
+     * @throws ApiException 400 if a value is missing or outside 0 to 100, 403 if not the owner,
+     *                      404 if the photograph is not on that listing
+     */
+    public void setImageFocus(Long id, Long imageId, Integer x, Integer y) {
+        api.put("/pets/" + id + "/images/" + imageId + "/focus", new FocusForm(x, y), Void.class);
     }
 }

@@ -79,15 +79,35 @@ public class UserRepository {
 
     /**
      * Sets the profile photo with a bulk update, which leaves {@code version} alone: a new photo
-     * must not make an open profile form stale. The entity is refreshed afterwards, since a bulk
-     * update bypasses the persistence context.
+     * must not make an open profile form stale. The focal point goes back to the centre, since
+     * the old one was chosen for another picture. The entity is refreshed afterwards, since a
+     * bulk update bypasses the persistence context.
      *
      * @param user a managed user
      * @param url  the new URL, or null to remove the photo
      */
     public void updateAvatarUrl(User user, String url) {
-        em.createQuery("UPDATE User u SET u.avatarUrl = :url WHERE u.userId = :id")
-                .setParameter("url", url).setParameter("id", user.getUserId())
+        // A short parameter, not the literal 50, so it matches the attribute's type exactly.
+        em.createQuery("UPDATE User u SET u.avatarUrl = :url, u.avatarFocusX = :centre,"
+                        + " u.avatarFocusY = :centre WHERE u.userId = :id")
+                .setParameter("url", url).setParameter("centre", (short) 50)
+                .setParameter("id", user.getUserId())
+                .executeUpdate();
+        em.refresh(user);
+    }
+
+    /**
+     * Moves the profile photo's focal point with a bulk update, leaving {@code version} alone
+     * for the same reason as {@link #updateAvatarUrl}.
+     *
+     * @param user a managed user
+     * @param x    percent of the width, 0 to 100, already validated
+     * @param y    percent of the height, 0 to 100, already validated
+     */
+    public void updateAvatarFocus(User user, int x, int y) {
+        em.createQuery("UPDATE User u SET u.avatarFocusX = :x, u.avatarFocusY = :y WHERE u.userId = :id")
+                .setParameter("x", (short) x).setParameter("y", (short) y)
+                .setParameter("id", user.getUserId())
                 .executeUpdate();
         em.refresh(user);
     }

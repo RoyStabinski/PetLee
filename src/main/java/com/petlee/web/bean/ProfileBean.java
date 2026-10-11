@@ -50,6 +50,12 @@ public class ProfileBean implements Serializable {
     private String phone;
     private String region;
     private String avatarUrl;
+    private int avatarFocusX = 50;
+    private int avatarFocusY = 50;
+
+    /** The focal point the editor submits; applied to avatarFocusX and Y once the API accepts it. */
+    private Integer focusX;
+    private Integer focusY;
 
     /** The profile's version when the page loaded it; sent back so a stale save is refused. */
     private Long version;
@@ -77,7 +83,7 @@ public class ProfileBean implements Serializable {
             email = me.email();
             phone = me.phone();
             region = me.region();
-            avatarUrl = me.avatarUrl();
+            showAvatar(me);
             version = me.version();
             loaded = true;
         } catch (ApiException failure) {
@@ -130,8 +136,8 @@ public class ProfileBean implements Serializable {
                 return null;
             }
             try (InputStream content = avatarFile.getInputStream()) {
-                avatarUrl = userApi.uploadAvatar(content, avatarFile.getSubmittedFileName(),
-                        avatarFile.getContentType()).avatarUrl();
+                showAvatar(userApi.uploadAvatar(content, avatarFile.getSubmittedFileName(),
+                        avatarFile.getContentType()));
             }
             Messages.info("Your profile photo has been updated.");
 
@@ -157,7 +163,7 @@ public class ProfileBean implements Serializable {
      */
     public String removeAvatar() {
         try {
-            avatarUrl = userApi.removeAvatar().avatarUrl();
+            showAvatar(userApi.removeAvatar());
             Messages.info("Your profile photo has been removed.");
         } catch (ApiException failure) {
             if (failure.getStatus() == HttpServletResponse.SC_UNAUTHORIZED) {
@@ -166,6 +172,32 @@ public class ProfileBean implements Serializable {
             Messages.error(failure.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Saves the focal point chosen in the editor (focus.js), from an ajax submit of the focus
+     * form. The API refreshes the session's copy of the account, so the header avatar follows.
+     *
+     * @return null to stay on the page, or the login page if the token has expired
+     */
+    public String saveAvatarFocus() {
+        try {
+            showAvatar(userApi.setAvatarFocus(focusX, focusY));
+            Messages.info("The photo's focus has been saved.");
+        } catch (ApiException failure) {
+            if (failure.getStatus() == HttpServletResponse.SC_UNAUTHORIZED) {
+                return Messages.sessionExpired();
+            }
+            Messages.error(failure.getMessage());
+        }
+        return null;
+    }
+
+    /** Takes the photo and its focal point from the account the API returned. */
+    private void showAvatar(UserDTO user) {
+        avatarUrl = user.avatarUrl();
+        avatarFocusX = user.avatarFocusX();
+        avatarFocusY = user.avatarFocusY();
     }
 
     /**
@@ -208,6 +240,27 @@ public class ProfileBean implements Serializable {
 
     /** @return the profile photo's URL, or null for the initials circle */
     public String getAvatarUrl() { return avatarUrl; }
+
+    /** @return the photo's focal point across, in percent */
+    public int getAvatarFocusX() { return avatarFocusX; }
+
+    /** @return the photo's focal point down, in percent */
+    public int getAvatarFocusY() { return avatarFocusY; }
+
+    /** @return the inline style that crops the photo around its focal point */
+    public String getAvatarStyle() { return FocusBean.styleOf(avatarFocusX, avatarFocusY); }
+
+    /** @return the focal point across the editor submits */
+    public Integer getFocusX() { return focusX; }
+
+    /** @param focusX the focal point across the editor submits */
+    public void setFocusX(Integer focusX) { this.focusX = focusX; }
+
+    /** @return the focal point down the editor submits */
+    public Integer getFocusY() { return focusY; }
+
+    /** @param focusY the focal point down the editor submits */
+    public void setFocusY(Integer focusY) { this.focusY = focusY; }
 
     /** @return whether there is a photo to show and to remove */
     public boolean isHasAvatar() { return avatarUrl != null && !avatarUrl.isBlank(); }

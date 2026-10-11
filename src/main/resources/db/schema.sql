@@ -19,7 +19,13 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url    VARCHAR(512),
     -- Optimistic locking, for @Version on the User entity.
     version       BIGINT       NOT NULL DEFAULT 0,
-    CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN'))
+    -- The profile photo's focal point, in percent of its width and height; 50/50 is the centre.
+    -- A cropped view is drawn with CSS object-position; the file itself is never changed.
+    avatar_focus_x SMALLINT    NOT NULL DEFAULT 50,
+    avatar_focus_y SMALLINT    NOT NULL DEFAULT 50,
+    CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN')),
+    CONSTRAINT ck_users_avatar_focus_x CHECK (avatar_focus_x BETWEEN 0 AND 100),
+    CONSTRAINT ck_users_avatar_focus_y CHECK (avatar_focus_y BETWEEN 0 AND 100)
 );
 
 -- Case-insensitive uniqueness; a plain UNIQUE would let A@B.com sit beside a@b.com.
@@ -74,7 +80,12 @@ CREATE TABLE IF NOT EXISTS pet_image (
     pet_id      BIGINT       NOT NULL REFERENCES pet (pet_id) ON DELETE CASCADE,
     image_url   VARCHAR(512) NOT NULL,
     is_main     BOOLEAN      NOT NULL DEFAULT FALSE,
-    uploaded_at TIMESTAMP    NOT NULL
+    uploaded_at TIMESTAMP    NOT NULL,
+    -- The focal point a cropped view centres on, as for users.avatar_focus_x and _y.
+    focus_x     SMALLINT     NOT NULL DEFAULT 50,
+    focus_y     SMALLINT     NOT NULL DEFAULT 50,
+    CONSTRAINT ck_pet_image_focus_x CHECK (focus_x BETWEEN 0 AND 100),
+    CONSTRAINT ck_pet_image_focus_y CHECK (focus_y BETWEEN 0 AND 100)
 );
 
 CREATE INDEX IF NOT EXISTS idx_pet_image_pet ON pet_image (pet_id);

@@ -29,6 +29,14 @@ public class PetImage {
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
+    // The focal point a cropped view centres on, in percent of the width and the height. The
+    // provider inserts every column, so the column DEFAULT never applies: 50 is set here too.
+    @Column(name = "focus_x", nullable = false)
+    private short focusX = 50;
+
+    @Column(name = "focus_y", nullable = false)
+    private short focusY = 50;
+
     /** For JPA. */
     public PetImage() {
     }
@@ -51,4 +59,17 @@ public class PetImage {
     public boolean isMain() { return main; }
 
     public void setMain(boolean main) { this.main = main; }
+
+    public int getFocusX() { return focusX; }
+
+    public int getFocusY() { return focusY; }
+
+    /**
+     * @param x percent of the width, 0 to 100, already validated
+     * @param y percent of the height, 0 to 100, already validated
+     */
+    public void setFocus(int x, int y) {
+        this.focusX = (short) x;
+        this.focusY = (short) y;
+    }
 }

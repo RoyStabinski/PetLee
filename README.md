@@ -21,7 +21,9 @@ JTA and JSON-B are all supplied by the server.
 ## Setup
 
 The steps below are the tested path: WildFly 41.0.0.Final, PostgreSQL 17 and JDK 21 on Windows.
-Follow them in order.
+Follow them in order. A new installation needs only `schema.sql` and `seed.sql`; the
+`migrate-00N` scripts are only for a database created by an earlier version (see
+[Upgrading an existing database](#upgrading-an-existing-database)).
 
 ### 1. Requirements
 
@@ -33,9 +35,27 @@ Follow them in order.
 - The **PostgreSQL JDBC driver** jar, `postgresql-42.7.x.jar`, from
   <https://jdbc.postgresql.org/download/> or Maven Central
 
-### 2. Database
+### 2. PostgreSQL tools on the PATH
 
-Create an empty `petlee` database, then apply the two scripts in order:
+The PostgreSQL installer does not put `psql` and `createdb` on the PATH. Add its `bin` folder for
+the current terminal session, in the terminal you will run the next two steps from:
+
+```powershell
+# PowerShell
+$env:Path += ";C:\Program Files\PostgreSQL\17\bin"
+```
+
+```bat
+:: cmd
+set PATH=%PATH%;C:\Program Files\PostgreSQL\17\bin
+```
+
+The version number in the path must match the installed version (`C:\Program Files\PostgreSQL\`
+has one folder per installed version). The setting lasts until the terminal is closed.
+
+### 3. Database
+
+Create an empty `petlee` database, then apply the two scripts in order, from the project root:
 
 ```bash
 createdb -U postgres petlee
@@ -43,34 +63,30 @@ psql -U postgres -d petlee -f src/main/resources/db/schema.sql
 psql -U postgres -d petlee -f src/main/resources/db/seed.sql
 ```
 
-Both are idempotent. `src/main/resources/db/README.md` covers the schema in more detail, including
-how to create the least-privileged `petlee_app` role the server's connection pool authenticates as.
-Create that role before the next step.
+Both are idempotent. `src/main/resources/db/README.md` covers the schema in more detail.
 
-**Upgrading an existing database** instead of creating one: a fresh install needs no migration,
-but a database created by an earlier version of `schema.sql` needs the ones it has not had yet,
-in number order, as described in `src/main/resources/db/README.md#migrations`:
+### 4. The application's database role
 
-- `migrate-001-pet-image.sql` moves each pet's single `pet.image_url` into the `pet_image` table
-  and drops the column. Back up first and stop the application while it runs.
-- `migrate-002-favorite.sql` adds the `favorite` table behind the favourites feature.
-- `migrate-003-user-profile.sql` adds `users.avatar_url` (the profile photo) and `users.version`
-  (optimistic locking for the edit-profile form). It only adds columns, needs no new grant, and
-  does not rewrite existing rows. A build with the profile feature fails on every query that
-  loads a user until it has been run.
-- `migrate-004-image-focus.sql` adds the photo focal points: `pet_image.focus_x`/`focus_y` and
-  `users.avatar_focus_x`/`avatar_focus_y`, `SMALLINT NOT NULL DEFAULT 50` with a 0–100 check.
-  Only adds columns, needs no new grant; every existing photo starts centred. A build with the
-  focal-point editor fails on every query that loads a user or a photograph until it has been run.
+The server's connection pool authenticates as a least-privileged `petlee_app` role, not as
+`postgres`. Create it and grant it access, replacing `<chosen>` with a password of your choice:
 
 ```bash
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-004-image-focus.sql
+psql -U postgres -d petlee -c "CREATE ROLE petlee_app LOGIN PASSWORD '<chosen>';"
+psql -U postgres -d petlee -c "GRANT CONNECT ON DATABASE petlee TO petlee_app; GRANT USAGE ON SCHEMA public TO petlee_app; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO petlee_app; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO petlee_app;"
 ```
 
-### 3. WildFly: JDBC driver and DataSource
+The `GRANT`s must run while connected to `petlee` (`-d petlee`), not to the default `postgres`
+database: `ON ALL TABLES IN SCHEMA public` means the tables of the database you are connected to,
+so run anywhere else they grant nothing on Pet-Lee's tables, and every request then fails with
+`permission denied`. For the same reason they must run after `schema.sql`, once the tables exist.
+A role belongs to the whole server, so if `petlee_app` already exists the first command fails
+with `role "petlee_app" already exists`; keep its existing password and run the second command
+anyway.
+
+The role has no DDL rights, so the application cannot alter the schema even by accident. Keep
+the password: the DataSource command in the next step needs it.
+
+### 5. WildFly: JDBC driver and DataSource
 
 The application never opens its own JDBC connection and names no driver class; it looks up the
 `jdbc/petlee` DataSource by name. That DataSource is created once on the server.
@@ -110,7 +126,7 @@ the pool instead of opening its own connection.
 These settings are saved in `standalone/configuration/standalone.xml`, so this step is done once;
 they survive server restarts and redeploys.
 
-### 4. Build and deploy
+### 6. Build and deploy
 
 Build the WAR from the project root:
 
@@ -130,7 +146,7 @@ deploy <path>/target/pet-lee.war --force
 
 Open <http://localhost:8080/pet-lee/> and log in as `admin` / `Admin123!`.
 
-### 5. Redeploying after a code change
+### 7. Redeploying after a code change
 
 Package again (`mvn clean package`), then run the same command:
 
@@ -138,7 +154,7 @@ Package again (`mvn clean package`), then run the same command:
 deploy <path>/target/pet-lee.war --force
 ```
 
-`--force` replaces the deployed version in place. The DataSource from step 3 does not need to be
+`--force` replaces the deployed version in place. The DataSource from step 5 does not need to be
 recreated.
 
 ### Uploaded photographs
@@ -156,7 +172,7 @@ directory on WildFly, run in the CLI:
 Two limits apply to uploads. `ImageStore` refuses any single photograph over 5 MB, pet photographs
 and profile photos alike, with a 400. Undertow, WildFly's web server, refuses a whole request body
 over its `max-post-size`, 10 MB unless configured, before the application sees it. The add-pet
-form sends all its photographs in one request, up to five of up to 5 MB each, so step 3 raises
+form sends all its photographs in one request, up to five of up to 5 MB each, so step 5 raises
 `max-post-size` to 26 MB (27262976 bytes). Nothing in `web.xml` limits uploads: Mojarra ignores
 the `jakarta.faces.UPLOADER_*` parameters.
 
@@ -174,12 +190,39 @@ and watch a preview of the crop. Uploading a new profile photo puts its focus ba
 ### Troubleshooting
 
 - **`Required services that are not installed: jboss.naming.context.java.jdbc.petlee`** on deploy
-  means the DataSource does not exist. Run step 3, check that
+  means the DataSource does not exist. Run step 5, check that
   `test-connection-in-pool` succeeds, then deploy again.
 - **Deploy with the CLI rather than copying the WAR into `standalone/deployments`.** The deployment
   scanner leaves marker files there, and a stale `pet-lee.war.failed` from an earlier attempt
   hides the real deployment state. `deploy ... --force` reports success or the actual error
   directly. If you did use the folder, delete any `pet-lee.war.*` marker files it contains.
+
+## Upgrading an existing database
+
+A fresh install needs no migration: `schema.sql` already has every table and column. A database
+created by an earlier version of `schema.sql` needs the migrations it has not had yet, in number
+order, as described in `src/main/resources/db/README.md#migrations`:
+
+- `migrate-001-pet-image.sql` moves each pet's single `pet.image_url` into the `pet_image` table
+  and drops the column. Back up first and stop the application while it runs.
+- `migrate-002-favorite.sql` adds the `favorite` table behind the favourites feature.
+- `migrate-003-user-profile.sql` adds `users.avatar_url` (the profile photo) and `users.version`
+  (optimistic locking for the edit-profile form). It only adds columns, needs no new grant, and
+  does not rewrite existing rows. A build with the profile feature fails on every query that
+  loads a user until it has been run.
+- `migrate-004-image-focus.sql` adds the photo focal points: `pet_image.focus_x`/`focus_y` and
+  `users.avatar_focus_x`/`avatar_focus_y`, `SMALLINT NOT NULL DEFAULT 50` with a 0–100 check.
+  Only adds columns, needs no new grant; every existing photo starts centred. A build with the
+  focal-point editor fails on every query that loads a user or a photograph until it has been run.
+
+```bash
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-004-image-focus.sql
+```
+
+`psql` must be on the PATH, as in [step 2](#2-postgresql-tools-on-the-path).
 
 ## Running the tests
 

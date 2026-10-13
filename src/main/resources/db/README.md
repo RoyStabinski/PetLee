@@ -25,7 +25,19 @@ psql -U postgres -d petlee -f src/main/resources/db/schema.sql
 psql -U postgres -d petlee -f src/main/resources/db/seed.sql
 ```
 
-On Windows the binaries live under `C:\Program Files\PostgreSQL\18\bin`.
+On Windows the binaries live under `C:\Program Files\PostgreSQL\17\bin`, which the installer does
+not put on the PATH; the version number in the path must match the installed version. Add it for
+the current terminal session first:
+
+```powershell
+# PowerShell
+$env:Path += ";C:\Program Files\PostgreSQL\17\bin"
+```
+
+```bat
+:: cmd
+set PATH=%PATH%;C:\Program Files\PostgreSQL\17\bin
+```
 
 Apply them to a **fresh** database. `CREATE TABLE IF NOT EXISTS` makes re-running safe; it does not
 make a drifted schema correct. On tables created by something else — JPA auto-DDL from an earlier
@@ -187,15 +199,22 @@ constraint goes with it).
 
 ## The application's database role
 
-The server's connection pool should authenticate as `petlee_app`, not as `postgres`:
+The server's connection pool should authenticate as `petlee_app`, not as `postgres`. After
+`schema.sql` and `seed.sql`, from the project root, replacing `<chosen>` with a password of your
+choice:
 
-```sql
-CREATE ROLE petlee_app LOGIN PASSWORD '<choose one>';
-GRANT CONNECT ON DATABASE petlee TO petlee_app;
-GRANT USAGE ON SCHEMA public TO petlee_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO petlee_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO petlee_app;
+```bash
+psql -U postgres -d petlee -c "CREATE ROLE petlee_app LOGIN PASSWORD '<chosen>';"
+psql -U postgres -d petlee -c "GRANT CONNECT ON DATABASE petlee TO petlee_app; GRANT USAGE ON SCHEMA public TO petlee_app; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO petlee_app; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO petlee_app;"
 ```
+
+The `GRANT`s must run while connected to `petlee` (`-d petlee`), not to the default `postgres`
+database: `ON ALL TABLES IN SCHEMA public` means the tables of the database you are connected to,
+so run anywhere else they grant nothing on Pet-Lee's tables, and every request then fails with
+`permission denied`. For the same reason they must run after `schema.sql`, once the tables exist.
+A role belongs to the whole server, so if `petlee_app` already exists the first command fails
+with `role "petlee_app" already exists`; keep its existing password and run the second command
+anyway. The password chosen here is the one the WildFly `data-source add` command needs.
 
 It deliberately has no DDL rights, so the application cannot alter the schema even by accident.
 The password is stored only in the server's JDBC pool, never in this repository.

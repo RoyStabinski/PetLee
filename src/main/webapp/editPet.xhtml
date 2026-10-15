@@ -3,8 +3,7 @@
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:f="jakarta.faces.core"
-                xmlns:ui="jakarta.faces.facelets"
-                xmlns:p="jakarta.faces.passthrough">
+                xmlns:ui="jakarta.faces.facelets">
 
     <f:metadata>
         <f:viewParam name="id" value="#{petFormBean.petId}"/>
@@ -13,141 +12,65 @@
 
     <ui:define name="title">Edit your listing - Pet-Lee</ui:define>
 
-    <ui:define name="head">
-        <script src="#{request.contextPath}/resources/js/upload.js?v=#{initParam['petlee.ASSET_VERSION']}"
-                defer="defer"></script>
-        <script src="#{request.contextPath}/resources/js/focus.js?v=#{initParam['petlee.ASSET_VERSION']}"
-                defer="defer"></script>
-    </ui:define>
-
     <ui:define name="content">
-        <div class="card-box form-card">
+        <div class="panel">
             <h1>Edit your listing</h1>
 
-            <!-- The listing's fields. The photographs below have forms of their own, so changing
-                 a photograph neither submits nor validates these fields - which is also why Save
-                 sits with the fields it saves rather than under the photographs. -->
             <h:form id="petForm">
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
-
-                <div class="actions form-actions">
+                <div class="actions">
                     <h:outputLink value="#{request.contextPath}/profile.xhtml"
                                   styleClass="button-secondary">Cancel</h:outputLink>
                     <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
                 </div>
             </h:form>
 
-            <section class="form-section photos-section" aria-labelledby="photosTitle">
-                <h2 id="photosTitle" class="form-section-title">Photos</h2>
+            <!-- Photo changes are separate requests that never touch the listing's version, so
+                 changing photos never makes the form above stale. -->
+            <section class="form-section" aria-labelledby="photosTitle">
+                <h2 id="photosTitle">Photos</h2>
 
                 <ui:fragment rendered="#{empty petFormBean.images}">
                     <p class="field-hint">This listing has no photographs yet.</p>
                 </ui:fragment>
 
-                <!-- Both forms use display: contents, so their tiles share the one row. -->
-                <div class="photo-row">
-                    <h:form id="photosForm" rendered="#{not empty petFormBean.images}" styleClass="form-contents">
-                        <ul class="photo-list">
-                            <ui:repeat id="photos" value="#{petFormBean.images}" var="image">
-                                <li class="photo-tile">
-                                    <div class="photo-tile-media">
-                                        <h:graphicImage value="#{image.url}" alt="Photograph of #{petFormBean.name}"
-                                                        width="120" height="120"
-                                                        style="#{focus.style(image.focusX, image.focusY)}"/>
-                                        <ui:fragment rendered="#{image.main}">
-                                            <span class="photo-main-badge">Main photograph</span>
-                                        </ui:fragment>
-                                    </div>
-                                    <div class="button-stack">
-                                        <!-- Opens the focus editor below; focus.js reveals it. -->
-                                        <button type="button" class="button-secondary button-small" hidden="hidden"
-                                                data-focus-open="" data-focus-id="#{image.id}"
-                                                data-focus-src="#{request.contextPath}#{image.url}"
-                                                data-focus-x="#{image.focusX}" data-focus-y="#{image.focusY}"
-                                                aria-controls="focusPanel" aria-expanded="false">Adjust focus</button>
-                                        <h:commandLink id="setMain" value="Set as main" styleClass="button-secondary button-small"
-                                                       rendered="#{not image.main}"
-                                                       action="#{petFormBean.setMainPhoto(image.id)}"/>
-                                        <h:commandLink id="deletePhoto" value="Delete" styleClass="button-danger button-small"
-                                                       action="#{petFormBean.deletePhoto(image.id)}"
-                                                       onclick="return confirm('Delete this photograph permanently?');"/>
-                                    </div>
-                                </li>
-                            </ui:repeat>
-                        </ul>
-                    </h:form>
+                <h:form id="photosForm" rendered="#{not empty petFormBean.images}">
+                    <ul class="photo-list">
+                        <ui:repeat id="photos" value="#{petFormBean.images}" var="image">
+                            <li>
+                                <h:graphicImage value="#{image.url}" alt="Photograph of #{petFormBean.name}"/>
+                                <ui:fragment rendered="#{image.main}">
+                                    <span class="badge badge-available">Main photograph</span>
+                                </ui:fragment>
+                                <div class="actions">
+                                    <h:commandLink id="setMain" value="Set as main" styleClass="button-secondary"
+                                                   rendered="#{not image.main}"
+                                                   action="#{petFormBean.setMainPhoto(image.id)}"/>
+                                    <h:commandLink id="deletePhoto" value="Delete" styleClass="button-danger"
+                                                   action="#{petFormBean.deletePhoto(image.id)}"
+                                                   onclick="return confirm('Delete this photograph permanently?');"/>
+                                </div>
+                            </li>
+                        </ui:repeat>
+                    </ul>
+                </h:form>
 
-                    <!-- Its own multipart form: enctype is not optional for h:inputFile. -->
-                    <h:form id="uploadForm" enctype="multipart/form-data"
-                            rendered="#{petFormBean.roomForPhotos}" styleClass="form-contents">
-                        <div class="upload-slot">
-                            <h:outputLabel for="morePhotos" styleClass="upload-tile">
-                                <svg class="icon" viewBox="0 0 24 24"
-                                     width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round"
-                                     aria-hidden="true" focusable="false">
-                                    <path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
-                                </svg>
-                                <span class="upload-tile-text">Add photo</span>
-                                <h:inputFile id="morePhotos" value="#{petFormBean.uploadedFiles}" accept="image/*"
-                                             multiple="true" styleClass="upload-input"/>
-                            </h:outputLabel>
-                            <h:commandButton id="upload" value="Upload" action="#{petFormBean.addPhotos}"
-                                             styleClass="button-small button-block"/>
-                        </div>
-                    </h:form>
-                </div>
-
-                <ui:fragment rendered="#{petFormBean.roomForPhotos}">
+                <h:form id="uploadForm" enctype="multipart/form-data" rendered="#{petFormBean.roomForPhotos}">
+                    <div class="field">
+                        <h:outputLabel for="morePhotos" value="Add photographs"/>
+                        <h:inputFile id="morePhotos" value="#{petFormBean.uploadedFiles}" accept="image/*"
+                                     multiple="true"/>
+                    </div>
+                    <h:commandButton id="upload" value="Upload" action="#{petFormBean.addPhotos}"/>
                     <p class="field-hint">
                         <h:outputFormat value="You can add {0} more. JPEG, PNG, WebP or GIF, each up to 5 MB.">
                             <f:param value="#{petFormBean.photoSlotsLeft}"/>
                         </h:outputFormat>
                     </p>
-                </ui:fragment>
-
+                </h:form>
                 <ui:fragment rendered="#{not petFormBean.roomForPhotos}">
                     <p class="field-hint">A listing can have at most 5 photographs. Delete one to add another.</p>
                 </ui:fragment>
-
-                <!-- The focus editor (focus.js), for whichever photograph's button opened it. Save
-                     is ajax: it re-renders the tiles with the stored crop, and a 401 is a redirect
-                     to the login page, as elsewhere. -->
-                <h:form id="focusForm" rendered="#{not empty petFormBean.images}">
-                    <section id="focusPanel" class="focus-panel" data-focus-panel="" hidden="hidden"
-                             aria-labelledby="focusTitle">
-                        <h2 id="focusTitle" class="form-section-title">Adjust focus</h2>
-                        <p id="focusHelp" class="field-hint">
-                            Drag the ring, or click, onto the part of the photograph that should stay in
-                            view when it is cropped, such as the pet's face. With the ring selected, the
-                            arrow keys move it 5%, or 1% with Shift. The photograph itself is not changed.
-                        </p>
-                        <div class="focus-body">
-                            <div class="focus-stage" data-focus-stage="">
-                                <img class="focus-image" data-focus-image="" alt="The whole photograph"/>
-                                <button type="button" class="focus-marker" data-focus-marker=""
-                                        aria-label="Focal point" aria-describedby="focusHelp"></button>
-                            </div>
-                            <div>
-                                <p class="focus-preview-label" aria-hidden="true">Preview</p>
-                                <div class="focus-preview focus-preview-card">
-                                    <img data-focus-preview="" alt="" width="240" height="180"/>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="sr-only" role="status" data-focus-status=""></p>
-                        <h:inputHidden id="imageId" value="#{petFormBean.focusImageId}" p:data-focus-field="id"/>
-                        <h:inputHidden id="focusX" value="#{petFormBean.focusX}" p:data-focus-field="x"/>
-                        <h:inputHidden id="focusY" value="#{petFormBean.focusY}" p:data-focus-field="y"/>
-                        <div class="actions">
-                            <button type="button" class="button-secondary" data-focus-cancel="">Cancel</button>
-                            <h:commandButton id="saveFocus" value="Save" action="#{petFormBean.saveFocus}">
-                                <f:ajax execute="@form" render=":photosForm :globalMessages"
-                                        onevent="PetLeeFocus.onSave"/>
-                            </h:commandButton>
-                        </div>
-                    </section>
-                </h:form>
             </section>
         </div>
     </ui:define>

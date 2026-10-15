@@ -15,17 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     region        VARCHAR(100),
     role          VARCHAR(20)  NOT NULL DEFAULT 'USER',
     created_at    TIMESTAMP    NOT NULL,
-    -- The profile photo's URL under /images/, or NULL for the initials circle.
-    avatar_url    VARCHAR(512),
-    -- Optimistic locking, for @Version on the User entity.
-    version       BIGINT       NOT NULL DEFAULT 0,
-    -- The profile photo's focal point, in percent of its width and height; 50/50 is the centre.
-    -- A cropped view is drawn with CSS object-position; the file itself is never changed.
-    avatar_focus_x SMALLINT    NOT NULL DEFAULT 50,
-    avatar_focus_y SMALLINT    NOT NULL DEFAULT 50,
-    CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN')),
-    CONSTRAINT ck_users_avatar_focus_x CHECK (avatar_focus_x BETWEEN 0 AND 100),
-    CONSTRAINT ck_users_avatar_focus_y CHECK (avatar_focus_y BETWEEN 0 AND 100)
+    CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
 
 -- Case-insensitive uniqueness; a plain UNIQUE would let A@B.com sit beside a@b.com.
@@ -80,12 +70,7 @@ CREATE TABLE IF NOT EXISTS pet_image (
     pet_id      BIGINT       NOT NULL REFERENCES pet (pet_id) ON DELETE CASCADE,
     image_url   VARCHAR(512) NOT NULL,
     is_main     BOOLEAN      NOT NULL DEFAULT FALSE,
-    uploaded_at TIMESTAMP    NOT NULL,
-    -- The focal point a cropped view centres on, as for users.avatar_focus_x and _y.
-    focus_x     SMALLINT     NOT NULL DEFAULT 50,
-    focus_y     SMALLINT     NOT NULL DEFAULT 50,
-    CONSTRAINT ck_pet_image_focus_x CHECK (focus_x BETWEEN 0 AND 100),
-    CONSTRAINT ck_pet_image_focus_y CHECK (focus_y BETWEEN 0 AND 100)
+    uploaded_at TIMESTAMP    NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_pet_image_pet ON pet_image (pet_id);
@@ -93,17 +78,3 @@ CREATE INDEX IF NOT EXISTS idx_pet_image_pet ON pet_image (pet_id);
 -- At most one main image per pet, enforced by the database rather than trusted to the code.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_pet_image_main ON pet_image (pet_id) WHERE is_main;
 
--- ---------------------------------------------------------------------------
--- favorite: the pets a member has saved, one row per member and pet
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS favorite (
-    -- Deleting the member or the pet deletes the saved row with it.
-    user_id    BIGINT    NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    pet_id     BIGINT    NOT NULL REFERENCES pet (pet_id) ON DELETE CASCADE,
-    created_at TIMESTAMP NOT NULL,
-    -- Also what makes saving idempotent: a second insert of the same pair is refused.
-    PRIMARY KEY (user_id, pet_id)
-);
-
--- The primary key serves lookups by member; this one serves the cascade when a pet is deleted.
-CREATE INDEX IF NOT EXISTS idx_favorite_pet ON favorite (pet_id);

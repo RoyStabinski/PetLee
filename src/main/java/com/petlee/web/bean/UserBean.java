@@ -5,7 +5,6 @@ import com.petlee.dto.UserDTO;
 import com.petlee.web.client.ApiCredentials;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.AuthApi;
-import com.petlee.web.client.UserApi;
 
 import jakarta.enterprise.context.SessionScoped;
 import jakarta.faces.context.ExternalContext;
@@ -13,10 +12,7 @@ import jakarta.faces.context.FacesContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.Part;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,7 +43,6 @@ public class UserBean implements Serializable {
     @SuppressWarnings("serial") @Inject private AuthApi authApi;
 
     /** For the photo chosen at registration. */
-    @SuppressWarnings("serial") @Inject private UserApi userApi;
 
     /** The token and the signed-in user. */
     @Inject private ApiCredentials credentials;
@@ -60,9 +55,6 @@ public class UserBean implements Serializable {
     private String email;
     private String phone;
     private String region;
-
-    /** The registration form's photo, if one was chosen. */
-    private transient Part avatarFile;
 
     // ------------------------------------------------------------------------------- the actions
 
@@ -120,13 +112,7 @@ public class UserBean implements Serializable {
             }
             rotateSessionId();
 
-            Messages.info("Welcome to Pet-Lee!");
-            String photoProblem = uploadChosenAvatar();
-            if (photoProblem != null) {
-                Messages.warn("Your account is ready, but your photo could not be added: "
-                        + photoProblem + " You can add one from Edit profile.");
-            }
-            return Messages.keep(PROFILE);
+            Messages.info("Welcome to Pet-Lee!");            return Messages.keep(PROFILE);
 
         } catch (ApiException failure) {
             // Only registration itself can land here; the calls after it catch their own.
@@ -135,29 +121,6 @@ public class UserBean implements Serializable {
 
         } finally {
             clearPasswords();
-            avatarFile = null;
-        }
-    }
-
-    /**
-     * Uploads the photo chosen on the registration form, for the member just signed in.
-     *
-     * @return null if there was no photo or it was stored, otherwise why it was not
-     */
-    private String uploadChosenAvatar() {
-        if (avatarFile == null || avatarFile.getSize() <= 0) {
-            return null;
-        }
-        try (InputStream content = avatarFile.getInputStream()) {
-            userApi.uploadAvatar(content, avatarFile.getSubmittedFileName(),
-                    avatarFile.getContentType());
-            return null;
-        } catch (ApiException | IOException failure) {
-            String reason = failure.getMessage();
-            if (reason == null || reason.isBlank()) {
-                return "the upload failed.";
-            }
-            return reason.endsWith(".") ? reason : reason + ".";
         }
     }
 
@@ -208,47 +171,6 @@ public class UserBean implements Serializable {
     public String getDisplayName() {
         UserDTO user = getCurrentUser();
         return user == null ? null : user.fullName();
-    }
-
-    /**
-     * @return up to two initials from the full name, for the avatar circle: the first letter of
-     *         the first and last words, or of the username, or "?" when signed out
-     */
-    public String getInitials() {
-        UserDTO user = getCurrentUser();
-        if (user == null) {
-            return "?";
-        }
-        return initialsOf(user.fullName() == null || user.fullName().isBlank()
-                ? user.username() : user.fullName());
-    }
-
-    /** @return the signed-in user's profile photo URL, or null for the initials circle */
-    public String getAvatarUrl() {
-        UserDTO user = getCurrentUser();
-        return user == null ? null : user.avatarUrl();
-    }
-
-    /** @return the inline style that crops the profile photo around its focal point, or null */
-    public String getAvatarStyle() {
-        UserDTO user = getCurrentUser();
-        return user == null ? null : FocusBean.styleOf(user.avatarFocusX(), user.avatarFocusY());
-    }
-
-    /**
-     * @param name a full name, may be null or blank
-     * @return the first letters of its first and last words, upper case, or "?" for none
-     */
-    static String initialsOf(String name) {
-        if (name == null || name.isBlank()) {
-            return "?";
-        }
-        String[] words = name.trim().split("\\s+");
-        String initials = words[0].substring(0, 1);
-        if (words.length > 1) {
-            initials += words[words.length - 1].substring(0, 1);
-        }
-        return initials.toUpperCase();
     }
 
     /** @return the signed-in user, or null. Carries no password material. */
@@ -319,9 +241,4 @@ public class UserBean implements Serializable {
     /** @param region the registration form's region, may be blank */
     public void setRegion(String region) { this.region = region; }
 
-    /** @return the photo chosen on the registration form, or null */
-    public Part getAvatarFile() { return avatarFile; }
-
-    /** @param avatarFile the photo chosen on the registration form */
-    public void setAvatarFile(Part avatarFile) { this.avatarFile = avatarFile; }
 }

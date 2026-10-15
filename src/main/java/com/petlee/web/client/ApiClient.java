@@ -235,9 +235,14 @@ public class ApiClient {
             builder.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
         }
 
-        try (Response response = body == null
+        // Jersey, the client on Jakarta EE 10 servers such as Payara, refuses a PUT without an
+        // entity, so a body-less PUT or POST sends an empty one; its data is in the query string.
+        Entity<?> sent = body == null && ("PUT".equals(method) || "POST".equals(method))
+                ? Entity.text("") : body;
+
+        try (Response response = sent == null
                 ? builder.method(method)
-                : builder.method(method, body)) {
+                : builder.method(method, sent)) {
 
             if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
                 if (response.getStatus() == 401 && token != null) {

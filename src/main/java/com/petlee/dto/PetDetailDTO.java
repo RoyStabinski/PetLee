@@ -6,9 +6,8 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * A pet in full. The owner fields are null for a caller who is not logged in, and
- * {@code ownerAvatarUrl} is also null when the owner has no profile photo;
- * {@code ownerAvatarFocusX} and {@code ownerAvatarFocusY} are its focal point in percent.
+ * A pet in full. The owner fields are null for a caller who is not logged in.
+ *
  * {@code version} is what a client sends back with {@code PUT /api/pets/{id}?version=},
  * so a save based on stale data is refused rather than silently overwriting a newer one.
  * {@code categoryId} and {@code ownedByCaller} are for an edit form: the value to preselect,
@@ -20,7 +19,6 @@ public record PetDetailDTO(Long id, String name, String breed, Integer age, Stri
                            String gender, String shortDesc, String longDesc, String status,
                            Integer categoryId, String categoryName, String imageUrl,
                            String ownerName, String ownerPhone, String ownerEmail,
-                           String ownerAvatarUrl, Integer ownerAvatarFocusX, Integer ownerAvatarFocusY,
                            boolean ownedByCaller, Long version, List<PetImageDTO> images)
         implements Serializable {
 
@@ -38,9 +36,6 @@ public record PetDetailDTO(Long id, String name, String breed, Integer age, Stri
                 authenticated ? p.getOwner().getFullName() : null,
                 authenticated ? p.getOwner().getPhoneNumber() : null,
                 authenticated ? p.getOwner().getEmail() : null,
-                authenticated ? p.getOwner().getAvatarUrl() : null,
-                authenticated ? p.getOwner().getAvatarFocusX() : null,
-                authenticated ? p.getOwner().getAvatarFocusY() : null,
                 ownedByCaller, p.getVersion(),
                 p.getImages().stream().map(PetImageDTO::of).toList());
     }

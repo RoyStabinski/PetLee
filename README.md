@@ -169,23 +169,14 @@ directory on WildFly, run in the CLI:
 /system-property=petlee.upload.dir:add(value=C:/petlee/uploads)
 ```
 
-Two limits apply to uploads. `ImageStore` refuses any single photograph over 5 MB, pet photographs
-and profile photos alike, with a 400. Undertow, WildFly's web server, refuses a whole request body
+Two limits apply to uploads. `ImageStore` refuses any single photograph over 5 MB
+with a 400. Undertow, WildFly's web server, refuses a whole request body
 over its `max-post-size`, 10 MB unless configured, before the application sees it. The add-pet
 form sends all its photographs in one request, up to five of up to 5 MB each, so step 5 raises
 `max-post-size` to 26 MB (27262976 bytes). Nothing in `web.xml` limits uploads: Mojarra ignores
 the `jakarta.faces.UPLOADER_*` parameters.
 
 The API itself receives one photograph per request, so it is not affected.
-
-**Focal points.** Every pet photograph and profile photo has a focal point, stored as two whole
-percentages of its width and height (50/50, the centre, by default). The files are never cropped
-or rewritten: wherever a photo is shown cropped (`object-fit: cover` in the stylesheet: gallery
-cards, the details carousel and its thumbnails, My listings, favourites, the admin table, the
-edit-page tiles and every avatar), the page draws it with `object-position: X% Y%`, so the crop
-moves towards the chosen spot. Owners set it with "Adjust focus" on the edit-listing and
-edit-profile pages: drag or click the ring on the whole photo, or move it with the arrow keys,
-and watch a preview of the crop. Uploading a new profile photo puts its focus back in the centre.
 
 ### Troubleshooting
 
@@ -205,21 +196,9 @@ order, as described in `src/main/resources/db/README.md#migrations`:
 
 - `migrate-001-pet-image.sql` moves each pet's single `pet.image_url` into the `pet_image` table
   and drops the column. Back up first and stop the application while it runs.
-- `migrate-002-favorite.sql` adds the `favorite` table behind the favourites feature.
-- `migrate-003-user-profile.sql` adds `users.avatar_url` (the profile photo) and `users.version`
-  (optimistic locking for the edit-profile form). It only adds columns, needs no new grant, and
-  does not rewrite existing rows. A build with the profile feature fails on every query that
-  loads a user until it has been run.
-- `migrate-004-image-focus.sql` adds the photo focal points: `pet_image.focus_x`/`focus_y` and
-  `users.avatar_focus_x`/`avatar_focus_y`, `SMALLINT NOT NULL DEFAULT 50` with a 0–100 check.
-  Only adds columns, needs no new grant; every existing photo starts centred. A build with the
-  focal-point editor fails on every query that loads a user or a photograph until it has been run.
 
 ```bash
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-favorite.sql
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-003-user-profile.sql
-psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-004-image-focus.sql
 ```
 
 `psql` must be on the PATH, as in [step 2](#2-postgresql-tools-on-the-path).
@@ -240,15 +219,9 @@ no database, server or network, and cover:
 - `PhoneNumbersTest`: valid mobile, landline and 07X numbers in many spellings (spaces, dashes,
   parentheses, `+972`, `972`) and their stored form; too short, too long, wrong-prefix and
   lettered numbers refused.
-- `TokenStoreTest`: issuing, resolving and revoking tokens, `revokeAllExcept`, the 30-minute idle
+- `TokenStoreTest`: issuing, resolving and revoking tokens, the 30-minute idle
   expiry and its sliding renewal (on a test clock, so nothing waits), and 32 threads sharing one
   store without losing or reviving a token.
-- `PetRepositoryTest`: the search text's LIKE pattern, lower-cased with `\`, `%` and `_` escaped.
-- `ContactLinksTest`: the contact card's links; WhatsApp for mobile numbers only, never for a
-  landline or a missing number.
-- `FocalPointTest`: a focal point's values; 0 and 100 accepted, -1, 101, a missing value and a
-  missing body refused with 400.
-- `FocusBeanTest`: the `object-position` style a focal point becomes.
 
 `mvn package` runs the same tests before it builds the WAR, and builds nothing if one fails.
 
@@ -283,7 +256,7 @@ Register through `/register.xhtml` to try the flow as a first-time user.
 ## Architecture
 
 The JSF tier (`com.petlee.web`) reaches the logic tier only through the REST API. Its managed
-beans call `com.petlee.web.client` (`AuthApi`, `UserApi`, `PetApi`, `CategoryApi`, `FavoriteApi`
+beans call `com.petlee.web.client` (`AuthApi`, `PetApi`, `CategoryApi`
 and `AdminApi` over one shared `ApiClient`), exchange the records in `com.petlee.dto`, and authenticate with the bearer
 token that login returns, kept in the session-scoped `ApiCredentials`; nothing in the JSF tier
 touches a service, an entity or a repository. The same holds for photographs: the pages send
@@ -319,19 +292,14 @@ session if there is one.
 | Method | Path | Access |
 |---|---|---|
 | POST | `/api/users/register` | open — 201 Created with `Location: /api/users/me` (where the new member reads the account once logged in) and the created user as the body |
-| GET | `/api/users/me` | auth — the caller's own account, with `region`, `avatarUrl` and `version` |
-| PUT | `/api/users/me?version=N` | auth — body `{fullName, email, phone, region}`; the username cannot change. `N` is the `version` from `GET /api/users/me`; a stale or missing one is 409 (`code` `STALE_VERSION`), and so is an email address another account has |
-| PUT | `/api/users/me/password` | auth — body `{currentPassword, newPassword}`; a wrong current password is 400, a new one under 8 characters is 400. Revokes every other bearer token of the caller and keeps the one sent; 204 |
-| POST | `/api/users/me/avatar` | auth — multipart/form-data, one part named `file`, the same formats and 5 MB limit as pet photographs; replaces the profile photo and deletes the old file; returns the account |
-| DELETE | `/api/users/me/avatar` | auth — removes the profile photo and its file; returns the account |
-| PUT | `/api/users/me/avatar/focus` | auth — body `{x, y}`, whole numbers 0 to 100 (percent of width and height); moves the profile photo's focal point; 204, and the `version` does not move |
+| GET | `/api/users/me` | auth — the caller's own account |
 | POST | `/api/auth/login` | open |
 | POST | `/api/auth/logout` | auth — 204 |
 | GET | `/api/categories` | open |
 | POST | `/api/categories` | admin — body `{name}`; 201 Created with `Location: /api/categories/{id}` and the created category as the body |
 | DELETE | `/api/categories/{id}` | admin — 204; 409 while listings still use it |
-| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge`, `q` |
-| GET | `/api/pets/{id}` | open — owner contact fields (`ownerName`, `ownerPhone`, `ownerEmail`, `ownerAvatarUrl`) only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
+| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
+| GET | `/api/pets/{id}` | open — owner contact fields (`ownerName`, `ownerPhone`, `ownerEmail`) only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth — 201 Created with `Location: /api/pets/{id}` and the created listing as the body |
 | PUT | `/api/pets/{id}?version=N` | owner only — `N` is the `version` from `GET /api/pets/{id}`; a stale or missing one is 409 |
@@ -340,44 +308,22 @@ session if there is one.
 | POST | `/api/pets/{id}/images` | owner only — multipart/form-data, one part named `file`; adds one photograph (at most 5); 201 Created with `Location: /api/pets/{id}/images/{imageId}` and `{id, url, main}` as the body |
 | DELETE | `/api/pets/{id}/images/{imageId}` | owner only — deletes the photograph and its file; 204 |
 | PUT | `/api/pets/{id}/images/{imageId}/main` | owner only — makes it the main photograph; 204 |
-| PUT | `/api/pets/{id}/images/{imageId}/focus` | owner only — body `{x, y}`, whole numbers 0 to 100; moves the photograph's focal point; 204, and the listing's `version` does not move. A missing or out-of-range value is 400; a photograph of another pet is 404 |
 | GET | `/api/admin/pets` | admin — every status, with `ownerName` and `createdAt`; filters: `categoryId`, `size`, `gender` |
 | PUT | `/api/admin/pets/{id}/status` | admin — `?status=REMOVED\|AVAILABLE` |
 | GET | `/api/admin/category-counts` | admin — listings per category id, e.g. `{"1": 4}`; unused categories are absent |
-| GET | `/api/favorites` | auth — the caller's saved pets, newest saved first, each with its `status`; withdrawn (REMOVED) pets are left out, adopted ones kept |
-| GET | `/api/favorites/ids` | auth — the ids of the caller's saved pets, e.g. `[7, 12]`, for marking hearts in one call |
-| PUT | `/api/favorites/{petId}` | auth — saves the pet; 204. Idempotent: saving it again is also 204. 404 if the pet does not exist or is not AVAILABLE |
-| DELETE | `/api/favorites/{petId}` | auth — forgets the pet; 204. Idempotent: 204 even if it was not saved |
 
 Enum strings are exact: size `SMALL\|MEDIUM\|LARGE`, gender `MALE\|FEMALE`, status
 `AVAILABLE\|ADOPTED\|REMOVED`, role `USER\|ADMIN`. Errors come back as
 `{"code": "...", "message": "..."}`.
 
-The four endpoints that create something (`POST /api/users/register`, `POST /api/pets`,
+The endpoints that create something (`POST /api/users/register`, `POST /api/pets`,
 `POST /api/pets/{id}/images` and `POST /api/categories`) answer 201 Created, with a `Location`
 header naming the new resource and the same body as before. Every other success is 200 with a
-body or 204 without one. `PUT /api/favorites/{petId}` stays 204: it is an idempotent put, not a
-creation, and answers the same whether or not the pet was already saved.
+body or 204 without one.
 
 `minAge` and `maxAge` are whole numbers from 0 to 50, and either may be given alone; a listing
 whose age is unknown is left out once either is given. A value outside that range, or `minAge`
 greater than `maxAge`, is a 400 naming the problem.
-
-`q` is free-text search: a pet matches when its name or its breed contains the text, ignoring
-case. It is trimmed and ignored when blank, and more than 50 characters is a 400. `%` and `_`
-match only themselves, not any text, and the value is bound as a query parameter, never pasted
-into the query:
-
-```bash
-curl "http://localhost:8080/pet-lee/api/pets?q=shep&size=LARGE"
-```
-
-On a pet's page, a signed-in member sees Call (`tel:`) and Email (`mailto:`, with the subject
-"About <pet name> on Pet-Lee") buttons in the contact card, and a WhatsApp button when the
-owner's number is a mobile one (05X). That button opens `https://wa.me/9725XXXXXXXX` (the stored
-`05X-XXXXXXX` with the leading 0 dropped and 972 added) in a new tab, with a ready-made opening
-message. Landlines and 07X numbers get no WhatsApp button, and a button whose phone number or
-address is missing is not shown.
 
 `PUT /api/pets/{id}/status` accepts only AVAILABLE to ADOPTED and back. It is a 409 when an
 administrator has withdrawn the listing (only an administrator can restore it), when the
@@ -390,11 +336,10 @@ curl -X PUT -H "Authorization: Bearer <token>" \
 ```
 
 A listing has up to five photographs, and once it has any, exactly one of them is main. The
-main one is the `imageUrl` of every pet the API returns, and the one the owner's listings and
-the admin table show. Every pet in a list also carries `images`, all of them with the main one
-first and each as `{url, focusX, focusY}`, for the gallery card's carousel; `GET /api/pets/{id}`
-lists them in `images` too, oldest first and with their ids, for the details page. `imageUrl` is
-null, and `images` empty, for a pet with no photographs.
+main one is the `imageUrl` of every pet the API returns, and the one the gallery, the owner's
+listings and the admin table show. `GET /api/pets/{id}` lists all of them in `images`, oldest
+first and with their ids, for the details and edit pages. `imageUrl` is null, and `images` empty,
+for a pet with no photographs.
 
 `POST /api/pets/{id}/images` adds one photograph per request. The part must be a JPEG, PNG, GIF
 or WebP image of at most 5 MB, sent with its own `Content-Type`; anything else is a 400, and a
@@ -406,60 +351,25 @@ curl -H "Authorization: Bearer <token>" \
      http://localhost:8080/pet-lee/api/pets/7/images
 ```
 
-Every `/api/users/me` endpoint acts for whoever the token or session belongs to; none takes a
-user id, so a member can neither read nor change another's account. A user carries a `version`,
-like a pet: send back the one `GET /api/users/me` returned, and a save based on an older read is
-a 409 whose `code` is `STALE_VERSION`. A taken email address is also a 409, with the ordinary
-`ERROR` code, decided by the case-insensitive unique index if two saves race. Changing the
-profile photo or the password does not move the `version`, so a profile form open at the same
-time can still be saved.
+`GET /api/users/me` returns the caller's own account and acts for whoever the token or session
+belongs to; no endpoint takes a user id, so a member cannot read another's account.
 
 ```bash
 curl -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/users/me
-curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
-     -d '{"fullName":"Dana Levi","email":"dana@example.com","phone":"+972 50 123 4567","region":"Haifa"}' \
-     "http://localhost:8080/pet-lee/api/users/me?version=0"
-curl -H "Authorization: Bearer <token>" -F "file=@me.jpg;type=image/jpeg" \
-     http://localhost:8080/pet-lee/api/users/me/avatar
-curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
-     -d '{"x":40,"y":25}' http://localhost:8080/pet-lee/api/users/me/avatar/focus
 ```
-
-Every image the API returns carries its focal point: `focusX` and `focusY` on each of a pet's
-`images` (in the gallery list and in full), `imageFocusX` and `imageFocusY` in the admin list,
-`avatarFocusX` and `avatarFocusY` on an account, and `ownerAvatarFocusX` and `ownerAvatarFocusY`
-on a pet in full. In the gallery list, `images` replaces the old `imageUrls`: a list of
-`{url, focusX, focusY}`.
-
-A password change signs the member out everywhere else: every other bearer token of theirs is
-revoked, and the token the request carried stays valid. Browser sessions that call `/api` with
-the session cookie are not tracked per user and are not ended; they expire on their own.
 
 **Telephone numbers** must be Israeli, at registration and on every profile save. Accepted:
 mobile numbers, 05X and seven digits; landlines 02, 03, 04, 08 and 09 and seven digits; and the
 07X numbers, 07X and seven digits. Spaces, dashes and parentheses are ignored, and the leading 0
 may be written `+972` or `972`. The number is stored normalised, `0XX-XXXXXXX` for mobile and
-07X numbers and `0X-XXXXXXX` for the other landlines, so `+972 (54) 123-4567` is stored as
-`054-1234567` and `021234567` as `02-1234567`. The field stays optional; a non-empty number that
-does not fit is a 400, "Enter a valid Israeli phone number, for example 050-1234567". The rule
-lives in `com.petlee.util.PhoneNumbers`; the register and edit-profile pages carry a matching
-regular expression for a quicker answer, and the server still decides. Numbers stored before
-the rule are left as they are until their owner next saves the profile.
-
-A member's favourites are theirs alone: every `/api/favorites` call acts for whoever the token
-or session belongs to, and no endpoint takes another user's id. They live in the `favorite`
-table, one row per member and pet, keyed by the pair, so saving twice cannot create a duplicate
-and two simultaneous saves both succeed. Deleting the member or the pet deletes the row with it.
-
-```bash
-curl -X PUT    -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/favorites/7
-curl           -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/favorites/ids
-curl -X DELETE -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/favorites/7
-```
-
-Deleting the main photograph makes the oldest remaining one main. An `imageId` that belongs to
-another pet is a 404. Deleting a pet deletes all its photographs, files included. Changing a
-listing's photographs does not change its `version`, so an edit form open at the same time can
+**Telephone numbers** must be Israeli, at registration. Accepted: mobile numbers, 05X and seven
+digits; landlines 02, 03, 04, 08 and 09 and seven digits; and the 07X numbers, 07X and seven
+digits. Spaces, dashes and parentheses are ignored, and the leading 0 may be written `+972` or
+`972`. The number is stored normalised, `0XX-XXXXXXX` for mobile and 07X numbers and `0X-XXXXXXX`
+for the other landlines, so `+972 (54) 123-4567` is stored as `054-1234567`. The field stays
+optional; a non-empty number that does not fit is a 400, "Enter a valid Israeli phone number, for
+example 050-1234567". The rule lives in `com.petlee.util.PhoneNumbers`; the register page carries
+a matching regular expression for a quicker answer, and the server still decides.
 still be saved.
 
 A browser login through the JSF pages authenticates the pages, not the browser's own `/api`

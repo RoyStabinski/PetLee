@@ -2,7 +2,6 @@ package com.petlee.web.bean;
 
 import com.petlee.dto.CategoryDTO;
 import com.petlee.dto.PetDTO;
-import com.petlee.dto.PhotoDTO;
 import com.petlee.web.client.ApiException;
 import com.petlee.web.client.CategoryApi;
 import com.petlee.web.client.PetApi;
@@ -34,9 +33,6 @@ public class PetBean implements Serializable {
     /** Shown for a listing with no photograph. Bundled, so it cannot 404. */
     static final String PLACEHOLDER_IMAGE = "/resources/images/placeholder-pet.png";
 
-    /** The placeholder as a card photo, centred. */
-    static final PhotoDTO PLACEHOLDER_PHOTO = new PhotoDTO(PLACEHOLDER_IMAGE, 50, 50);
-
     // Not transient: what CDI injects is the client proxy of a normal-scoped bean, which is
     // serializable; javac sees only the declared type. Transient would leave null after
     // the session or view is passivated and restored.
@@ -52,8 +48,6 @@ public class PetBean implements Serializable {
     private String selectedGender;
     private Integer minAge;
     private Integer maxAge;
-    private String search;
-
     /** The owner's own listings, every status included; a serializable list, as above. */
     @SuppressWarnings("serial") private List<PetDTO> myListings;
 
@@ -95,14 +89,12 @@ public class PetBean implements Serializable {
         selectedGender = null;
         minAge = null;
         maxAge = null;
-        search = null;
         return load();
     }
 
     private String load() {
         try {
-            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender, minAge, maxAge,
-                    search);
+            pets = petApi.gallery(selectedCategoryId, selectedSize, selectedGender, minAge, maxAge);
         } catch (ApiException e) {
             if (e.getStatus() == 401) {
                 return Messages.sessionExpired();
@@ -116,26 +108,13 @@ public class PetBean implements Serializable {
      * @param petId a listing
      * @return the details page for it, as a redirect
      */
-    public String viewDetails(Long petId) {
-        return "/petDetails.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
+    /** @return the pet's main photograph, or the placeholder when it has none */
+    public String imageUrlOf(PetDTO pet) {
+        return imageOf(pet == null ? null : pet.imageUrl());
     }
 
-    /**
-     * @param pet a listing
-     * @return its main photograph with its focal point, or the placeholder
-     */
-    public PhotoDTO mainPhotoOf(PetDTO pet) { return photosOf(pet).get(0); }
-
-    /**
-     * @param pet a gallery listing
-     * @return its photographs with their focal points for the card's carousel, main first; just
-     *         the placeholder when it has none, so the card always has one photo to show
-     */
-    public List<PhotoDTO> photosOf(PetDTO pet) {
-        if (pet == null || pet.images() == null || pet.images().isEmpty()) {
-            return List.of(PLACEHOLDER_PHOTO);
-        }
-        return pet.images();
+    public String viewDetails(Long petId) {
+        return "/petDetails.xhtml?faces-redirect=true&includeViewParams=true&id=" + petId;
     }
 
     /**
@@ -341,12 +320,6 @@ public class PetBean implements Serializable {
     /** @return whether no listing matches the gallery filters */
     public boolean isEmpty() { return pets.isEmpty(); }
 
-    /** @return the line above the gallery: "1 pet found" or "N pets found" */
-    public String getResultCountLabel() {
-        int count = pets.size();
-        return count + (count == 1 ? " pet found" : " pets found");
-    }
-
     /** @return the category filter, or null for any */
     public Integer getSelectedCategoryId() { return selectedCategoryId; }
 
@@ -377,9 +350,4 @@ public class PetBean implements Serializable {
     /** @param v the oldest age to show, or null for no upper bound */
     public void setMaxAge(Integer v) { this.maxAge = v; }
 
-    /** @return the text a name or breed must contain, or null for any */
-    public String getSearch() { return search; }
-
-    /** @param v the text a name or breed must contain, or null for any */
-    public void setSearch(String v) { this.search = v; }
 }

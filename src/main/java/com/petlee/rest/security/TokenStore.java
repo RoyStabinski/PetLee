@@ -103,26 +103,6 @@ public class TokenStore {
         }
     }
 
-    /**
-     * Forgets every token of one user except one, for a password change: whoever holds the old
-     * password's tokens elsewhere is signed out, and the caller stays signed in.
-     *
-     * @param userId    the user whose tokens to revoke; null revokes nothing
-     * @param keepToken the token to keep, or null to revoke them all
-     */
-    public void revokeAllExcept(Long userId, String keepToken) {
-        if (userId == null) {
-            return;
-        }
-        // remove(key), not entrySet().removeIf: that removes an entry only if its value is
-        // unchanged, so a token a concurrent resolve had just slid would survive.
-        entries.forEach((token, entry) -> {
-            if (userId.equals(entry.user().userId()) && !token.equals(keepToken)) {
-                entries.remove(token);
-            }
-        });
-    }
-
     /** A user and when their token was last used. */
     private record Entry(SessionUser user, Instant lastUsed) {
 

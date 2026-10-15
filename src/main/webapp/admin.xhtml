@@ -15,14 +15,6 @@
 
     <ui:define name="title">Admin panel - Pet-Lee</ui:define>
 
-    <ui:define name="banner">
-        <div class="page-banner">
-            <div class="container">
-                <h1>Admin panel</h1>
-            </div>
-        </div>
-    </ui:define>
-
     <ui:define name="content">
 
         <h2 class="section-title">Listing management</h2>
@@ -96,8 +88,7 @@
                                 <tr>
                                     <td class="cell-thumb">
                                         <h:graphicImage value="#{adminBean.thumbnailOf(pet)}" alt="#{pet.name}"
-                                                        width="48" height="48"
-                                                        style="#{focus.style(pet.imageFocusX, pet.imageFocusY)}"/>
+                                                        width="48" height="48"/>
                                     </td>
                                     <td class="cell-strong">#{pet.name}</td>
                                     <td>#{pet.ownerName}</td>

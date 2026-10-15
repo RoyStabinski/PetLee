@@ -1,107 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    The frame every screen is written inside: title, content and footer, plus the navigation bar
-    and the one global message region every page inherits.
-
-    The navigation bar's three shapes - guest, member, administrator - are menu visibility only,
-    never a security boundary. Under WEB-INF, so no browser can request the template itself.
-
+    The frame every screen is written inside: navigation bar, one global message region, title,
+    content and footer. The navigation's three shapes - guest, member, administrator - are menu
+    visibility only, never a security boundary. Under WEB-INF, so no browser can request it.
     The stylesheet is a plain link, not h:outputStylesheet: Faces serves its resources with a
-    seven-day max-age, so a browser kept an old petlee.css. The ?v= comes from the
-    petlee.ASSET_VERSION context-param in web.xml; raise it after changing a CSS or JS file.
+    seven-day max-age. The ?v= comes from the petlee.ASSET_VERSION context-param in web.xml.
 -->
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:h="jakarta.faces.html"
       xmlns:f="jakarta.faces.core"
-      xmlns:ui="jakarta.faces.facelets"
-      xmlns:p="jakarta.faces.passthrough">
-
+      xmlns:ui="jakarta.faces.facelets">
 <h:head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title><ui:insert name="title">Pet-Lee</ui:insert></title>
-    <link rel="icon" type="image/svg+xml"
-          href="#{request.contextPath}/resources/images/logo.svg?v=#{initParam['petlee.ASSET_VERSION']}"/>
+    <link rel="icon" type="image/svg+xml" href="#{request.contextPath}/resources/images/logo.svg"/>
     <link rel="stylesheet"
           href="#{request.contextPath}/resources/css/petlee.css?v=#{initParam['petlee.ASSET_VERSION']}"/>
-    <!-- Site-wide: the Space key for link-buttons, and focus kept across ajax updates. -->
-    <script src="#{request.contextPath}/resources/js/site.js?v=#{initParam['petlee.ASSET_VERSION']}"
-            defer="defer"></script>
-    <!-- A page's own scripts, such as the carousel on petDetails.xhtml. -->
-    <ui:insert name="head"/>
 </h:head>
-
 <h:body styleClass="page">
-
-    <!-- First stop for a keyboard or screen-reader user; visible only once focused. -->
     <a class="skip-link" href="#content">Skip to content</a>
 
     <header class="site-header">
         <div class="container header-inner">
-
-            <!-- The mark's alt is empty: the wordmark beside it already says "Pet-Lee". -->
             <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="brand">
-                <img class="brand-mark" src="#{request.contextPath}/resources/images/logo.svg"
-                     alt="" width="36" height="36"/>
-                <span class="brand-text">
-                    <span class="brand-name">Pet-Lee</span>
-                    <span class="brand-tagline">Find your new companion</span>
-                </span>
+                <img src="#{request.contextPath}/resources/images/logo.svg" alt="" width="32" height="32"/>
+                Pet-Lee
             </h:outputLink>
-
             <nav class="nav" aria-label="Main navigation">
-
                 <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="nav-link">Home</h:outputLink>
 
-                <!-- Guest -->
                 <ui:fragment rendered="#{not userBean.loggedIn}">
                     <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="nav-link">Log in</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/register.xhtml"
-                                  styleClass="button button-accent">Register</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/register.xhtml" styleClass="button">Register</h:outputLink>
                 </ui:fragment>
 
-                <!-- Member -->
                 <ui:fragment rendered="#{userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/addPet.xhtml"
-                                  styleClass="button button-accent">Add a pet</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">Add a pet</h:outputLink>
                     <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="nav-link">My profile</h:outputLink>
-                </ui:fragment>
-
-                <!-- Always rendered, even for a guest: every heart's ajax call names :navFavorites
-                     among its targets, and Faces refuses a target id that is not on the page. -->
-                <h:panelGroup id="navFavorites" styleClass="nav-favorites">
-                    <ui:fragment rendered="#{userBean.loggedIn}">
-                        <a class="nav-link" href="#{request.contextPath}/favorites.xhtml">Favourites
-                            <span class="count-badge">#{favoriteBean.count}<span class="sr-only"> saved</span></span></a>
-                    </ui:fragment>
-                </h:panelGroup>
-
-                <ui:fragment rendered="#{userBean.loggedIn}">
-                    <!-- Administrator: the member links plus this one. -->
                     <ui:fragment rendered="#{userBean.admin}">
                         <h:outputLink value="#{request.contextPath}/admin.xhtml" styleClass="nav-link">Admin panel</h:outputLink>
                     </ui:fragment>
-
-                    <!-- The avatar and name together are one link to the profile page. Its name
-                         starts with the visible words, so a voice command that says what it sees
-                         still finds it. A component with an id, so the profile photo's focus
-                         editor can re-render it. -->
-                    <h:outputLink id="navUser" value="#{request.contextPath}/profile.xhtml" styleClass="nav-user"
-                                  p:aria-label="Signed in as #{userBean.displayName}, my profile">
-                        <!-- Decorative: the text beside it names the user. -->
-                        <ui:fragment rendered="#{not empty userBean.avatarUrl}">
-                            <h:graphicImage value="#{userBean.avatarUrl}" alt="" width="32" height="32"
-                                            styleClass="avatar-img avatar-sm" style="#{userBean.avatarStyle}"/>
-                        </ui:fragment>
-                        <ui:fragment rendered="#{empty userBean.avatarUrl}">
-                            <span class="avatar avatar-sm" aria-hidden="true">#{userBean.initials}</span>
-                        </ui:fragment>
-                        <h:outputFormat value="Signed in as {0}">
-                            <f:param value="#{userBean.displayName}"/>
-                        </h:outputFormat>
-                    </h:outputLink>
-
+                    <span class="nav-user">Signed in as #{userBean.displayName}</span>
                     <!-- A POST, not a link: a GET that changes server state can be triggered
                          by any image tag on any page the user visits. -->
                     <h:form id="logoutForm" styleClass="nav-form">
@@ -109,44 +50,23 @@
                                          styleClass="button-secondary"/>
                     </h:form>
                 </ui:fragment>
-
             </nav>
         </div>
     </header>
 
-    <!-- A page's full-width teal banner, if it has one. -->
-    <ui:insert name="banner"/>
-
     <main class="main" id="content">
         <div class="container">
-
             <!-- globalOnly: field-level messages belong beside their field. The id is
-                 load-bearing - every ajax render names :globalMessages alongside its own
-                 target, or a failure reported here never reaches the screen. -->
+                 load-bearing: every ajax render names :globalMessages alongside its target. -->
             <h:messages id="globalMessages" globalOnly="true" layout="list" styleClass="messages"
                         infoClass="message-info" warnClass="message-warn"
                         errorClass="message-error" fatalClass="message-error"/>
-
             <ui:insert name="content"/>
         </div>
     </main>
 
     <footer class="site-footer">
-        <div class="container footer-inner">
-            <ui:insert name="footer">
-                <div class="footer-brand">
-                    <!-- On a white disc: the teal mark would vanish into the dark teal band. -->
-                    <span class="footer-mark">
-                        <img src="#{request.contextPath}/resources/images/logo.svg"
-                             alt="" width="28" height="28"/>
-                    </span>
-                    <span class="footer-name">Pet-Lee</span>
-                    <span class="footer-tagline">Find your new companion</span>
-                </div>
-                <p class="footer-copy">&#169; 2026 Pet-Lee</p>
-            </ui:insert>
-        </div>
+        <div class="container">&#169; 2026 Pet-Lee</div>
     </footer>
-
 </h:body>
 </html>

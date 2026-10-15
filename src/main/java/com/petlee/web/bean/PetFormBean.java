@@ -80,11 +80,6 @@ public class PetFormBean implements Serializable {
     /** The edit page's photographs, main included, oldest first; a serializable list, as above. */
     @SuppressWarnings("serial") private List<PetImageDTO> images = Collections.emptyList();
 
-    /** What the focus editor (focus.js) submits: which photograph, and its new focal point. */
-    private Long focusImageId;
-    private Integer focusX;
-    private Integer focusY;
-
     /**
      * The add page's view action: fills the category menu.
      *
@@ -279,25 +274,6 @@ public class PetFormBean implements Serializable {
     }
 
     /**
-     * Saves the focal point chosen in the editor, from an ajax submit of the focus form, then
-     * re-reads the photographs so the tiles show the stored crop.
-     *
-     * @return null to stay on the edit page, or the login page if the token has expired
-     */
-    public String saveFocus() {
-        try {
-            petApi.setImageFocus(petId, focusImageId, focusX, focusY);
-            Messages.info("The photograph's focus has been saved.");
-        } catch (ApiException failure) {
-            if (failure.getStatus() == 401) {
-                return Messages.sessionExpired();
-            }
-            Messages.error(failure.getMessage());
-        }
-        return reloadImages();
-    }
-
-    /**
      * Re-reads the photographs after a change, or after a failure that may mean the page is out
      * of date. Only the photographs: the form fields and their version stay as the user left
      * them, and photograph changes do not move the version.
@@ -372,24 +348,6 @@ public class PetFormBean implements Serializable {
 
     /** @return the edit page's photographs, main included, oldest first */
     public List<PetImageDTO> getImages() { return images; }
-
-    /** @return the photograph the focus editor is saving */
-    public Long getFocusImageId() { return focusImageId; }
-
-    /** @param focusImageId the photograph the focus editor is saving */
-    public void setFocusImageId(Long focusImageId) { this.focusImageId = focusImageId; }
-
-    /** @return the focal point across the editor submits */
-    public Integer getFocusX() { return focusX; }
-
-    /** @param focusX the focal point across the editor submits */
-    public void setFocusX(Integer focusX) { this.focusX = focusX; }
-
-    /** @return the focal point down the editor submits */
-    public Integer getFocusY() { return focusY; }
-
-    /** @param focusY the focal point down the editor submits */
-    public void setFocusY(Integer focusY) { this.focusY = focusY; }
 
     /** @return whether the edit page may offer more uploads */
     public boolean isRoomForPhotos() { return images.size() < MAX_PHOTOS; }

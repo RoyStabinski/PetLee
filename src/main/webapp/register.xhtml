@@ -12,50 +12,16 @@
 
     <ui:define name="title">Create an account - Pet-Lee</ui:define>
 
-    <ui:define name="head">
-        <script src="#{request.contextPath}/resources/js/avatar.js?v=#{initParam['petlee.ASSET_VERSION']}"
-                defer="defer"></script>
-    </ui:define>
-
     <ui:define name="content">
 
-        <div class="auth-card">
-            <ui:include src="/WEB-INF/includes/authPanel.xhtml"/>
+        <div class="narrow">
 
-            <div class="auth-form">
+            <div class="panel">
                 <h1>Create an account</h1>
 
-                <!-- Multipart for the photo: enctype is not optional for h:inputFile. -->
-                <h:form id="registerForm" enctype="multipart/form-data">
+                <h:form id="registerForm">
 
-                    <!-- The optional photo. The round tile is the file input's label; avatar.js
-                         previews the chosen file in it. Without JavaScript the upload still
-                         works, the tile just keeps its silhouette. -->
-                    <div class="avatar-picker" data-avatar-picker="">
-                        <h:outputLabel for="avatarFile" styleClass="avatar-picker-label">
-                            <span class="avatar-picker-frame">
-                                <span class="avatar-picker-placeholder" data-avatar-placeholder="">
-                                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor"
-                                         aria-hidden="true" focusable="false">
-                                        <circle cx="12" cy="8.5" r="4.5"/>
-                                        <path d="M3 22c.8-4.6 4.4-7.5 9-7.5s8.2 2.9 9 7.5z"/>
-                                    </svg>
-                                </span>
-                                <img class="avatar-picker-img" data-avatar-img="" alt="" width="96" height="96"
-                                     hidden="hidden"/>
-                                <span class="avatar-picker-badge" aria-hidden="true">+</span>
-                            </span>
-                            <span class="avatar-picker-caption" data-avatar-caption="">Add photo</span>
-                            <h:inputFile id="avatarFile" value="#{userBean.avatarFile}"
-                                         accept="image/jpeg,image/png,image/gif,image/webp"
-                                         styleClass="upload-input"/>
-                        </h:outputLabel>
-                        <span class="field-hint">Optional. JPEG, PNG, GIF or WebP, up to 5 MB.</span>
-                    </div>
-
-                    <!-- Two fields a row: full name and username, email and telephone, the two
-                         passwords, then region across the row. -->
-                    <div class="form-grid form-grid-2">
+                    <div class="form-grid">
 
                         <div class="field">
                             <h:outputLabel for="fullName" value="Full name"/>
@@ -144,8 +110,6 @@
                 </p>
             </div>
         </div>
-
-        <ui:include src="/WEB-INF/includes/authScene.xhtml"/>
 
     </ui:define>
 

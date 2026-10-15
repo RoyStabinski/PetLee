@@ -2,7 +2,6 @@ package com.petlee.rest;
 
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
-import com.petlee.dto.FocusForm;
 import com.petlee.dto.PetForm;
 import com.petlee.dto.PetImageDTO;
 import com.petlee.model.Pet;
@@ -10,7 +9,6 @@ import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
 import com.petlee.rest.security.SessionUser;
 import com.petlee.service.AppException;
-import com.petlee.service.FocalPoint;
 import com.petlee.service.PetService;
 
 import jakarta.enterprise.context.RequestScoped;
@@ -47,9 +45,6 @@ import java.util.Optional;
 @RequestScoped
 public class PetResource {
 
-    /** The longest gallery search text {@code GET /api/pets?q=} accepts. */
-    static final int MAX_SEARCH_LENGTH = 50;
-
     private PetService pets;
 
     private CurrentUser currentUser;
@@ -84,8 +79,6 @@ public class PetResource {
      * @param gender     MALE or FEMALE, or absent
      * @param minAge     the youngest age to include, 0 to 50, or absent
      * @param maxAge     the oldest age to include, 0 to 50, or absent
-     * @param q          text the name or the breed must contain, ignoring case; trimmed, blank
-     *                   is ignored, at most 50 characters
      * @return the matching available pets, newest first
      */
     @GET
@@ -94,10 +87,9 @@ public class PetResource {
                                     @QueryParam("size") String size,
                                     @QueryParam("gender") String gender,
                                     @QueryParam("minAge") String minAge,
-                                    @QueryParam("maxAge") String maxAge,
-                                    @QueryParam("q") String q) {
+                                    @QueryParam("maxAge") String maxAge) {
         return pets.findGallery(categoryId, parseSize(size), parseGender(gender),
-                        parseAge("minAge", minAge), parseAge("maxAge", maxAge), parseSearch(q))
+                        parseAge("minAge", minAge), parseAge("maxAge", maxAge))
                 .stream().map(PetDTO::of).toList();
     }
 
@@ -235,24 +227,6 @@ public class PetResource {
     }
 
     /**
-     * Reads the gallery's search text.
-     *
-     * @param value the raw query parameter, may be null or blank
-     * @return the text, trimmed, or null when absent or blank
-     * @throws AppException 400 if it is longer than {@value #MAX_SEARCH_LENGTH} characters
-     */
-    private static String parseSearch(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String search = value.trim();
-        if (search.length() > MAX_SEARCH_LENGTH) {
-            throw new AppException(400, "q must be at most " + MAX_SEARCH_LENGTH + " characters");
-        }
-        return search;
-    }
-
-    /**
      * Parses the version by hand, for the same reason as {@link #parseFilter}: a failed
      * {@code @QueryParam} conversion is a 404, where a 400 naming the field is what helps.
      *
@@ -354,27 +328,6 @@ public class PetResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response setMainImage(@PathParam("id") Long id, @PathParam("imageId") Long imageId) {
         pets.setMainImage(id, imageId, caller().userId());
-        return Response.noContent().build();
-    }
-
-    /**
-     * {@code PUT /api/pets/{id}/images/{imageId}/focus} — auth, owner only. Moves the point a
-     * cropped view of the photograph centres on. The file is not changed, and neither is the
-     * listing's version.
-     *
-     * @param id      the pet
-     * @param imageId the photograph, which must belong to that pet
-     * @param form    {@code {x, y}}, whole percent of the width and height, each 0 to 100
-     * @return 204 No Content
-     */
-    @PUT
-    @Path("{id: \\d+}/images/{imageId: \\d+}/focus")
-    @Secured
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response setImageFocus(@PathParam("id") Long id, @PathParam("imageId") Long imageId,
-                                  FocusForm form) {
-        pets.setImageFocus(id, imageId, FocalPoint.from(form), caller().userId());
         return Response.noContent().build();
     }
 

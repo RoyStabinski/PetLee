@@ -53,6 +53,22 @@ class TokenStoreTest {
     }
 
     @Test
+    @DisplayName("Revoking all but one token keeps that one and leaves other users' tokens alone")
+    void should_keep_only_given_token_when_revoking_all_others_of_a_user() {
+        String aliceKept = store.issue(ALICE);
+        String aliceOther1 = store.issue(ALICE);
+        String aliceOther2 = store.issue(ALICE);
+        String bobs = store.issue(BOB);
+
+        store.revokeAllExcept(ALICE.userId(), aliceKept);
+
+        assertEquals(Optional.of(ALICE), store.resolve(aliceKept));
+        assertEquals(Optional.empty(), store.resolve(aliceOther1));
+        assertEquals(Optional.empty(), store.resolve(aliceOther2));
+        assertEquals(Optional.of(BOB), store.resolve(bobs));
+    }
+
+    @Test
     @DisplayName("A token left unused for more than 30 minutes expires")
     void should_expire_token_when_idle_for_thirty_minutes() {
         MutableClock clock = new MutableClock();

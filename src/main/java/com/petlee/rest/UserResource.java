@@ -1,5 +1,7 @@
 package com.petlee.rest;
 
+import com.petlee.dto.ChangePasswordForm;
+import com.petlee.dto.ProfileForm;
 import com.petlee.dto.RegisterForm;
 import com.petlee.dto.UserDTO;
 import com.petlee.model.User;
@@ -105,6 +107,50 @@ public class UserResource {
     @Produces(MediaType.APPLICATION_JSON)
     public UserDTO me() {
         return UserDTO.of(users.findProfile(caller().userId()));
+    }
+
+    /**
+     * {@code PUT /api/users/me?version=N} — auth. {@code N} is the {@code version} from
+     * {@code GET /api/users/me}; a stale or missing one is 409, as for a pet. The username
+     * cannot change.
+     *
+     * @param version the version the client last read
+     * @param form    the new name, email address, telephone number and region
+     * @return the updated account
+     */
+    @PUT
+    @Path("me")
+    @Secured
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public UserDTO updateProfile(@QueryParam("version") String version, ProfileForm form) {
+        if (form == null) {
+            throw new AppException(400, "A request body is required");
+        }
+        return UserDTO.of(users.updateProfile(caller().userId(), form,
+                PetResource.parseVersion(version)));
+    }
+
+    /**
+     * {@code PUT /api/users/me/password} — auth. Every other bearer token of the caller is
+     * revoked, so a device signed in with the old password is signed out; the token this
+     * request carried, if any, stays valid.
+     *
+     * @param form the current and the new password
+     * @return 204 No Content
+     */
+    @PUT
+    @Path("me/password")
+    @Secured
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response changePassword(ChangePasswordForm form) {
+        if (form == null) {
+            throw new AppException(400, "A request body is required");
+        }
+        Long userId = caller().userId();
+        users.changePassword(userId, form);
+        tokens.revokeAllExcept(userId, currentUser.bearerToken(request).orElse(null));
+        return Response.noContent().build();
     }
 
     /**

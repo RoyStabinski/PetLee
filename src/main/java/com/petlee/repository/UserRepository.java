@@ -44,6 +44,25 @@ public class UserRepository {
                 .setParameter("email", email).getSingleResult() > 0;
     }
 
+    /** @return true if an account other than {@code userId} has the email, ignoring case */
+    public boolean existsByEmailForOtherUser(String email, Long userId) {
+        return email != null && em.createQuery(
+                        "SELECT COUNT(u) FROM User u WHERE LOWER(u.email) = LOWER(:email)"
+                                + " AND u.userId <> :id", Long.class)
+                .setParameter("email", email).setParameter("id", userId)
+                .getSingleResult() > 0;
+    }
+
+    /**
+     * Replaces the password digest with a bulk update, which leaves {@code version} alone: a
+     * password change must not make an open profile form stale.
+     */
+    public void updatePassword(Long userId, String digest) {
+        em.createQuery("UPDATE User u SET u.password = :digest WHERE u.userId = :id")
+                .setParameter("digest", digest).setParameter("id", userId)
+                .executeUpdate();
+    }
+
     /** Inserts the user and flushes, so a unique-index violation surfaces here. */
     public User save(User user) {
         em.persist(user);

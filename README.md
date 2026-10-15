@@ -196,9 +196,13 @@ order, as described in `src/main/resources/db/README.md#migrations`:
 
 - `migrate-001-pet-image.sql` moves each pet's single `pet.image_url` into the `pet_image` table
   and drops the column. Back up first and stop the application while it runs.
+- `migrate-002-user-version.sql` adds `users.version`, the optimistic lock behind the
+  edit-profile form. It only adds a column with a default and needs no new grant. A build with
+  edit profile fails on every query that loads a user until it has been run.
 
 ```bash
 psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-user-version.sql
 ```
 
 `psql` must be on the PATH, as in [step 2](#2-postgresql-tools-on-the-path).
@@ -219,9 +223,10 @@ no database, server or network, and cover:
 - `PhoneNumbersTest`: valid mobile, landline and 07X numbers in many spellings (spaces, dashes,
   parentheses, `+972`, `972`) and their stored form; too short, too long, wrong-prefix and
   lettered numbers refused.
-- `TokenStoreTest`: issuing, resolving and revoking tokens, the 30-minute idle
+- `TokenStoreTest`: issuing, resolving and revoking tokens, `revokeAllExcept`, the 30-minute idle
   expiry and its sliding renewal (on a test clock, so nothing waits), and 32 threads sharing one
   store without losing or reviving a token.
+- `PetRepositoryTest`: the search text's LIKE pattern, lower-cased with `\`, `%` and `_` escaped.
 
 `mvn package` runs the same tests before it builds the WAR, and builds nothing if one fails.
 
@@ -292,13 +297,15 @@ session if there is one.
 | Method | Path | Access |
 |---|---|---|
 | POST | `/api/users/register` | open — 201 Created with `Location: /api/users/me` (where the new member reads the account once logged in) and the created user as the body |
-| GET | `/api/users/me` | auth — the caller's own account |
+| GET | `/api/users/me` | auth — the caller's own account, with its `version` |
+| PUT | `/api/users/me?version=N` | auth — body `{fullName, email, phone, region}`; the username cannot change. `N` is the `version` from `GET /api/users/me`; a stale or missing one is 409 (`code` `STALE_VERSION`), and so is an email address another account has |
+| PUT | `/api/users/me/password` | auth — body `{currentPassword, newPassword}`; a wrong current password is 400, a new one under 8 characters is 400. Revokes every other bearer token of the caller and keeps the one sent; 204 |
 | POST | `/api/auth/login` | open |
 | POST | `/api/auth/logout` | auth — 204 |
 | GET | `/api/categories` | open |
 | POST | `/api/categories` | admin — body `{name}`; 201 Created with `Location: /api/categories/{id}` and the created category as the body |
 | DELETE | `/api/categories/{id}` | admin — 204; 409 while listings still use it |
-| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge` |
+| GET | `/api/pets` | open — filters: `categoryId`, `size`, `gender`, `minAge`, `maxAge`, `q` |
 | GET | `/api/pets/{id}` | open — owner contact fields (`ownerName`, `ownerPhone`, `ownerEmail`) only when logged in; `ownedByCaller` is true only for the owner; `images` lists every photograph |
 | GET | `/api/pets/mine` | auth |
 | POST | `/api/pets` | auth — 201 Created with `Location: /api/pets/{id}` and the created listing as the body |
@@ -324,6 +331,14 @@ body or 204 without one.
 `minAge` and `maxAge` are whole numbers from 0 to 50, and either may be given alone; a listing
 whose age is unknown is left out once either is given. A value outside that range, or `minAge`
 greater than `maxAge`, is a 400 naming the problem.
+
+`q` is free-text search: a pet matches when its name or its breed contains the text, ignoring
+case. It is trimmed and ignored when blank, and more than 50 characters is a 400. `%` and `_`
+match only themselves, and the value is bound as a query parameter, never pasted into the query:
+
+```bash
+curl "http://localhost:8080/pet-lee/api/pets?q=shep&size=LARGE"
+```
 
 `PUT /api/pets/{id}/status` accepts only AVAILABLE to ADOPTED and back. It is a 409 when an
 administrator has withdrawn the listing (only an administrator can restore it), when the
@@ -351,26 +366,30 @@ curl -H "Authorization: Bearer <token>" \
      http://localhost:8080/pet-lee/api/pets/7/images
 ```
 
-`GET /api/users/me` returns the caller's own account and acts for whoever the token or session
-belongs to; no endpoint takes a user id, so a member cannot read another's account.
+Every `/api/users/me` endpoint acts for whoever the token or session belongs to; none takes a
+user id, so a member can neither read nor change another's account. A user carries a `version`,
+like a pet: send back the one `GET /api/users/me` returned, and a save based on an older read is
+a 409 whose `code` is `STALE_VERSION`. A taken email address is also a 409, with the ordinary
+`ERROR` code. A password change does not move the `version`, so a profile form open at the same
+time can still be saved, and it signs the member out everywhere else: every other bearer token
+of theirs is revoked, and the token the request carried stays valid.
 
 ```bash
 curl -H "Authorization: Bearer <token>" http://localhost:8080/pet-lee/api/users/me
+curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+     -d '{"fullName":"Dana Levi","email":"dana@example.com","phone":"050-1234567","region":"Haifa"}' \
+     "http://localhost:8080/pet-lee/api/users/me?version=0"
 ```
 
 **Telephone numbers** must be Israeli, at registration and on every profile save. Accepted:
 mobile numbers, 05X and seven digits; landlines 02, 03, 04, 08 and 09 and seven digits; and the
 07X numbers, 07X and seven digits. Spaces, dashes and parentheses are ignored, and the leading 0
 may be written `+972` or `972`. The number is stored normalised, `0XX-XXXXXXX` for mobile and
-**Telephone numbers** must be Israeli, at registration. Accepted: mobile numbers, 05X and seven
-digits; landlines 02, 03, 04, 08 and 09 and seven digits; and the 07X numbers, 07X and seven
-digits. Spaces, dashes and parentheses are ignored, and the leading 0 may be written `+972` or
-`972`. The number is stored normalised, `0XX-XXXXXXX` for mobile and 07X numbers and `0X-XXXXXXX`
-for the other landlines, so `+972 (54) 123-4567` is stored as `054-1234567`. The field stays
-optional; a non-empty number that does not fit is a 400, "Enter a valid Israeli phone number, for
-example 050-1234567". The rule lives in `com.petlee.util.PhoneNumbers`; the register page carries
-a matching regular expression for a quicker answer, and the server still decides.
-still be saved.
+07X numbers and `0X-XXXXXXX` for the other landlines, so `+972 (54) 123-4567` is stored as
+`054-1234567`. The field stays optional; a non-empty number that does not fit is a 400, "Enter a
+valid Israeli phone number, for example 050-1234567". The rule lives in
+`com.petlee.util.PhoneNumbers`; the register and edit-profile pages carry a matching regular
+expression for a quicker answer, and the server still decides.
 
 A browser login through the JSF pages authenticates the pages, not the browser's own `/api`
 calls: the server-side client logs in with a bearer token, and the browser session never holds

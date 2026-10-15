@@ -31,12 +31,14 @@ public class PetApi {
      * @param gender     MALE or FEMALE, or null
      * @param minAge     the youngest age to include, or null
      * @param maxAge     the oldest age to include, or null
+     * @param search     text the name or the breed must contain, or null; the API trims it
+     *                   and ignores it when blank
      * @return the matching available pets, newest first
      * @throws ApiException 400 for an unrecognised size or gender, an age outside 0 to 50,
-     *                      minAge greater than maxAge
+     *                      minAge greater than maxAge, or search text over 50 characters
      */
     public List<PetDTO> gallery(Integer categoryId, String size, String gender,
-                                Integer minAge, Integer maxAge) {
+                                Integer minAge, Integer maxAge, String search) {
         // HashMap, not Map.of: the values may be null, and ApiClient skips those.
         Map<String, Object> query = new HashMap<>();
         query.put("categoryId", categoryId);
@@ -44,6 +46,7 @@ public class PetApi {
         query.put("gender", gender);
         query.put("minAge", minAge);
         query.put("maxAge", maxAge);
+        query.put("q", search);
         return api.get("/pets", query, PET_LIST);
     }
 

@@ -45,6 +45,9 @@ import java.util.Optional;
 @RequestScoped
 public class PetResource {
 
+    /** The longest gallery search text {@code GET /api/pets?q=} accepts. */
+    static final int MAX_SEARCH_LENGTH = 50;
+
     private PetService pets;
 
     private CurrentUser currentUser;
@@ -79,6 +82,8 @@ public class PetResource {
      * @param gender     MALE or FEMALE, or absent
      * @param minAge     the youngest age to include, 0 to 50, or absent
      * @param maxAge     the oldest age to include, 0 to 50, or absent
+     * @param q          text the name or the breed must contain, ignoring case; trimmed, blank
+     *                   is ignored, at most 50 characters
      * @return the matching available pets, newest first
      */
     @GET
@@ -87,9 +92,10 @@ public class PetResource {
                                     @QueryParam("size") String size,
                                     @QueryParam("gender") String gender,
                                     @QueryParam("minAge") String minAge,
-                                    @QueryParam("maxAge") String maxAge) {
+                                    @QueryParam("maxAge") String maxAge,
+                                    @QueryParam("q") String q) {
         return pets.findGallery(categoryId, parseSize(size), parseGender(gender),
-                        parseAge("minAge", minAge), parseAge("maxAge", maxAge))
+                        parseAge("minAge", minAge), parseAge("maxAge", maxAge), parseSearch(q))
                 .stream().map(PetDTO::of).toList();
     }
 
@@ -224,6 +230,24 @@ public class PetResource {
             // fall through to the same message
         }
         throw new AppException(400, name + " must be a whole number from 0 to 50");
+    }
+
+    /**
+     * Reads the gallery's search text.
+     *
+     * @param value the raw query parameter, may be null or blank
+     * @return the text, trimmed, or null when absent or blank
+     * @throws AppException 400 if it is longer than {@value #MAX_SEARCH_LENGTH} characters
+     */
+    private static String parseSearch(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String search = value.trim();
+        if (search.length() > MAX_SEARCH_LENGTH) {
+            throw new AppException(400, "q must be at most " + MAX_SEARCH_LENGTH + " characters");
+        }
+        return search;
     }
 
     /**

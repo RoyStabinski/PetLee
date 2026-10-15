@@ -90,7 +90,7 @@ img { max-width: 100%; }
 .card-box { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
 .field { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .9rem; }
 .field label { font-weight: 600; font-size: .95rem; }
-input[type=text], input[type=password], input[type=email], input[type=tel], input[type=number], select, textarea {
+input[type=text], input[type=search], input[type=password], input[type=email], input[type=tel], input[type=number], select, textarea {
     width: 100%; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; background: #fff;
 }
 .form-section { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; margin: 0 0 1rem; }

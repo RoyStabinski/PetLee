@@ -4,8 +4,7 @@
 INSERT INTO category (category_name) VALUES
     ('Dogs'),
     ('Cats'),
-    ('Birds'),
-    ('Bunnies')
+    ('Birds')
 -- Inferred from ux_category_name_lower: plain "ON CONFLICT (category_name)" fails, because
 -- inference matches the indexed expression, not the column.
 ON CONFLICT (LOWER(category_name)) DO NOTHING;

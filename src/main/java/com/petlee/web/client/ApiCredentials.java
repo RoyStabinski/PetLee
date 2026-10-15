@@ -37,6 +37,13 @@ public class ApiCredentials implements Serializable {
      *
      * @param user the user as the API just returned it
      */
+    public void refreshUser(UserDTO user) {
+        if (token != null && this.user != null && user != null
+                && this.user.id() != null && this.user.id().equals(user.id())) {
+            this.user = user;
+        }
+    }
+
     /** Forgets the token and the user. */
     public void clear() {
         token = null;

@@ -6,8 +6,9 @@ upgrading an older one. No migration tool — plain SQL.
 | File | What it does |
 |---|---|
 | `schema.sql` | Creates `users`, `category`, `pet` and `pet_image`, their constraints and indexes |
-| `seed.sql` | Inserts the four categories and the `admin` account |
+| `seed.sql` | Inserts the three categories and the `admin` account |
 | `migrate-001-pet-image.sql` | Upgrades an existing database from one photograph per pet to `pet_image` — see [Migrations](#migrations) |
+| `migrate-002-user-version.sql` | Adds `users.version`, which edit profile needs — see [Migrations](#migrations) |
 
 `schema.sql` and `seed.sql` are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
 provider never touches the schema — `persistence.xml` sets
@@ -90,6 +91,17 @@ are copied as they are.
    ```
 
 To undo it, restore the backup: `pg_restore -U postgres -d petlee --clean petlee-before-001.dump`.
+
+### 002 — `users.version`
+
+Needed if the `users` table has no `version` column (`\d users` shows it). The column is the
+optimistic lock behind the edit-profile form; a build with edit profile fails on every query that
+loads a user until it exists. The script only adds the column, `BIGINT NOT NULL DEFAULT 0`, so
+it rewrites no rows, needs no new grant, and is harmless to re-run:
+
+```bash
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-user-version.sql
+```
 
 ## The application's database role
 

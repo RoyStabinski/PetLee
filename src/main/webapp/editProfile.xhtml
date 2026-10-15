@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition template="/WEB-INF/templates/main.xhtml"
+                xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
+
+    <!-- Members only: not in PageAccessFilter's public list, so a guest is sent to log in. -->
+    <f:metadata>
+        <f:viewAction action="#{profileBean.load}"/>
+    </f:metadata>
+
+    <ui:define name="title">Edit profile - Pet-Lee</ui:define>
+
+    <ui:define name="content">
+
+        <!-- Two forms: the details and the password each submit and validate only their own fields. -->
+        <ui:fragment rendered="#{profileBean.loaded}">
+            <div class="narrow">
+
+                <div class="panel">
+                    <h1>Edit profile</h1>
+
+                    <h:form id="profileForm">
+                        <div class="form-grid">
+
+                            <!-- Shown, not submitted: no name attribute, and the API has no field for it. -->
+                            <div class="field">
+                                <label for="username">Username</label>
+                                <input id="username" type="text" value="#{profileBean.username}"
+                                       readonly="readonly" aria-describedby="usernameHint"/>
+                                <span id="usernameHint" class="field-hint">Your username cannot be changed.</span>
+                            </div>
+
+                            <div class="field">
+                                <h:outputLabel for="fullName" value="Full name"/>
+                                <h:inputText id="fullName" value="#{profileBean.fullName}" required="true"
+                                             requiredMessage="Required" autocomplete="name"
+                                             validatorMessage="A full name is at most 50 characters.">
+                                    <f:validateLength maximum="50"/>
+                                </h:inputText>
+                                <h:message for="fullName" styleClass="field-error"/>
+                            </div>
+
+                            <div class="field">
+                                <h:outputLabel for="email" value="Email"/>
+                                <h:inputText id="email" value="#{profileBean.email}" type="email" required="true"
+                                             requiredMessage="Required" autocomplete="email"
+                                             validatorMessage="Enter a valid email address of at most 100 characters.">
+                                    <f:validateLength maximum="100"/>
+                                    <f:validateRegex pattern="^[^@\s]+@[^@\s]+$"/>
+                                </h:inputText>
+                                <h:message for="email" styleClass="field-error"/>
+                            </div>
+
+                            <div class="field">
+                                <h:outputLabel for="phone" value="Telephone"/>
+                                <!-- The regex mirrors com.petlee.util.PhoneNumbers, which decides. -->
+                                <h:inputText id="phone" value="#{profileBean.phone}" type="tel" maxlength="20"
+                                             p:placeholder="050-1234567" autocomplete="tel"
+                                             validatorMessage="Enter a valid Israeli phone number, for example 050-1234567">
+                                    <f:validateLength maximum="20"/>
+                                    <f:validateRegex pattern="^(?:\s*|[\s()-]*(?:\+[\s()-]*9[\s()-]*7[\s()-]*2|9[\s()-]*7[\s()-]*2|0)[\s()-]*(?:[57](?:[\s()-]*\d){8}|[23489](?:[\s()-]*\d){7})[\s()-]*)$"/>
+                                </h:inputText>
+                                <h:message for="phone" styleClass="field-error"/>
+                                <span class="field-hint">Optional. A mobile (05X) or landline number, for example 050-1234567 or 02-1234567</span>
+                            </div>
+
+                            <div class="field field-wide">
+                                <h:outputLabel for="region" value="Region"/>
+                                <h:inputText id="region" value="#{profileBean.region}"
+                                             autocomplete="address-level1"
+                                             validatorMessage="A region is at most 100 characters.">
+                                    <f:validateLength maximum="100"/>
+                                </h:inputText>
+                                <h:message for="region" styleClass="field-error"/>
+                            </div>
+
+                        </div>
+
+                        <div class="actions">
+                            <h:commandButton id="save" value="Save" action="#{profileBean.save}"/>
+                            <h:outputLink value="#{request.contextPath}/profile.xhtml"
+                                          styleClass="button-secondary">Cancel</h:outputLink>
+                        </div>
+                    </h:form>
+                </div>
+
+                <div class="panel">
+                    <h2>Change password</h2>
+                    <p class="field-hint">Other devices signed in to your account are signed out; this one stays signed in.</p>
+
+                    <h:form id="passwordForm">
+                        <div class="field">
+                            <h:outputLabel for="currentPassword" value="Current password"/>
+                            <h:inputSecret id="currentPassword" value="#{profileBean.currentPassword}"
+                                           required="true" requiredMessage="Required" redisplay="false"
+                                           autocomplete="current-password"/>
+                            <h:message for="currentPassword" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="newPassword" value="New password"/>
+                            <h:inputSecret id="newPassword" value="#{profileBean.newPassword}"
+                                           required="true" requiredMessage="Required" redisplay="false"
+                                           autocomplete="new-password"
+                                           validatorMessage="A password is at least 8 characters.">
+                                <f:validateLength minimum="8"/>
+                            </h:inputSecret>
+                            <h:message for="newPassword" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="confirmPassword" value="Confirm new password"/>
+                            <h:inputSecret id="confirmPassword" value="#{profileBean.confirmPassword}"
+                                           required="true" requiredMessage="Required" redisplay="false"
+                                           autocomplete="new-password"/>
+                            <h:message for="confirmPassword" styleClass="field-error"/>
+                        </div>
+
+                        <div class="actions">
+                            <h:commandButton id="changePassword" value="Change password"
+                                             action="#{profileBean.changePassword}"/>
+                        </div>
+                    </h:form>
+                </div>
+
+            </div>
+        </ui:fragment>
+
+    </ui:define>
+
+</ui:composition>

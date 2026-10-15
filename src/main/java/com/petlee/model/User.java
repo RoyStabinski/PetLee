@@ -46,6 +46,12 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // Optimistic locking for the edit-profile form, as on Pet. A password change is a bulk
+    // update in UserRepository, so it does not move the version and stale an open form.
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     /** For JPA. */
     public User() {
     }
@@ -85,4 +91,6 @@ public class User {
 
     public void setRole(Role role) { this.role = role; }
 
+    // Long, not long: null until the row is first written. No setter — JPA owns this field.
+    public Long getVersion() { return version; }
 }

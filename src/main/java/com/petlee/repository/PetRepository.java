@@ -8,6 +8,7 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -26,19 +27,22 @@ public class PetRepository {
      * each.
      *
      * <p>Every filter is a named parameter; no value is ever concatenated into the JPQL. An age
-     * bound excludes listings whose age is unknown, since SQL compares null as unknown.
+     * bound excludes listings whose age is unknown, since SQL compares null as unknown. The search
+     * text is matched as a case-insensitive substring of the name or the breed, its LIKE
+     * wildcards escaped by {@link #containsPattern} so they match only themselves.
      *
      * @param categoryId    the category, or null for any
      * @param size          the size, or null for any
      * @param gender        the gender, or null for any
      * @param minAge        the youngest age to include, or null for no lower bound
      * @param maxAge        the oldest age to include, or null for no upper bound
+     * @param search        text the name or the breed must contain, or null for any
      * @param ownerId       the owner, or null for anyone's
      * @param availableOnly whether to keep AVAILABLE listings only
      * @return the matching pets, newest first
      */
     public List<Pet> find(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
-                          Integer minAge, Integer maxAge, Long ownerId,
+                          Integer minAge, Integer maxAge, String search, Long ownerId,
                           boolean availableOnly) {
         StringBuilder jpql = new StringBuilder(
                 "SELECT DISTINCT p FROM Pet p"
@@ -73,11 +77,32 @@ public class PetRepository {
             jpql.append(" AND p.age <= :maxAge");
             params.add(new Object[]{"maxAge", maxAge});
         }
+        if (search != null) {
+            jpql.append(" AND (LOWER(p.petName) LIKE :q ESCAPE '\\'"
+                    + " OR LOWER(p.breed) LIKE :q ESCAPE '\\')");
+            params.add(new Object[]{"q", containsPattern(search)});
+        }
         jpql.append(" ORDER BY p.createdAt DESC");
 
         TypedQuery<Pet> query = em.createQuery(jpql.toString(), Pet.class);
         params.forEach(p -> query.setParameter((String) p[0], p[1]));
         return query.getResultList();
+    }
+
+    /**
+     * Turns search text into a LIKE pattern for "contains, ignoring case": lower-cased, with
+     * {@code \}, {@code %} and {@code _} escaped by a backslash, then wrapped in {@code %}. So
+     * "%" finds names that contain a percent sign, not every name.
+     *
+     * @param text the search text, not null
+     * @return the pattern, for use with {@code ESCAPE '\'}
+     */
+    static String containsPattern(String text) {
+        String escaped = text.toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     /**

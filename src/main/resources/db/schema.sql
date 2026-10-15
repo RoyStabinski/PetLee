@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
     region        VARCHAR(100),
     role          VARCHAR(20)  NOT NULL DEFAULT 'USER',
     created_at    TIMESTAMP    NOT NULL,
+    -- Optimistic locking, for @Version on the User entity (the edit-profile form).
+    version       BIGINT       NOT NULL DEFAULT 0,
     CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
 

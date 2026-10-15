@@ -64,17 +64,18 @@ public class PetService {
      * @param gender     gender filter, or null for any
      * @param minAge     the youngest age to include, or null for no lower bound
      * @param maxAge     the oldest age to include, or null for no upper bound
+     * @param search     text the name or the breed must contain, ignoring case; null for any
      * @return the matching pets, never null; a listing with no age is left out once either
      *         bound is given
      * @throws AppException 400 if both bounds are given and minAge is greater than maxAge
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<Pet> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
-                                 Integer minAge, Integer maxAge) {
+                                 Integer minAge, Integer maxAge, String search) {
         if (minAge != null && maxAge != null && minAge > maxAge) {
             throw new AppException(400, "minAge must not be greater than maxAge");
         }
-        return pets.find(categoryId, size, gender, minAge, maxAge, null, true);
+        return pets.find(categoryId, size, gender, minAge, maxAge, search, null, true);
     }
 
     /**
@@ -87,7 +88,7 @@ public class PetService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<Pet> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, null, null, false);
+        return pets.find(categoryId, size, gender, null, null, null, null, false);
     }
 
     /**
@@ -427,7 +428,7 @@ public class PetService {
         if (ownerUserId == null) {
             return List.of();
         }
-        return pets.find(null, null, null, null, null, ownerUserId, false);
+        return pets.find(null, null, null, null, null, null, ownerUserId, false);
     }
 
     /**

@@ -7,8 +7,8 @@ One WAR, three tiers, one PostgreSQL database.
 ## Stack
 
 - **Presentation:** Jakarta Server Faces (JSF) / Facelets
-- **Business logic:** Jakarta RESTful Web Services at `/api`, plus CDI services the JSF tier calls
-  directly
+- **Business logic:** Jakarta RESTful Web Services at `/api`, backed by CDI services; the JSF tier
+  reaches them only through the REST API
 - **Persistence:** Jakarta Persistence (JPA)
 - **Database:** PostgreSQL 17+
 - **Runtime:** a Jakarta EE 10 application server — WildFly 41 is the tested target; Payara 6 and
@@ -261,7 +261,7 @@ Register through `/register.xhtml` to try the flow as a first-time user.
 ## Architecture
 
 The JSF tier (`com.petlee.web`) reaches the logic tier only through the REST API. Its managed
-beans call `com.petlee.web.client` (`AuthApi`, `PetApi`, `CategoryApi`
+beans call `com.petlee.web.client` (`AuthApi`, `PetApi`, `UserApi`, `CategoryApi`
 and `AdminApi` over one shared `ApiClient`), exchange the records in `com.petlee.dto`, and authenticate with the bearer
 token that login returns, kept in the session-scoped `ApiCredentials`; nothing in the JSF tier
 touches a service, an entity or a repository. The same holds for photographs: the pages send

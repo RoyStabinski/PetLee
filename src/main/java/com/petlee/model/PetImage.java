@@ -29,9 +29,6 @@ public class PetImage {
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
-    // The focal point a cropped view centres on, in percent of the width and the height. The
-    // provider inserts every column, so the column DEFAULT never applies: 50 is set here too.
-
     /** For JPA. */
     public PetImage() {
     }

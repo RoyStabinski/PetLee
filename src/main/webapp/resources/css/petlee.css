@@ -123,12 +123,12 @@ input[type=text], input[type=search], input[type=password], input[type=email], i
 .detail-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius); background: #e9e4d8; }
 .thumbs { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: .5rem 0 0; }
 .thumbs img { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; display: block; }
-.facts { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.25rem; margin: 0; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .35rem 1.25rem; margin: 0; }
 .facts dt { font-weight: 600; color: var(--muted); }
-.facts dd { margin: 0; }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .contact-card { background: var(--teal); color: #fff; border-color: var(--teal); }
 .contact-card a { color: #fff; }
-.contact-list { list-style: none; padding: 0; margin: 0; }
+.contact-list { list-style: none; padding: 0; margin: 0; overflow-wrap: anywhere; }
 .profile-layout { display: grid; grid-template-columns: 280px 1fr; gap: 1.25rem; align-items: start; }
 .photo-list { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; padding: 0; margin: 0 0 1rem; }
 .photo-list img { width: 140px; height: 105px; object-fit: cover; border-radius: 4px; display: block; }

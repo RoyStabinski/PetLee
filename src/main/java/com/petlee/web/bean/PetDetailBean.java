@@ -81,8 +81,8 @@ public class PetDetailBean implements Serializable {
     public String getImageUrl() { return PetBean.imageOf(pet == null ? null : pet.imageUrl()); }
 
     /**
-     * @return every photograph, with its focal point, for the carousel: the main one first and
-     *         the rest oldest first; just the placeholder, centred, when the listing has none
+     * @return the photographs for the details page: the main one first and the rest oldest
+     *         first; just the placeholder when the listing has none
      */
     public List<PetImageDTO> getPhotos() {
         if (pet == null || pet.images() == null || pet.images().isEmpty()) {
@@ -94,7 +94,7 @@ public class PetDetailBean implements Serializable {
         return photos;
     }
 
-    /** @return how many photographs the carousel shows; at least one, the placeholder */
+    /** @return how many photographs the details page shows; at least one, the placeholder */
     public int getPhotoCount() { return getPhotos().size(); }
 
     /** @return the age as the gallery shows it, or "Unknown" */

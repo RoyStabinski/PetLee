@@ -1,12 +1,17 @@
 package com.petlee.web.bean;
 
+import com.petlee.web.client.ApiException;
+
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
 
 /** Queues Faces messages for the page to render. Shared by the managed beans. */
 final class Messages {
+
+    private static final String LOGIN = "/login.xhtml?faces-redirect=true";
+
+    /** The code {@code ConstraintViolationExceptionMapper} answers a bean-validation failure with. */
+    private static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
     private Messages() {
     }
@@ -24,17 +29,20 @@ final class Messages {
     }
 
     /**
-     * Picks one violation message, for a form that shows a single error at a time.
+     * The text to show for a failed API call. The mapper writes a bean-validation failure as
+     * {@code "<field> <message>"}; the forms show only the message, since their messages already
+     * name their field. Anything else is shown as the server wrote it.
      *
-     * @param invalid  the validation failure
-     * @param fallback the message to use when the set is empty
-     * @return the first message the set yields, or {@code fallback}
+     * @param failure the failed call
+     * @return the text for the page
      */
-    static String firstViolation(ConstraintViolationException invalid, String fallback) {
-        for (ConstraintViolation<?> violation : invalid.getConstraintViolations()) {
-            return violation.getMessage();
+    static String text(ApiException failure) {
+        String message = failure.getMessage();
+        if (!VALIDATION_FAILED.equals(failure.getCode()) || message == null) {
+            return message;
         }
-        return fallback;
+        int space = message.indexOf(' ');
+        return space < 0 ? message : message.substring(space + 1);
     }
 
     /**
@@ -46,5 +54,16 @@ final class Messages {
     static String keep(String outcome) {
         FacesContext.getCurrentInstance().getExternalContext().getFlash().setKeepMessages(true);
         return outcome;
+    }
+
+    /**
+     * For an API call answered 401: the token has expired and {@code ApiClient} has already
+     * forgotten it, so the user is sent to log in again.
+     *
+     * @return the login page, keeping the message across the redirect
+     */
+    static String sessionExpired() {
+        error("Your session has expired. Please log in again.");
+        return keep(LOGIN);
     }
 }

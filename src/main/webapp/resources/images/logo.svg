@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="36" height="36">
+  <!-- The Pet-Lee mark: a teal paw print whose main pad is an orange heart. Also the favicon.
+       Original artwork. -->
+  <g fill="#2F6F62">
+    <ellipse cx="12" cy="26" rx="6.2" ry="8" transform="rotate(-20 12 26)"/>
+    <ellipse cx="24" cy="13.5" rx="6.4" ry="8.4" transform="rotate(-6 24 13.5)"/>
+    <ellipse cx="40" cy="13.5" rx="6.4" ry="8.4" transform="rotate(6 40 13.5)"/>
+    <ellipse cx="52" cy="26" rx="6.2" ry="8" transform="rotate(20 52 26)"/>
+  </g>
+  <path fill="#D9773F" d="M32 60c-1.4 0-19-10.4-19-22 0-6 4.6-10.6 10.3-10.6 3.7 0 6.9 1.9 8.7 4.8 1.8-2.9 5-4.8 8.7-4.8C46.4 27.4 51 32 51 38c0 11.6-17.6 22-19 22z"/>
+</svg>

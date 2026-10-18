@@ -1,13 +1,16 @@
 # Database setup
 
-Two scripts, applied in order to a database you create first. No migration tool — plain SQL.
+Two scripts, applied in order to a database you create first, and numbered migrations for
+upgrading an older one. No migration tool — plain SQL.
 
 | File | What it does |
 |---|---|
-| `schema.sql` | Creates `users`, `category` and `pet`, their constraints and indexes |
-| `seed.sql` | Inserts the four categories and the `admin` account |
+| `schema.sql` | Creates `users`, `category`, `pet` and `pet_image`, their constraints and indexes |
+| `seed.sql` | Inserts the three categories and the `admin` account |
+| `migrate-001-pet-image.sql` | Upgrades an existing database from one photograph per pet to `pet_image` — see [Migrations](#migrations) |
+| `migrate-002-user-version.sql` | Adds `users.version`, which edit profile needs — see [Migrations](#migrations) |
 
-Both are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
+`schema.sql` and `seed.sql` are re-runnable: every statement is `IF NOT EXISTS` or `ON CONFLICT DO NOTHING`. The JPA
 provider never touches the schema — `persistence.xml` sets
 `jakarta.persistence.schema-generation.database.action=none`, so what is in these files is what the
 database has.
@@ -20,7 +23,19 @@ psql -U postgres -d petlee -f src/main/resources/db/schema.sql
 psql -U postgres -d petlee -f src/main/resources/db/seed.sql
 ```
 
-On Windows the binaries live under `C:\Program Files\PostgreSQL\18\bin`.
+On Windows the binaries live under `C:\Program Files\PostgreSQL\17\bin`, which the installer does
+not put on the PATH; the version number in the path must match the installed version. Add it for
+the current terminal session first:
+
+```powershell
+# PowerShell
+$env:Path += ";C:\Program Files\PostgreSQL\17\bin"
+```
+
+```bat
+:: cmd
+set PATH=%PATH%;C:\Program Files\PostgreSQL\17\bin
+```
 
 Apply them to a **fresh** database. `CREATE TABLE IF NOT EXISTS` makes re-running safe; it does not
 make a drifted schema correct. On tables created by something else — JPA auto-DDL from an earlier
@@ -36,17 +51,76 @@ SELECT LOWER(email), count(*) FROM users GROUP BY 1 HAVING count(*) > 1;
 SELECT LOWER(category_name), count(*) FROM category GROUP BY 1 HAVING count(*) > 1;
 ```
 
+## Migrations
+
+A fresh install needs none: `schema.sql` already has every table. A migration is for a database
+created by an earlier version of `schema.sql`, and each one runs once, in number order.
+
+### 001 — `pet_image`
+
+Needed if the `pet` table still has an `image_url` column (`\d pet` shows it). The script creates
+`pet_image` and its two indexes, copies each non-blank `pet.image_url` into it as that pet's main
+image (dated with the pet's `created_at`), drops `pet.image_url`, and grants `petlee_app` access
+to the new table and its sequence. The files in the upload directory are not touched: the URLs
+are copied as they are.
+
+1. **Back up first.** The script drops a column; the backup is the only way back.
+
+   ```bash
+   pg_dump -U postgres -Fc -f petlee-before-001.dump petlee
+   ```
+
+2. Stop the application, or at least undeploy it: the old build writes `pet.image_url`, and the
+   new build reads `pet_image`, so neither works against the other's schema.
+
+3. Run the script as `postgres`. It is one transaction, so a failure changes nothing, and
+   `ON_ERROR_STOP` makes `psql` stop at the first error rather than carry on outside it.
+
+   ```bash
+   psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-001-pet-image.sql
+   ```
+
+   It fails if the `petlee_app` role does not exist; create it first (below).
+
+4. Check, then deploy the new build:
+
+   ```sql
+   \d pet                                   -- no image_url column
+   \d pet_image                             -- ux_pet_image_main and idx_pet_image_pet present
+   SELECT count(*) FROM pet_image;          -- the number of pets that had a photograph
+   ```
+
+To undo it, restore the backup: `pg_restore -U postgres -d petlee --clean petlee-before-001.dump`.
+
+### 002 — `users.version`
+
+Needed if the `users` table has no `version` column (`\d users` shows it). The column is the
+optimistic lock behind the edit-profile form; a build with edit profile fails on every query that
+loads a user until it exists. The script only adds the column, `BIGINT NOT NULL DEFAULT 0`, so
+it rewrites no rows, needs no new grant, and is harmless to re-run:
+
+```bash
+psql -U postgres -d petlee -v ON_ERROR_STOP=1 -f src/main/resources/db/migrate-002-user-version.sql
+```
+
 ## The application's database role
 
-The server's connection pool should authenticate as `petlee_app`, not as `postgres`:
+The server's connection pool should authenticate as `petlee_app`, not as `postgres`. After
+`schema.sql` and `seed.sql`, from the project root, replacing `<chosen>` with a password of your
+choice:
 
-```sql
-CREATE ROLE petlee_app LOGIN PASSWORD '<choose one>';
-GRANT CONNECT ON DATABASE petlee TO petlee_app;
-GRANT USAGE ON SCHEMA public TO petlee_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO petlee_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO petlee_app;
+```bash
+psql -U postgres -d petlee -c "CREATE ROLE petlee_app LOGIN PASSWORD '<chosen>';"
+psql -U postgres -d petlee -c "GRANT CONNECT ON DATABASE petlee TO petlee_app; GRANT USAGE ON SCHEMA public TO petlee_app; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO petlee_app; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO petlee_app;"
 ```
+
+The `GRANT`s must run while connected to `petlee` (`-d petlee`), not to the default `postgres`
+database: `ON ALL TABLES IN SCHEMA public` means the tables of the database you are connected to,
+so run anywhere else they grant nothing on Pet-Lee's tables, and every request then fails with
+`permission denied`. For the same reason they must run after `schema.sql`, once the tables exist.
+A role belongs to the whole server, so if `petlee_app` already exists the first command fails
+with `role "petlee_app" already exists`; keep its existing password and run the second command
+anyway. The password chosen here is the one the WildFly `data-source add` command needs.
 
 It deliberately has no DDL rights, so the application cannot alter the schema even by accident.
 The password is stored only in the server's JDBC pool, never in this repository.
@@ -54,7 +128,7 @@ The password is stored only in the server's JDBC pool, never in this repository.
 ## Verifying
 
 ```sql
-\dt                                                    -- users, category, pet
+\dt                                                    -- users, category, pet, pet_image
 SELECT count(*) FROM category;                         -- 4
 SELECT count(*) FROM users WHERE user_name = 'admin';  -- 1
 \d users                                               -- ux_users_email_lower present

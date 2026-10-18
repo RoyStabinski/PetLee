@@ -5,28 +5,34 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
+    <f:metadata>
+        <f:viewAction action="#{petFormBean.loadCategories}"/>
+    </f:metadata>
+
     <ui:define name="title">Add a pet - Pet-Lee</ui:define>
 
     <ui:define name="content">
         <div class="panel">
-            <h1>Add a pet</h1>
-
-            <!-- enctype is not optional: without it the file is never sent and h:inputFile
-                 hands the bean a null Part, with no error to explain it. -->
+            <h1>Publish a new adoption listing</h1>
+            <!-- multipart: Mojarra's h:inputFile decodes with request.getParts(). -->
             <h:form id="petForm" enctype="multipart/form-data">
                 <ui:include src="/WEB-INF/includes/petFields.xhtml"/>
 
-                <div class="field field-wide">
-                    <h:outputLabel for="photo" value="Photograph"/>
-                    <h:inputFile id="photo" value="#{petFormBean.uploadedFile}" accept="image/*"/>
-                    <h:message for="photo" styleClass="field-error"/>
-                    <span class="field-hint">#{petFormBean.uploadLimits}</span>
-                </div>
+                <fieldset class="form-section">
+                    <legend>Photos</legend>
+                    <div class="field">
+                        <h:outputLabel for="photo" value="Choose photographs"/>
+                        <h:inputFile id="photo" value="#{petFormBean.uploadedFiles}" accept="image/*"
+                                     multiple="true"/>
+                        <h:message for="photo" styleClass="field-error"/>
+                        <p class="field-hint">#{petFormBean.uploadLimits}</p>
+                    </div>
+                </fieldset>
 
                 <div class="actions">
-                    <h:commandButton id="save" value="Save" action="#{petFormBean.save}"/>
                     <h:outputLink value="#{request.contextPath}/profile.xhtml"
                                   styleClass="button-secondary">Cancel</h:outputLink>
+                    <h:commandButton id="save" value="Publish" action="#{petFormBean.save}"/>
                 </div>
             </h:form>
         </div>

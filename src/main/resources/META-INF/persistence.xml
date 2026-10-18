@@ -21,14 +21,19 @@
         <class>com.petlee.model.User</class>
         <class>com.petlee.model.Category</class>
         <class>com.petlee.model.Pet</class>
+        <class>com.petlee.model.PetImage</class>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
+
+        <!-- No shared cache: photos change through PetImageRepository, outside the pet's own images
+             list, so a cached pet would keep showing its old photographs. -->
+        <shared-cache-mode>NONE</shared-cache-mode>
 
         <properties>
             <!-- schema.sql owns the schema; the provider must never touch it. -->
             <property name="jakarta.persistence.schema-generation.database.action" value="none"/>
 
             <!-- Validation belongs to the service layer, where a violation can be turned into
-                 the contract's error shape; one thrown from flush() cannot be. -->
+                 the API's JSON error body; one thrown from flush() cannot be. -->
             <property name="jakarta.persistence.validation.mode" value="NONE"/>
         </properties>
 

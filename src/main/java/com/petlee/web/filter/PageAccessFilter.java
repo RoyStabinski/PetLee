@@ -20,7 +20,8 @@ import java.util.logging.Logger;
 
 /**
  * Keeps guests off the pages that are not for them, by allow-list, so a page added later is
- * protected by default.
+ * protected by default. The members-only pages - addPet, editPet, profile and editProfile - are
+ * therefore listed nowhere: not being in {@link #PUBLIC_VIEWS} is what sends a guest to log in.
  *
  * <p>Convenience, not enforcement: the services and {@code @Secured} already refuse the
  * operations behind these pages, and no REST check may be weakened because this filter exists.
@@ -44,11 +45,14 @@ public class PageAccessFilter implements Filter {
     private static final Set<String> ADMIN_VIEWS = Set.of("/admin.xhtml");
 
     private static final String LOGIN_VIEW = "/login.xhtml";
-    private static final String FORBIDDEN_VIEW = "/error/error.xhtml";
 
     @Inject
     private UserBean userBean;
 
+    /**
+     * Lets a public page through, sends a guest on a members-only page to the login page, and
+     * answers 403 to a member on an administrator's page.
+     */
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
@@ -77,8 +81,9 @@ public class PageAccessFilter implements Filter {
         if (ADMIN_VIEWS.contains(view) && !userBean.isAdmin()) {
             // Not a redirect to login: they are logged in, and logging in again would not help.
             LOGGER.log(Level.FINE, () -> "non-administrator refused " + view);
-            httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            http.getRequestDispatcher(FORBIDDEN_VIEW).forward(request, response);
+            // sendError, not a forward: the container then sets the error attributes the
+            // error page reads to say "permission" rather than "something went wrong".
+            httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 

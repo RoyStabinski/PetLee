@@ -1,94 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    The frame every screen is written inside: title, content and footer, plus the navigation bar
-    and the one global message region every page inherits.
-
-    The navigation bar's three shapes - guest, member, administrator - are menu visibility only,
-    never a security boundary. Under WEB-INF, so no browser can request the template itself.
+    The frame every screen is written inside: navigation bar, one global message region, title,
+    content and footer. The navigation's three shapes - guest, member, administrator - are menu
+    visibility only, never a security boundary. Under WEB-INF, so no browser can request it.
+    The stylesheet is a plain link, not h:outputStylesheet: Faces serves its resources with a
+    seven-day max-age. The ?v= comes from the petlee.ASSET_VERSION context-param in web.xml.
 -->
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:h="jakarta.faces.html"
       xmlns:f="jakarta.faces.core"
       xmlns:ui="jakarta.faces.facelets">
-
 <h:head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title><ui:insert name="title">Pet-Lee</ui:insert></title>
-    <h:outputStylesheet library="css" name="petlee.css"/>
+    <link rel="icon" type="image/svg+xml" href="#{request.contextPath}/resources/images/logo.svg"/>
+    <link rel="stylesheet"
+          href="#{request.contextPath}/resources/css/petlee.css?v=#{initParam['petlee.ASSET_VERSION']}"/>
 </h:head>
-
 <h:body styleClass="page">
-
-    <!-- First stop for a keyboard or screen-reader user; visible only once focused. -->
     <a class="skip-link" href="#content">Skip to content</a>
 
     <header class="site-header">
-        <div class="container">
-
+        <div class="container header-inner">
             <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="brand">
-                <span class="brand-name">Pet-Lee</span>
-                <span class="brand-tagline">Find a companion, give a home</span>
+                <img src="#{request.contextPath}/resources/images/logo.svg" alt="" width="32" height="32"/>
+                Pet-Lee
             </h:outputLink>
-
             <nav class="nav" aria-label="Main navigation">
+                <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="nav-link">Home</h:outputLink>
 
-                <h:outputLink value="#{request.contextPath}/index.xhtml">Home</h:outputLink>
-
-                <!-- Guest -->
                 <ui:fragment rendered="#{not userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/login.xhtml">Log in</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/register.xhtml">Register</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="nav-link">Log in</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/register.xhtml" styleClass="button">Register</h:outputLink>
                 </ui:fragment>
 
-                <!-- Member -->
                 <ui:fragment rendered="#{userBean.loggedIn}">
-                    <h:outputLink value="#{request.contextPath}/addPet.xhtml">Add a pet</h:outputLink>
-                    <h:outputLink value="#{request.contextPath}/profile.xhtml">My listings</h:outputLink>
-
-                    <!-- Administrator: the member links plus this one. -->
+                    <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">Add a pet</h:outputLink>
+                    <h:outputLink value="#{request.contextPath}/profile.xhtml" styleClass="nav-link">My profile</h:outputLink>
                     <ui:fragment rendered="#{userBean.admin}">
-                        <h:outputLink value="#{request.contextPath}/admin.xhtml">Admin panel</h:outputLink>
+                        <h:outputLink value="#{request.contextPath}/admin.xhtml" styleClass="nav-link">Admin panel</h:outputLink>
                     </ui:fragment>
-
-                    <span class="nav-user">
-                        <h:outputFormat value="Signed in as {0}">
-                            <f:param value="#{userBean.displayName}"/>
-                        </h:outputFormat>
-                    </span>
-
+                    <span class="nav-user">Signed in as #{userBean.displayName}</span>
                     <!-- A POST, not a link: a GET that changes server state can be triggered
                          by any image tag on any page the user visits. -->
-                    <h:form id="logoutForm">
+                    <h:form id="logoutForm" styleClass="nav-form">
                         <h:commandButton id="logout" value="Log out" action="#{userBean.logout}"
                                          styleClass="button-secondary"/>
                     </h:form>
                 </ui:fragment>
-
             </nav>
         </div>
     </header>
 
     <main class="main" id="content">
         <div class="container">
-
             <!-- globalOnly: field-level messages belong beside their field. The id is
-                 load-bearing - every ajax render names :globalMessages alongside its own
-                 target, or a failure reported here never reaches the screen. -->
+                 load-bearing: every ajax render names :globalMessages alongside its target. -->
             <h:messages id="globalMessages" globalOnly="true" layout="list" styleClass="messages"
                         infoClass="message-info" warnClass="message-warn"
                         errorClass="message-error" fatalClass="message-error"/>
-
             <ui:insert name="content"/>
         </div>
     </main>
 
     <footer class="site-footer">
-        <div class="container">
-            <ui:insert name="footer">Pet-Lee - a not-for-profit pet adoption exchange</ui:insert>
-        </div>
+        <div class="container">&#169; 2026 Pet-Lee</div>
     </footer>
-
 </h:body>
 </html>

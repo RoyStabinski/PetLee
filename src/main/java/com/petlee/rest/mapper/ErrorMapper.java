@@ -25,10 +25,14 @@ public class ErrorMapper implements ExceptionMapper<Throwable> {
 
     private static final Logger LOGGER = Logger.getLogger(ErrorMapper.class.getName());
 
+    /**
+     * @param failure whatever escaped the resource method
+     * @return the JSON error response for it; see the class comment for which status
+     */
     @Override
     public Response toResponse(Throwable failure) {
         if (failure instanceof AppException app) {
-            return json(app.getStatus(), "ERROR", app.getMessage());
+            return json(app.getStatus(), app.getCode(), app.getMessage());
         }
         if (failure instanceof WebApplicationException web) {
             return json(web.getResponse().getStatus(), "ERROR", web.getMessage());

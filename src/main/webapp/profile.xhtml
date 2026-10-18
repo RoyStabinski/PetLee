@@ -5,82 +5,90 @@
                 xmlns:f="jakarta.faces.core"
                 xmlns:ui="jakarta.faces.facelets">
 
+    <f:metadata>
+        <f:viewAction action="#{petBean.loadMyListings}"/>
+    </f:metadata>
+
     <ui:define name="title">My profile - Pet-Lee</ui:define>
 
     <ui:define name="content">
 
-        <h1>My profile</h1>
+        <h1>My profile: #{userBean.currentUser.fullName}</h1>
 
-        <!-- The user's own details, so no privacy gate applies here. -->
-        <div class="panel">
-            <dl class="detail-facts">
-                <dt>Full name</dt>
-                <dd>#{userBean.currentUser.fullName}</dd>
-                <dt>Username</dt>
-                <dd>#{userBean.currentUser.userName}</dd>
-                <dt>Email</dt>
-                <dd>#{userBean.currentUser.email}</dd>
-                <dt>Telephone</dt>
-                <dd>#{userBean.currentUser.phoneNumber}</dd>
-                <dt>Status</dt>
-                <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
-            </dl>
-        </div>
+        <div class="profile-layout">
 
-        <h2>My listings</h2>
+            <aside class="panel" aria-label="Your account">
+                <dl class="facts">
+                    <dt>Username</dt>
+                    <dd>#{userBean.currentUser.username}</dd>
+                    <dt>Email</dt>
+                    <dd>#{userBean.currentUser.email}</dd>
+                    <dt>Telephone</dt>
+                    <dd>#{empty userBean.currentUser.phone ? 'Not given' : userBean.currentUser.phone}</dd>
+                    <dt>Region</dt>
+                    <dd>#{empty userBean.currentUser.region ? 'Not given' : userBean.currentUser.region}</dd>
+                    <dt>Status</dt>
+                    <dd>#{userBean.currentUser.role == 'USER' ? 'Member' : 'Administrator'}</dd>
+                </dl>
+                <p class="muted">
+                    <h:outputFormat value="{0} {1}, {2} active">
+                        <f:param value="#{petBean.listingCount}"/>
+                        <f:param value="#{petBean.listingCount == 1 ? 'listing' : 'listings'}"/>
+                        <f:param value="#{petBean.activeListingCount}"/>
+                    </h:outputFormat>
+                </p>
+                <h:outputLink value="#{request.contextPath}/editProfile.xhtml"
+                              styleClass="button-secondary button-small">Edit profile</h:outputLink>
+            </aside>
 
-        <ui:fragment rendered="#{petBean.noListings}">
-            <div class="empty-state">
-                <p>You have not posted any listings yet.</p>
-                <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
-                    Add your first pet
-                </h:outputLink>
-            </div>
-        </ui:fragment>
+            <section aria-labelledby="listingsTitle">
+                <h2 id="listingsTitle">My listings</h2>
 
-        <ui:fragment rendered="#{not petBean.noListings}">
-            <h:form id="listingsForm">
-                <div class="table-scroll">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Photograph</th>
-                                <th scope="col">Name</th>
-                                <th scope="col">Category</th>
-                                <th scope="col">Status</th>
-                                <th scope="col">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                <ui:fragment rendered="#{petBean.noListings}">
+                    <div class="empty-state">
+                        <p>You have not posted any listings yet.</p>
+                        <h:outputLink value="#{request.contextPath}/addPet.xhtml" styleClass="button">
+                            Add your first pet
+                        </h:outputLink>
+                    </div>
+                </ui:fragment>
+
+                <ui:fragment rendered="#{not petBean.noListings}">
+                    <h:form id="listingsForm">
+                        <ul class="pet-grid">
                             <ui:repeat id="rows" value="#{petBean.myListings}" var="pet">
-                                <tr>
-                                    <td class="cell-thumb">
-                                        <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.petName}"/>
-                                    </td>
-                                    <td>#{pet.petName}</td>
-                                    <td>#{pet.category.categoryName}</td>
-                                    <td>
-                                        <span class="#{petBean.statusStyle(pet)}">
-                                            #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
-                                        </span>
-                                    </td>
-                                    <td>
+                                <li class="pet-card">
+                                    <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"
+                                                    styleClass="pet-photo"/>
+                                    <div class="pet-card-body">
+                                        <h3>#{pet.name}
+                                            <span class="#{petBean.statusStyle(pet)}">
+                                                #{pet.status == 'AVAILABLE' ? 'Available' : (pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}
+                                            </span>
+                                        </h3>
                                         <div class="actions">
+                                            <!-- The version is what the API checks, so a stale page cannot overwrite. -->
+                                            <h:commandLink id="markAdopted" value="Mark as adopted" styleClass="button"
+                                                           rendered="#{pet.status == 'AVAILABLE'}"
+                                                           action="#{petBean.markAdopted(pet.id, pet.version)}"/>
+                                            <h:commandLink id="markAvailable" value="Mark as available" styleClass="button"
+                                                           rendered="#{pet.status == 'ADOPTED'}"
+                                                           action="#{petBean.markAvailable(pet.id, pet.version)}"/>
                                             <h:commandLink id="edit" value="Edit" styleClass="button-secondary"
-                                                           action="#{petBean.edit(pet.petId)}"/>
-                                            <!-- Confirmed before the call: deletion is permanent. -->
-                                            <h:commandLink id="delete" value="Delete" styleClass="button button-danger"
-                                                           action="#{petBean.delete(pet.petId)}"
+                                                           action="#{petBean.edit(pet.id)}"/>
+                                            <h:commandLink id="delete" value="Delete" styleClass="button-danger"
+                                                           action="#{petBean.delete(pet.id)}"
                                                            onclick="return confirm('Delete this listing permanently? Its photographs go with it.');"/>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </div>
+                                </li>
                             </ui:repeat>
-                        </tbody>
-                    </table>
-                </div>
-            </h:form>
-        </ui:fragment>
+                        </ul>
+                    </h:form>
+                </ui:fragment>
+            </section>
+
+        </div>
 
     </ui:define>
 

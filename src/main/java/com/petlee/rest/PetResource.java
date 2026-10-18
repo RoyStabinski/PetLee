@@ -3,6 +3,7 @@ package com.petlee.rest;
 import com.petlee.dto.PetDTO;
 import com.petlee.dto.PetDetailDTO;
 import com.petlee.dto.PetForm;
+import com.petlee.dto.PetImageDTO;
 import com.petlee.model.Pet;
 import com.petlee.rest.security.CurrentUser;
 import com.petlee.rest.security.Secured;
@@ -15,6 +16,7 @@ import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -23,33 +25,53 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.EntityPart;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
- * {@code /api/pets}. Decides who is asking — always from the session, never from the body — and
- * maps entities onto records; every rule and every error status belongs to {@link PetService}.
+ * {@code /api/pets}. Decides who is asking — from the bearer token or the session, never from the
+ * body — and maps entities onto records; every rule and every error status belongs to
+ * {@link PetService}.
  */
 @Path("pets")
 @RequestScoped
 public class PetResource {
 
+    /** The longest gallery search text {@code GET /api/pets?q=} accepts. */
+    static final int MAX_SEARCH_LENGTH = 50;
+
     private PetService pets;
 
-    /** For the session, which Jakarta REST has none of its own. */
+    private CurrentUser currentUser;
+
+    /** For the Authorization header and the session, which Jakarta REST has none of its own. */
     @Context
     private HttpServletRequest request;
+
+    /** For the Location header of a 201 Created. */
+    @Context
+    private UriInfo uriInfo;
 
     /** For the container. Public, as Jakarta REST requires of a root resource class. */
     public PetResource() {
     }
 
+    /**
+     * @param pets        the listing rules
+     * @param currentUser resolves the caller from the bearer token or the session
+     */
     @Inject
-    public PetResource(PetService pets) {
+    public PetResource(PetService pets, CurrentUser currentUser) {
         this.pets = pets;
+        this.currentUser = currentUser;
     }
 
     /**
@@ -58,20 +80,28 @@ public class PetResource {
      * @param categoryId the category to restrict to, or absent for all
      * @param size       SMALL, MEDIUM or LARGE, or absent
      * @param gender     MALE or FEMALE, or absent
+     * @param minAge     the youngest age to include, 0 to 50, or absent
+     * @param maxAge     the oldest age to include, 0 to 50, or absent
+     * @param q          text the name or the breed must contain, ignoring case; trimmed, blank
+     *                   is ignored, at most 50 characters
      * @return the matching available pets, newest first
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public List<PetDTO> findGallery(@QueryParam("categoryId") Integer categoryId,
                                     @QueryParam("size") String size,
-                                    @QueryParam("gender") String gender) {
-        return pets.findGallery(categoryId, parseSize(size), parseGender(gender))
+                                    @QueryParam("gender") String gender,
+                                    @QueryParam("minAge") String minAge,
+                                    @QueryParam("maxAge") String maxAge,
+                                    @QueryParam("q") String q) {
+        return pets.findGallery(categoryId, parseSize(size), parseGender(gender),
+                        parseAge("minAge", minAge), parseAge("maxAge", maxAge), parseSearch(q))
                 .stream().map(PetDTO::of).toList();
     }
 
     /**
      * {@code GET /api/pets/{id}} — open, but the owner's contact fields are filled only for a
-     * logged-in caller.
+     * logged-in caller, and {@code ownedByCaller} is true only for the owner.
      *
      * @param id the pet id
      * @return the pet in full
@@ -80,12 +110,16 @@ public class PetResource {
     @Path("{id: \\d+}")
     @Produces(MediaType.APPLICATION_JSON)
     public PetDetailDTO findDetail(@PathParam("id") Long id) {
-        return PetDetailDTO.of(pets.findDetail(id), CurrentUser.from(request).isPresent());
+        Pet pet = pets.findDetail(id);
+        Optional<SessionUser> caller = currentUser.from(request);
+        boolean owned = caller.isPresent() && pet.getOwner() != null
+                && caller.get().userId().equals(pet.getOwner().getUserId());
+        return PetDetailDTO.of(pet, caller.isPresent(), owned);
     }
 
     /**
-     * {@code GET /api/pets/mine} — auth. An extension to the contract, for the dashboard.
-     * The owner is the session user and never a parameter.
+     * {@code GET /api/pets/mine} — auth. The owner's dashboard. The owner is the caller and never
+     * a parameter.
      *
      * @return this user's listings, newest first, in every status
      */
@@ -98,24 +132,34 @@ public class PetResource {
     }
 
     /**
-     * {@code POST /api/pets} — auth. Answers 200, not 201: the contract is frozen.
+     * {@code POST /api/pets} — auth. The owner is the caller.
      *
      * @param form the listing to create
-     * @return the created listing
+     * @return 201 Created, with {@code Location: /api/pets/{id}} and the created listing as the body
      */
     @POST
     @Secured
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetDTO create(PetForm form) {
-        return PetDTO.of(pets.create(form, caller().userId()));
+    public Response create(PetForm form) {
+        if (form == null) {
+            throw new AppException(400, "A request body is required");
+        }
+        PetDTO created = PetDTO.of(pets.create(form, caller().userId()));
+        return Response.created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build())
+                .entity(created).build();
     }
 
     /**
-     * {@code PUT /api/pets/{id}} — auth, owner only.
+     * {@code PUT /api/pets/{id}?version=N} — auth, owner only.
      *
-     * @param id   the pet to update
-     * @param form the new values
+     * <p>{@code N} is the {@code version} this client read from {@code GET /api/pets/{id}}.
+     * A stale or missing version is answered 409, so one client cannot silently overwrite
+     * another's change.
+     *
+     * @param id      the pet to update
+     * @param version the version the client last read, as a query parameter
+     * @param form    the new values
      * @return the updated listing
      */
     @PUT
@@ -123,8 +167,106 @@ public class PetResource {
     @Secured
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public PetDTO update(@PathParam("id") Long id, PetForm form) {
-        return PetDTO.of(pets.update(id, form, caller().userId()));
+    public PetDTO update(@PathParam("id") Long id, @QueryParam("version") String version,
+                         PetForm form) {
+        if (form == null) {
+            throw new AppException(400, "A request body is required");
+        }
+        return PetDTO.of(pets.update(id, form, parseVersion(version), caller().userId()));
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/status?status=ADOPTED|AVAILABLE&version=N} — auth, owner only.
+     * Marks a listing adopted or available again. A listing an administrator has withdrawn
+     * cannot be changed this way, and a stale or missing version is 409, as for an edit.
+     *
+     * @param id      the listing
+     * @param status  ADOPTED or AVAILABLE
+     * @param version the version the client last read
+     * @return the listing in its new state
+     */
+    @PUT
+    @Path("{id: \\d+}/status")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public PetDTO changeOwnStatus(@PathParam("id") Long id, @QueryParam("status") String status,
+                                  @QueryParam("version") String version) {
+        return PetDTO.of(pets.changeOwnStatus(id, parseOwnStatus(status), parseVersion(version),
+                caller().userId()));
+    }
+
+    /**
+     * @param value the raw query parameter
+     * @return ADOPTED or AVAILABLE
+     * @throws AppException 400 for anything else, absent included
+     */
+    private static Pet.PetStatus parseOwnStatus(String value) {
+        Pet.PetStatus status = parseFilter(Pet.PetStatus.class, value,
+                "status must be ADOPTED or AVAILABLE");
+        if (status != Pet.PetStatus.ADOPTED && status != Pet.PetStatus.AVAILABLE) {
+            throw new AppException(400, "status must be ADOPTED or AVAILABLE");
+        }
+        return status;
+    }
+
+    /**
+     * Parses an optional age bound by hand, for the same reason as {@link #parseFilter}.
+     *
+     * @param name  the parameter's name, for the message
+     * @param value the raw query parameter, may be null or blank
+     * @return the bound, or null for none
+     * @throws AppException 400 unless the value is a whole number from 0 to 50
+     */
+    private static Integer parseAge(String name, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            int age = Integer.parseInt(value.trim());
+            if (age >= 0 && age <= 50) {
+                return age;
+            }
+        } catch (NumberFormatException notANumber) {
+            // fall through to the same message
+        }
+        throw new AppException(400, name + " must be a whole number from 0 to 50");
+    }
+
+    /**
+     * Reads the gallery's search text.
+     *
+     * @param value the raw query parameter, may be null or blank
+     * @return the text, trimmed, or null when absent or blank
+     * @throws AppException 400 if it is longer than {@value #MAX_SEARCH_LENGTH} characters
+     */
+    private static String parseSearch(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String search = value.trim();
+        if (search.length() > MAX_SEARCH_LENGTH) {
+            throw new AppException(400, "q must be at most " + MAX_SEARCH_LENGTH + " characters");
+        }
+        return search;
+    }
+
+    /**
+     * Parses the version by hand, for the same reason as {@link #parseFilter}: a failed
+     * {@code @QueryParam} conversion is a 404, where a 400 naming the field is what helps.
+     *
+     * @param value the raw query parameter, may be null or blank
+     * @return the version, or null when absent — which the service refuses with 409
+     * @throws AppException 400 if the value is present but not a whole number
+     */
+    static Long parseVersion(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException notANumber) {
+            throw new AppException(400, "version must be a whole number");
+        }
     }
 
     /**
@@ -143,10 +285,82 @@ public class PetResource {
         return Response.noContent().build();
     }
 
-    /** @return the session user, which {@code @Secured} has already guaranteed exists */
+    /**
+     * {@code POST /api/pets/{id}/images} — auth, owner only. Adds one photograph, the
+     * multipart/form-data part named {@code file}: JPEG, PNG, GIF or WebP, at most 5 MB. The
+     * first photograph a listing gets becomes its main image. A listing holds at most five.
+     *
+     * @param id   the pet
+     * @param file the {@code file} part, or null when the request has none
+     * @return 201 Created, with {@code Location: /api/pets/{id}/images/{imageId}} and the stored
+     *         photograph as the body
+     */
+    @POST
+    @Path("{id: \\d+}/images")
+    @Secured
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response addImage(@PathParam("id") Long id, @FormParam("file") EntityPart file) {
+        if (file == null) {
+            throw new AppException(400, "A photo file is required, as the multipart part \"file\"");
+        }
+        MediaType type = file.getMediaType();
+        String contentType = type == null ? null : type.getType() + "/" + type.getSubtype();
+
+        InputStream content = file.getContent();
+        try {
+            PetImageDTO stored = PetImageDTO.of(pets.addImage(id, content, contentType, caller().userId()));
+            return Response.created(uriInfo.getAbsolutePathBuilder().path(String.valueOf(stored.id())).build())
+                    .entity(stored).build();
+        } finally {
+            try {
+                content.close();
+            } catch (IOException ignored) {
+                // the photograph is stored or refused by now; a failed close changes neither
+            }
+        }
+    }
+
+    /**
+     * {@code DELETE /api/pets/{id}/images/{imageId}} — auth, owner only. Deletes the photograph
+     * and its file; if it was the main one, the oldest remaining photograph becomes main.
+     *
+     * @param id      the pet
+     * @param imageId the photograph, which must belong to that pet
+     * @return 204 No Content
+     */
+    @DELETE
+    @Path("{id: \\d+}/images/{imageId: \\d+}")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deleteImage(@PathParam("id") Long id, @PathParam("imageId") Long imageId) {
+        pets.deleteImage(id, imageId, caller().userId());
+        return Response.noContent().build();
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/images/{imageId}/main} — auth, owner only. Makes the photograph
+     * the one the gallery shows. Choosing the current main photograph is not an error.
+     *
+     * @param id      the pet
+     * @param imageId the photograph, which must belong to that pet
+     * @return 204 No Content
+     */
+    @PUT
+    @Path("{id: \\d+}/images/{imageId: \\d+}/main")
+    @Secured
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response setMainImage(@PathParam("id") Long id, @PathParam("imageId") Long imageId) {
+        pets.setMainImage(id, imageId, caller().userId());
+        return Response.noContent().build();
+    }
+
+    /**
+     * @return the caller, which {@code @Secured} has already guaranteed exists
+     */
     private SessionUser caller() {
-        return CurrentUser.from(request).orElseThrow(() -> new IllegalStateException(
-                "no session on a @Secured endpoint; the annotation is missing or the filter is not bound"));
+        return currentUser.from(request).orElseThrow(() -> new IllegalStateException(
+                "no caller on a @Secured endpoint; the annotation is missing or the filter is not bound"));
     }
 
     static Pet.PetSize parseSize(String value) {

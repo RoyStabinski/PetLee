@@ -10,69 +10,83 @@
         <f:viewAction action="#{petDetailBean.load}"/>
     </f:metadata>
 
-    <ui:define name="title">#{petDetailBean.pet.petName} - Pet-Lee</ui:define>
+    <ui:define name="title">#{petDetailBean.pet.name} - Pet-Lee</ui:define>
 
     <ui:define name="content">
-
         <ui:fragment rendered="#{not empty petDetailBean.pet}">
 
-            <h1>#{petDetailBean.pet.petName}</h1>
+            <h1>
+                #{petDetailBean.pet.name}
+                <ui:fragment rendered="#{petDetailBean.withdrawn}">
+                    <span class="#{petDetailBean.statusStyle}">#{petDetailBean.pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn'}</span>
+                </ui:fragment>
+            </h1>
 
-            <ui:fragment rendered="#{petDetailBean.withdrawn}">
-                <p class="tag tag-removed">This listing is no longer available</p>
-            </ui:fragment>
+            <div class="detail-layout">
 
-            <div class="detail">
-
-                <div>
-                    <h:panelGroup layout="block" styleClass="detail-media">
-                        <h:graphicImage value="#{petDetailBean.imageUrl}" alt="#{petDetailBean.pet.petName}"/>
-                    </h:panelGroup>
+                <!-- The main photograph first, then the rest as thumbnails that open full size. -->
+                <div class="detail-photos">
+                    <ui:repeat value="#{petDetailBean.photos}" var="photo" varStatus="loop">
+                        <ui:fragment rendered="#{loop.first}">
+                            <h:graphicImage value="#{photo.url}" alt="Photo of #{petDetailBean.pet.name}"
+                                            styleClass="detail-photo"/>
+                        </ui:fragment>
+                    </ui:repeat>
+                    <ui:fragment rendered="#{petDetailBean.photoCount gt 1}">
+                        <ul class="thumbs">
+                            <ui:repeat value="#{petDetailBean.photos}" var="photo" varStatus="loop">
+                                <li>
+                                    <a href="#{request.contextPath}#{photo.url}" target="_blank" rel="noopener">
+                                        <h:graphicImage value="#{photo.url}"
+                                                        alt="Photo #{loop.index + 1} of #{petDetailBean.photoCount}"/>
+                                    </a>
+                                </li>
+                            </ui:repeat>
+                        </ul>
+                    </ui:fragment>
                 </div>
 
-                <div>
-                    <dl class="detail-facts">
-                        <dt>Breed</dt>
-                        <dd>#{petDetailBean.pet.breed}</dd>
-                        <dt>Age</dt>
-                        <dd><h:outputFormat value="{0} years old">
-                            <f:param value="#{petDetailBean.pet.age}"/>
-                        </h:outputFormat></dd>
-                        <dt>Size</dt>
-                        <dd>#{petDetailBean.pet.size == 'SMALL' ? 'Small' : (petDetailBean.pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</dd>
-                        <dt>Gender</dt>
-                        <dd>#{petDetailBean.pet.gender == 'MALE' ? 'Male' : 'Female'}</dd>
-                        <dt>Category</dt>
-                        <dd>#{petDetailBean.pet.category.categoryName}</dd>
-                        <dt>Status</dt>
-                        <dd>#{petDetailBean.pet.status == 'AVAILABLE' ? 'Available' : (petDetailBean.pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}</dd>
-                    </dl>
+                <div class="detail-info">
+                    <section class="panel">
+                        <h2>About</h2>
+                        <p>#{petDetailBean.pet.longDesc}</p>
+                    </section>
 
-                    <h2>About</h2>
-                    <p>#{petDetailBean.pet.longDesc}</p>
-
-                    <!-- This rendered check is the privacy gate on this tier: the entity always
-                         carries its owner, so removing it exposes a stranger's contact details. -->
-                    <h:panelGroup layout="block" styleClass="panel"
-                                  rendered="#{petDetailBean.contactVisible}">
-                        <h2>Contact the owner</h2>
-                        <dl class="detail-facts">
-                            <dt>Posted by</dt>
-                            <dd>#{petDetailBean.pet.owner.fullName}</dd>
-                            <dt>Email</dt>
-                            <dd><a href="mailto:#{petDetailBean.pet.owner.email}">#{petDetailBean.pet.owner.email}</a></dd>
-                            <dt>Telephone</dt>
-                            <dd><a href="tel:#{petDetailBean.pet.owner.phoneNumber}">#{petDetailBean.pet.owner.phoneNumber}</a></dd>
+                    <section class="panel">
+                        <h2>Key facts</h2>
+                        <dl class="facts">
+                            <dt>Breed</dt>
+                            <dd>#{empty petDetailBean.pet.breed ? 'Not given' : petDetailBean.pet.breed}</dd>
+                            <dt>Age</dt>
+                            <dd>#{petDetailBean.ageLabel}</dd>
+                            <dt>Size</dt>
+                            <dd>#{petDetailBean.pet.size == 'SMALL' ? 'Small' : (petDetailBean.pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</dd>
+                            <dt>Gender</dt>
+                            <dd>#{petDetailBean.pet.gender == 'MALE' ? 'Male' : 'Female'}</dd>
+                            <dt>Category</dt>
+                            <dd>#{petDetailBean.pet.categoryName}</dd>
+                            <dt>Status</dt>
+                            <dd>#{petDetailBean.pet.status == 'AVAILABLE' ? 'Available' : (petDetailBean.pet.status == 'ADOPTED' ? 'Adopted' : 'Withdrawn')}</dd>
                         </dl>
-                    </h:panelGroup>
+                    </section>
 
-                    <h:panelGroup layout="block" styleClass="panel"
-                                  rendered="#{not petDetailBean.contactVisible}">
-                        <p>Log in to see how to contact the owner</p>
-                        <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="button">
-                            Log in
-                        </h:outputLink>
-                    </h:panelGroup>
+                    <!-- Withheld by the API itself for a guest, not hidden by this page. -->
+                    <section class="panel contact-card">
+                        <h2>Contact the owner</h2>
+                        <h:panelGroup layout="block" rendered="#{petDetailBean.contactVisible}">
+                            <p><strong>#{petDetailBean.pet.ownerName}</strong></p>
+                            <ul class="contact-list">
+                                <ui:fragment rendered="#{not empty petDetailBean.pet.ownerPhone}">
+                                    <li>Telephone: <a href="tel:#{petDetailBean.pet.ownerPhone}">#{petDetailBean.pet.ownerPhone}</a></li>
+                                </ui:fragment>
+                                <li>Email: <a href="mailto:#{petDetailBean.pet.ownerEmail}">#{petDetailBean.pet.ownerEmail}</a></li>
+                            </ul>
+                        </h:panelGroup>
+                        <h:panelGroup layout="block" rendered="#{not petDetailBean.contactVisible}">
+                            <p>Log in to see the owner's details.</p>
+                            <h:outputLink value="#{request.contextPath}/login.xhtml" styleClass="button">Log in</h:outputLink>
+                        </h:panelGroup>
+                    </section>
 
                     <div class="actions">
                         <h:outputLink value="#{request.contextPath}/index.xhtml" styleClass="button-secondary">
@@ -81,8 +95,8 @@
                 </div>
 
             </div>
-        </ui:fragment>
 
+        </ui:fragment>
     </ui:define>
 
 </ui:composition>

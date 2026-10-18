@@ -87,7 +87,7 @@ public final class PasswordHasher {
             byte[] actual = derive(plainPassword, salt, iterations, expected.length * 8);
             return MessageDigest.isEqual(expected, actual);
         } catch (IllegalArgumentException malformed) {
-            return false; // corrupt stored value; see the method contract
+            return false; // a corrupt stored value fails this login, as documented above
         }
     }
 

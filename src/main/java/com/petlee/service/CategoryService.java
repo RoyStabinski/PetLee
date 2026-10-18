@@ -5,6 +5,7 @@ import com.petlee.repository.CategoryRepository;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.PersistenceException;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
@@ -47,10 +48,15 @@ public class CategoryService {
             throw new AppException(400,
                     "A category name is required, of at most " + NAME_MAX + " characters");
         }
+        // For the message, not the guarantee: ux_category_name_lower decides a race.
         if (categories.existsByName(trimmed)) {
             throw new AppException(409, "A category named " + trimmed + " already exists");
         }
-        return categories.save(new Category(trimmed));
+        try {
+            return categories.save(new Category(trimmed));
+        } catch (PersistenceException race) {
+            throw new AppException(409, "A category named " + trimmed + " already exists", race);
+        }
     }
 
     /**

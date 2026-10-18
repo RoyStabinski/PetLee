@@ -2,6 +2,8 @@ package com.petlee.dto;
 
 import jakarta.validation.constraints.*;
 
+import java.io.Serializable;
+
 /**
  * The body of {@code POST /api/pets} and {@code PUT /api/pets/{id}}. The enums stay strings so
  * an unknown value is a 400 the caller can read, not a deserialisation failure.
@@ -12,6 +14,6 @@ public record PetForm(
         @Min(0) @Max(50) Integer age,
         @NotNull @Pattern(regexp = "SMALL|MEDIUM|LARGE") String size,
         @NotNull @Pattern(regexp = "MALE|FEMALE") String gender,
-        @Size(max = 255) String shortDesc,
+        @NotBlank @Size(max = 255) String shortDesc,
         String longDesc,
-        @NotNull Integer categoryId) { }
+        @NotNull Integer categoryId) implements Serializable { }

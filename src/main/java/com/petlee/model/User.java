@@ -36,7 +36,6 @@ public class User {
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
-    // Accepted at registration; deliberately absent from UserDTO, which the contract fixes.
     @Column(name = "region", length = 100)
     private String region;
 
@@ -46,6 +45,12 @@ public class User {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // Optimistic locking for the edit-profile form, as on Pet. A password change is a bulk
+    // update in UserRepository, so it does not move the version and stale an open form.
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     /** For JPA. */
     public User() {
@@ -57,8 +62,6 @@ public class User {
     }
 
     public Long getUserId() { return userId; }
-
-    public void setUserId(Long userId) { this.userId = userId; }
 
     public String getUserName() { return userName; }
 
@@ -88,7 +91,6 @@ public class User {
 
     public void setRole(Role role) { this.role = role; }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-
-    public boolean isAdmin() { return role == Role.ADMIN; }
+    // Long, not long: null until the row is first written. No setter — JPA owns this field.
+    public Long getVersion() { return version; }
 }

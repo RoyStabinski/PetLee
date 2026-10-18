@@ -1,0 +1,172 @@
+package com.petlee.web.client;
+
+import com.petlee.dto.PetDTO;
+import com.petlee.dto.PetDetailDTO;
+import com.petlee.dto.PetForm;
+import com.petlee.dto.PetImageDTO;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.core.GenericType;
+
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** The pet endpoints under {@code /api/pets}. */
+@ApplicationScoped
+public class PetApi {
+
+    private static final GenericType<List<PetDTO>> PET_LIST = new GenericType<>() { };
+
+    @Inject
+    private ApiClient api;
+
+    /**
+     * {@code GET /api/pets}. A null filter is not sent, which the API reads as "any".
+     *
+     * @param categoryId the category to restrict to, or null
+     * @param size       SMALL, MEDIUM or LARGE, or null
+     * @param gender     MALE or FEMALE, or null
+     * @param minAge     the youngest age to include, or null
+     * @param maxAge     the oldest age to include, or null
+     * @param search     text the name or the breed must contain, or null; the API trims it
+     *                   and ignores it when blank
+     * @return the matching available pets, newest first
+     * @throws ApiException 400 for an unrecognised size or gender, an age outside 0 to 50,
+     *                      minAge greater than maxAge, or search text over 50 characters
+     */
+    public List<PetDTO> gallery(Integer categoryId, String size, String gender,
+                                Integer minAge, Integer maxAge, String search) {
+        // HashMap, not Map.of: the values may be null, and ApiClient skips those.
+        Map<String, Object> query = new HashMap<>();
+        query.put("categoryId", categoryId);
+        query.put("size", size);
+        query.put("gender", gender);
+        query.put("minAge", minAge);
+        query.put("maxAge", maxAge);
+        query.put("q", search);
+        return api.get("/pets", query, PET_LIST);
+    }
+
+    /**
+     * {@code GET /api/pets/{id}}. The owner's contact fields are filled only when the API sees a
+     * logged-in caller, that is, when {@link ApiCredentials} holds a live token.
+     *
+     * @param id the pet id
+     * @return the pet in full
+     * @throws ApiException 404 if there is no such pet
+     */
+    public PetDetailDTO detail(Long id) {
+        return api.get("/pets/" + id, PetDetailDTO.class);
+    }
+
+    /**
+     * {@code GET /api/pets/mine}.
+     *
+     * @return the caller's listings, newest first, in every status
+     * @throws ApiException 401 if the caller is not logged in
+     */
+    public List<PetDTO> mine() {
+        return api.get("/pets/mine", PET_LIST);
+    }
+
+    /**
+     * {@code POST /api/pets}. The owner is whoever the token belongs to.
+     *
+     * @param form the new listing
+     * @return the created listing
+     * @throws ApiException 400 for an invalid form, 401 if the caller is not logged in
+     */
+    public PetDTO create(PetForm form) {
+        return api.post("/pets", form, PetDTO.class);
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}?version=}.
+     *
+     * @param id      the listing
+     * @param form    the new values
+     * @param version the {@code version} from {@link #detail}; null is sent as absent
+     * @return the updated listing
+     * @throws ApiException 400 for an invalid form, 403 if not the owner, 404 if gone, 409 if
+     *                      the version is stale or missing
+     */
+    public PetDTO update(Long id, PetForm form, Long version) {
+        // HashMap, not Map.of: the version may be null, and ApiClient skips it then.
+        Map<String, Object> query = new HashMap<>();
+        query.put("version", version);
+        return api.put("/pets/" + id, query, form, PetDTO.class);
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/status?status=&version=}: the owner marks a listing adopted,
+     * or available again.
+     *
+     * @param id      the listing
+     * @param status  ADOPTED or AVAILABLE
+     * @param version the {@code version} from the listing as last read; null is sent as absent
+     * @return the listing in its new state
+     * @throws ApiException 403 if not the owner, 409 if withdrawn by an administrator, already
+     *                      in that status, or changed since it was read
+     */
+    public PetDTO changeStatus(Long id, String status, Long version) {
+        Map<String, Object> query = new HashMap<>();
+        query.put("status", status);
+        query.put("version", version);
+        return api.put("/pets/" + id + "/status", query, null, PetDTO.class);
+    }
+
+    /**
+     * {@code DELETE /api/pets/{id}}.
+     *
+     * @param id the listing
+     * @throws ApiException 403 if neither owner nor admin, 404 if gone, 409 on a concurrent edit
+     */
+    public void delete(Long id) {
+        api.delete("/pets/" + id);
+    }
+
+    /**
+     * {@code POST /api/pets/{id}/images}, as the multipart part {@code file}: adds one
+     * photograph. The first one a listing gets becomes main. The stream is read during the call
+     * but not closed.
+     *
+     * @param id          the listing
+     * @param content     the photograph's bytes
+     * @param fileName    the file name to send, may be null
+     * @param contentType its media type, such as {@code image/png}
+     * @return the stored photograph
+     * @throws ApiException 400 if missing, too large or not a supported image, 403 if not the
+     *                      owner, 409 if the listing already has five photographs
+     */
+    public PetImageDTO addImage(Long id, InputStream content, String fileName, String contentType) {
+        return api.postMultipart("/pets/" + id + "/images",
+                List.of(ApiClient.filePart(content, fileName, contentType)), PetImageDTO.class);
+    }
+
+    /**
+     * {@code DELETE /api/pets/{id}/images/{imageId}}. Deleting the main photograph makes the
+     * oldest remaining one main.
+     *
+     * @param id      the listing
+     * @param imageId the photograph
+     * @throws ApiException 403 if not the owner, 404 if the photograph is not on that listing
+     */
+    public void deleteImage(Long id, Long imageId) {
+        api.delete("/pets/" + id + "/images/" + imageId);
+    }
+
+    /**
+     * {@code PUT /api/pets/{id}/images/{imageId}/main}.
+     *
+     * @param id      the listing
+     * @param imageId the photograph to show in the gallery
+     * @throws ApiException 403 if not the owner, 404 if the photograph is not on that listing
+     */
+    public void setMainImage(Long id, Long imageId) {
+        api.put("/pets/" + id + "/images/" + imageId + "/main", null, Void.class);
+    }
+
+}

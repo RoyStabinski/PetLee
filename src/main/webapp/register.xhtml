@@ -14,94 +14,101 @@
 
     <ui:define name="content">
 
-        <div class="panel panel-narrow">
-            <h1>Create an account</h1>
+        <div class="narrow">
 
-            <h:form id="registerForm">
-                <fieldset class="form-grid">
+            <div class="panel">
+                <h1>Create an account</h1>
 
-                    <div class="field field-wide">
-                        <h:outputLabel for="username" value="Username"/>
-                        <h:inputText id="username" value="#{userBean.username}" required="true"
-                                     requiredMessage="Required" autocomplete="username"
-                                     validatorMessage="A username is 3 to 20 characters.">
-                            <f:validateLength minimum="3" maximum="20"/>
-                        </h:inputText>
-                        <h:message for="username" styleClass="field-error"/>
+                <h:form id="registerForm">
+
+                    <div class="form-grid">
+
+                        <div class="field">
+                            <h:outputLabel for="fullName" value="Full name"/>
+                            <h:inputText id="fullName" value="#{userBean.fullName}" required="true"
+                                         requiredMessage="Required" autocomplete="name"
+                                         validatorMessage="A full name is at most 50 characters.">
+                                <f:validateLength maximum="50"/>
+                            </h:inputText>
+                            <h:message for="fullName" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="username" value="Username"/>
+                            <h:inputText id="username" value="#{userBean.username}" required="true"
+                                         requiredMessage="Required" autocomplete="username"
+                                         validatorMessage="A username is 3 to 20 characters: letters, digits and underscore.">
+                                <f:validateRegex pattern="^[A-Za-z0-9_]{3,20}$"/>
+                            </h:inputText>
+                            <h:message for="username" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="email" value="Email"/>
+                            <h:inputText id="email" value="#{userBean.email}" type="email" required="true"
+                                         requiredMessage="Required" autocomplete="email"
+                                         validatorMessage="Enter a valid email address of at most 100 characters.">
+                                <f:validateLength maximum="100"/>
+                                <f:validateRegex pattern="^[^@\s]+@[^@\s]+$"/>
+                            </h:inputText>
+                            <h:message for="email" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="phone" value="Telephone"/>
+                            <!-- The regex mirrors com.petlee.util.PhoneNumbers, which decides. -->
+                            <h:inputText id="phone" value="#{userBean.phone}" type="tel" maxlength="20"
+                                         p:placeholder="050-1234567" autocomplete="tel"
+                                         validatorMessage="Enter a valid Israeli phone number, for example 050-1234567">
+                                <f:validateLength maximum="20"/>
+                                <f:validateRegex pattern="^(?:\s*|[\s()-]*(?:\+[\s()-]*9[\s()-]*7[\s()-]*2|9[\s()-]*7[\s()-]*2|0)[\s()-]*(?:[57](?:[\s()-]*\d){8}|[23489](?:[\s()-]*\d){7})[\s()-]*)$"/>
+                            </h:inputText>
+                            <h:message for="phone" styleClass="field-error"/>
+                            <span class="field-hint">Optional. A mobile (05X) or landline number, for example 050-1234567 or 02-1234567</span>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="password" value="Password"/>
+                            <h:inputSecret id="password" value="#{userBean.password}" required="true"
+                                           requiredMessage="Required" redisplay="false"
+                                           autocomplete="new-password"
+                                           validatorMessage="A password is at least 8 characters.">
+                                <f:validateLength minimum="8"/>
+                            </h:inputSecret>
+                            <h:message for="password" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field">
+                            <h:outputLabel for="confirmPassword" value="Confirm password"/>
+                            <h:inputSecret id="confirmPassword" value="#{userBean.confirmPassword}"
+                                           required="true" requiredMessage="Required"
+                                           redisplay="false" autocomplete="new-password"/>
+                            <h:message for="confirmPassword" styleClass="field-error"/>
+                        </div>
+
+                        <div class="field field-wide">
+                            <h:outputLabel for="region" value="Region"/>
+                            <h:inputText id="region" value="#{userBean.region}"
+                                         autocomplete="address-level1"
+                                         validatorMessage="A region is at most 100 characters.">
+                                <f:validateLength maximum="100"/>
+                            </h:inputText>
+                            <h:message for="region" styleClass="field-error"/>
+                        </div>
+
                     </div>
 
-                    <div class="field">
-                        <h:outputLabel for="password" value="Password"/>
-                        <h:inputSecret id="password" value="#{userBean.password}" required="true"
-                                       requiredMessage="Required" redisplay="false"
-                                       autocomplete="new-password"
-                                       validatorMessage="A password is at least 8 characters.">
-                            <f:validateLength minimum="8"/>
-                        </h:inputSecret>
-                        <h:message for="password" styleClass="field-error"/>
+                    <div class="actions">
+                        <h:commandButton id="submit" value="Create account" action="#{userBean.register}"
+                                         styleClass="button-block"/>
                     </div>
+                </h:form>
 
-                    <div class="field">
-                        <h:outputLabel for="confirmPassword" value="Confirm password"/>
-                        <h:inputSecret id="confirmPassword" value="#{userBean.confirmPassword}"
-                                       required="true" requiredMessage="Required"
-                                       redisplay="false" autocomplete="new-password"/>
-                        <h:message for="confirmPassword" styleClass="field-error"/>
-                    </div>
-
-                    <div class="field field-wide">
-                        <h:outputLabel for="fullName" value="Full name"/>
-                        <h:inputText id="fullName" value="#{userBean.fullName}" required="true"
-                                     requiredMessage="Required" autocomplete="name"
-                                     validatorMessage="A full name is at most 50 characters.">
-                            <f:validateLength maximum="50"/>
-                        </h:inputText>
-                        <h:message for="fullName" styleClass="field-error"/>
-                    </div>
-
-                    <div class="field">
-                        <h:outputLabel for="email" value="Email"/>
-                        <h:inputText id="email" value="#{userBean.email}" type="email" required="true"
-                                     requiredMessage="Required" autocomplete="email"
-                                     validatorMessage="An email address is at most 100 characters.">
-                            <f:validateLength maximum="100"/>
-                        </h:inputText>
-                        <h:message for="email" styleClass="field-error"/>
-                    </div>
-
-                    <div class="field">
-                        <h:outputLabel for="phone" value="Telephone"/>
-                        <!-- 20, not 10: the contract's own example "050-1234567" is 11 characters. -->
-                        <h:inputText id="phone" value="#{userBean.phone}" maxlength="20"
-                                     p:placeholder="050-1234567" autocomplete="tel"
-                                     validatorMessage="A telephone number is at most 20 characters.">
-                            <f:validateLength maximum="20"/>
-                        </h:inputText>
-                        <h:message for="phone" styleClass="field-error"/>
-                        <span class="field-hint">Up to 20 characters, for example 050-1234567</span>
-                    </div>
-
-                    <div class="field field-wide">
-                        <h:outputLabel for="region" value="Region"/>
-                        <h:inputText id="region" value="#{userBean.region}"
-                                     autocomplete="address-level1"
-                                     validatorMessage="A region is at most 100 characters.">
-                            <f:validateLength maximum="100"/>
-                        </h:inputText>
-                        <h:message for="region" styleClass="field-error"/>
-                    </div>
-
-                </fieldset>
-
-                <div class="actions">
-                    <h:commandButton id="submit" value="Create account" action="#{userBean.register}"/>
-                </div>
-            </h:form>
-
-            <p>
-                Already registered?
-                <h:outputLink value="#{request.contextPath}/login.xhtml">Log in</h:outputLink>
-            </p>
+                <p class="auth-switch">
+                    Already registered?
+                    <h:outputLink value="#{request.contextPath}/login.xhtml">Log in</h:outputLink>
+                </p>
+            </div>
         </div>
 
     </ui:define>

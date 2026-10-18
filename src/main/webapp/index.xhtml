@@ -3,7 +3,12 @@
                 xmlns="http://www.w3.org/1999/xhtml"
                 xmlns:h="jakarta.faces.html"
                 xmlns:f="jakarta.faces.core"
-                xmlns:ui="jakarta.faces.facelets">
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:p="jakarta.faces.passthrough">
+
+    <f:metadata>
+        <f:viewAction action="#{petBean.loadGallery}"/>
+    </f:metadata>
 
     <ui:define name="title">Pets looking for a home - Pet-Lee</ui:define>
 
@@ -18,11 +23,21 @@
                     <legend>Narrow the list</legend>
 
                     <div class="field">
+                        <h:outputLabel for="search" value="Search"/>
+                        <h:inputText id="search" value="#{petBean.search}" type="search"
+                                     p:placeholder="Name or breed"
+                                     validatorMessage="Search is at most 50 characters.">
+                            <f:validateLength maximum="50"/>
+                        </h:inputText>
+                        <h:message for="search" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
                         <h:outputLabel for="category" value="Category"/>
                         <h:selectOneMenu id="category" value="#{petBean.selectedCategoryId}">
                             <f:selectItem itemValue="#{null}" itemLabel="Any"/>
                             <f:selectItems value="#{petBean.categories}" var="c"
-                                           itemValue="#{c.categoryId}" itemLabel="#{c.categoryName}"/>
+                                           itemValue="#{c.id}" itemLabel="#{c.name}"/>
                         </h:selectOneMenu>
                     </div>
 
@@ -40,13 +55,34 @@
                         </h:selectOneMenu>
                     </div>
 
+                    <div class="field">
+                        <h:outputLabel for="minAge" value="Age from"/>
+                        <h:inputText id="minAge" value="#{petBean.minAge}"
+                                     converterMessage="An age is a whole number from 0 to 50."
+                                     validatorMessage="An age is a whole number from 0 to 50.">
+                            <f:validateLongRange minimum="0" maximum="50"/>
+                        </h:inputText>
+                        <h:message for="minAge" styleClass="field-error"/>
+                    </div>
+
+                    <div class="field">
+                        <h:outputLabel for="maxAge" value="Age to"/>
+                        <h:inputText id="maxAge" value="#{petBean.maxAge}"
+                                     converterMessage="An age is a whole number from 0 to 50."
+                                     validatorMessage="An age is a whole number from 0 to 50.">
+                            <f:validateLongRange minimum="0" maximum="50"/>
+                        </h:inputText>
+                        <h:message for="maxAge" styleClass="field-error"/>
+                    </div>
+
                     <div class="actions">
                         <h:commandButton id="apply" value="Apply" action="#{petBean.applyFilter}">
-                            <f:ajax execute="@form" render=":globalMessages :galleryGrid"/>
+                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
                         </h:commandButton>
                         <h:commandButton id="clear" value="Clear" action="#{petBean.clearFilters}"
                                          styleClass="button-secondary">
-                            <f:ajax execute="@form" render=":globalMessages :galleryGrid @form"/>
+                            <f:ajax execute="@this" render=":globalMessages :galleryGrid @form"
+                                    resetValues="true"/>
                         </h:commandButton>
                     </div>
                 </fieldset>
@@ -54,8 +90,7 @@
 
             <h:panelGroup id="galleryGrid" layout="block" styleClass="gallery-results">
 
-                <!-- Bracket notation: 'empty' is a reserved EL operator, so #{petBean.empty}
-                     fails to parse the view outright. -->
+                <!-- Bracket notation: 'empty' is a reserved EL operator. -->
                 <ui:fragment rendered="#{petBean['empty']}">
                     <div class="empty-state">
                         <p>No pets match your search just yet.</p>
@@ -67,33 +102,27 @@
                 </ui:fragment>
 
                 <ui:fragment rendered="#{not petBean['empty']}">
-                    <ul class="gallery">
+                    <ul class="pet-grid">
                         <ui:repeat value="#{petBean.pets}" var="pet">
-                            <li class="card">
-
-                                <!-- No contextPath: h:graphicImage prepends it itself for a "/" value. -->
-                                <div class="card-media">
-                                    <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.petName}"/>
-                                </div>
-
-                                <div class="card-body">
-                                    <h3 class="card-title">#{pet.petName}</h3>
-                                    <p class="card-desc">#{pet.shortDesc}</p>
-
+                            <li class="pet-card">
+                                <h:graphicImage value="#{petBean.imageUrlOf(pet)}" alt="#{pet.name}"
+                                                styleClass="pet-photo"/>
+                                <div class="pet-card-body">
+                                    <h3>#{pet.name}</h3>
+                                    <p class="muted">#{pet.shortDesc}</p>
                                     <ul class="tags">
+                                        <ui:fragment rendered="#{not empty petBean.ageOf(pet)}">
+                                            <li class="tag">#{petBean.ageOf(pet)}</li>
+                                        </ui:fragment>
                                         <li class="tag">#{pet.size == 'SMALL' ? 'Small' : (pet.size == 'MEDIUM' ? 'Medium' : 'Large')}</li>
                                         <li class="tag">#{pet.gender == 'MALE' ? 'Male' : 'Female'}</li>
-                                        <li class="tag">#{pet.category.categoryName}</li>
+                                        <li class="tag">#{pet.categoryName}</li>
                                     </ul>
-
-                                    <div class="card-actions">
-                                        <h:form>
-                                            <h:commandLink value="See details" styleClass="button"
-                                                           action="#{petBean.viewDetails(pet.petId)}"/>
-                                        </h:form>
-                                    </div>
+                                    <h:form>
+                                        <h:commandLink value="See details" styleClass="button"
+                                                       action="#{petBean.viewDetails(pet.id)}"/>
+                                    </h:form>
                                 </div>
-
                             </li>
                         </ui:repeat>
                     </ul>

@@ -2,19 +2,22 @@ package com.petlee.service;
 
 import com.petlee.dto.PetForm;
 import com.petlee.model.Pet;
+import com.petlee.model.PetImage;
 import com.petlee.model.User;
+import com.petlee.repository.PetImageRepository;
 import com.petlee.repository.PetRepository;
 import com.petlee.repository.UserRepository;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.OptimisticLockException;
-import jakarta.servlet.http.Part;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Pet listings: the catalogue, the ownership rules and optimistic-lock handling.
@@ -23,23 +26,31 @@ import java.util.Locale;
 @ApplicationScoped
 public class PetService {
 
+    /** How many photographs one listing may carry. */
+    public static final int MAX_IMAGES = 5;
+
     private PetRepository pets;
+    private PetImageRepository petImages;
     private UserRepository users;
     private CategoryService categories;
     private ImageStore images;
-
-    /** Self-reference, so the scalar overloads reach {@code @Valid} through the CDI proxy. */
-    @Inject
-    private PetService self;
 
     /** For CDI only. */
     protected PetService() {
     }
 
+    /**
+     * @param pets       the listings
+     * @param petImages  the listings' photograph rows
+     * @param users      the owners
+     * @param categories the category lookup
+     * @param images     the photograph files
+     */
     @Inject
-    public PetService(PetRepository pets, UserRepository users, CategoryService categories,
-                      ImageStore images) {
+    public PetService(PetRepository pets, PetImageRepository petImages, UserRepository users,
+                      CategoryService categories, ImageStore images) {
         this.pets = pets;
+        this.petImages = petImages;
         this.users = users;
         this.categories = categories;
         this.images = images;
@@ -51,11 +62,20 @@ public class PetService {
      * @param categoryId category filter, or null for any
      * @param size       size filter, or null for any
      * @param gender     gender filter, or null for any
-     * @return the matching pets, never null
+     * @param minAge     the youngest age to include, or null for no lower bound
+     * @param maxAge     the oldest age to include, or null for no upper bound
+     * @param search     text the name or the breed must contain, ignoring case; null for any
+     * @return the matching pets, never null; a listing with no age is left out once either
+     *         bound is given
+     * @throws AppException 400 if both bounds are given and minAge is greater than maxAge
      */
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<Pet> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, true);
+    public List<Pet> findGallery(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
+                                 Integer minAge, Integer maxAge, String search) {
+        if (minAge != null && maxAge != null && minAge > maxAge) {
+            throw new AppException(400, "minAge must not be greater than maxAge");
+        }
+        return pets.find(categoryId, size, gender, minAge, maxAge, search, null, true);
     }
 
     /**
@@ -68,7 +88,18 @@ public class PetService {
      */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<Pet> findAllForAdmin(Integer categoryId, Pet.PetSize size, Pet.PetGender gender) {
-        return pets.find(categoryId, size, gender, null, false);
+        return pets.find(categoryId, size, gender, null, null, null, null, false);
+    }
+
+    /**
+     * Counts every listing per category, in all statuses and regardless of any admin filter,
+     * so the admin panel can tell which categories are still in use.
+     *
+     * @return listing counts keyed by category id; a category with no listings is absent
+     */
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public Map<Integer, Long> countListingsByCategory() {
+        return pets.countByCategory();
     }
 
     /**
@@ -77,13 +108,68 @@ public class PetService {
      * @param petId  the listing to move
      * @param status REMOVED or AVAILABLE, in any case
      * @return the listing in its new state
-     * @throws AppException 404 if no such pet, 400 if the status is anything else
+     * @throws AppException 404 if no such pet, 400 if the status is anything else, 409 if the
+     *                      listing changed concurrently
      */
     @Transactional
     public Pet changeStatus(Long petId, String status) {
         Pet pet = requireById(petId);
         pet.setStatus(moderationStatus(status));
-        return pets.save(pet);
+        try {
+            return pets.save(pet);
+        } catch (OptimisticLockException e) {
+            throw concurrentEdit(e);
+        }
+    }
+
+    /**
+     * Lets an owner mark their listing adopted, or undo that. Only AVAILABLE to ADOPTED and
+     * ADOPTED to AVAILABLE are accepted; hiding and restoring stay with the administrators.
+     *
+     * <p>The withdrawn check comes before the version check on purpose: an administrator's
+     * change bumps the version too, and "changed by someone else" would hide the real reason.
+     *
+     * @param petId           the listing
+     * @param newStatus       ADOPTED or AVAILABLE
+     * @param expectedVersion the version the caller last read
+     * @param callerUserId    the caller's id
+     * @return the listing in its new state
+     * @throws AppException 404 if no such pet, 403 if not the owner, 400 for any other target
+     *                      status, 409 if an administrator withdrew it, if it already has that
+     *                      status, or if the version is missing or stale
+     */
+    @Transactional
+    public Pet changeOwnStatus(Long petId, Pet.PetStatus newStatus, Long expectedVersion,
+                               Long callerUserId) {
+        Pet pet = requireById(petId);
+
+        if (!isSameUser(pet.getOwner(), callerUserId)) {
+            throw new AppException(403, "Only the owner of a listing can change its status");
+        }
+        if (newStatus != Pet.PetStatus.ADOPTED && newStatus != Pet.PetStatus.AVAILABLE) {
+            throw new AppException(400, "status must be ADOPTED or AVAILABLE");
+        }
+        if (pet.getStatus() == Pet.PetStatus.REMOVED) {
+            throw new AppException(409, "An administrator has withdrawn this listing, "
+                    + "so its status cannot be changed");
+        }
+
+        // Boxed Long values are compared with equals, never with ==, which tests identity.
+        if (expectedVersion == null || !expectedVersion.equals(pet.getVersion())) {
+            throw concurrentEdit(null);
+        }
+        if (pet.getStatus() == newStatus) {
+            throw new AppException(409, newStatus == Pet.PetStatus.ADOPTED
+                    ? "This listing is already marked as adopted"
+                    : "This listing is already available");
+        }
+
+        pet.setStatus(newStatus);
+        try {
+            return pets.save(pet);
+        } catch (OptimisticLockException e) {
+            throw concurrentEdit(e);
+        }
     }
 
     private static Pet.PetStatus moderationStatus(String status) {
@@ -135,28 +221,33 @@ public class PetService {
         return pets.save(pet);
     }
 
-    /** Scalar overload for the JSF tier, which cannot bind a record. */
-    public Pet create(String name, String breed, Integer age, String size, String gender,
-                      String shortDesc, String longDesc, Integer categoryId, Long ownerUserId) {
-        return self.create(new PetForm(name, breed, age, size, gender, shortDesc, longDesc, categoryId),
-                ownerUserId);
-    }
-
     /**
      * Edits a listing. Only its owner may do so — not an administrator.
      *
-     * @param petId        the pet's id
-     * @param form         the validated form
-     * @param callerUserId the session user's id
+     * <p>Optimistic locking works in two layers. The explicit version check catches a stale
+     * form: one opened before somebody else saved. {@code @Version} on {@link Pet} catches the
+     * narrower race of two saves that both pass the check and reach the database together.
+     *
+     * @param petId           the pet's id
+     * @param form            the validated form
+     * @param expectedVersion the version the caller saw when it loaded the listing
+     * @param callerUserId    the session user's id
      * @return the updated listing
-     * @throws AppException 404 if no such pet, 403 if not the owner, 409 on a concurrent edit
+     * @throws AppException 404 if no such pet, 403 if not the owner, 409 if the listing changed
+     *                      since the caller loaded it
      */
     @Transactional
-    public Pet update(Long petId, @Valid PetForm form, Long callerUserId) {
+    public Pet update(Long petId, @Valid PetForm form, Long expectedVersion, Long callerUserId) {
         Pet pet = requireById(petId);
 
+        // Ownership first: a non-owner learns nothing about the listing's edit history.
         if (!isSameUser(pet.getOwner(), callerUserId)) {
             throw new AppException(403, "Only the owner of a listing can edit it");
+        }
+
+        // Boxed Long values are compared with equals, never with ==, which tests identity.
+        if (expectedVersion == null || !expectedVersion.equals(pet.getVersion())) {
+            throw concurrentEdit(null);
         }
 
         applyForm(form, pet);
@@ -164,26 +255,29 @@ public class PetService {
         try {
             return pets.save(pet);
         } catch (OptimisticLockException e) {
-            throw new AppException(409,
-                    "This listing was changed by someone else; reload it and try again", e);
+            throw concurrentEdit(e);
         }
     }
 
-    /** Scalar overload for the JSF tier, which cannot bind a record. */
-    public Pet update(Long petId, String name, String breed, Integer age, String size,
-                      String gender, String shortDesc, String longDesc, Integer categoryId,
-                      Long callerUserId) {
-        return self.update(petId, new PetForm(name, breed, age, size, gender, shortDesc, longDesc,
-                categoryId), callerUserId);
+    /**
+     * The one 409 for an edit that lost a race with another edit of the same listing.
+     *
+     * @param cause the underlying lock failure, or null when the version check caught it first
+     * @return the exception to throw
+     */
+    private static AppException concurrentEdit(Throwable cause) {
+        return new AppException(409,
+                "This listing was changed by someone else; reload it and try again", cause);
     }
 
     /**
-     * Deletes a listing and its photograph. Owner or administrator only.
+     * Deletes a listing and all its photographs. Owner or administrator only.
      *
      * @param petId         the pet's id
      * @param callerUserId  the session user's id
      * @param callerIsAdmin whether that user is an administrator
-     * @throws AppException 404 if no such pet, 403 if neither owner nor admin
+     * @throws AppException 404 if no such pet, 403 if neither owner nor admin, 409 if the
+     *                      listing changed concurrently
      */
     @Transactional
     public void delete(Long petId, Long callerUserId, boolean callerIsAdmin) {
@@ -194,34 +288,133 @@ public class PetService {
                     "Only the owner of a listing, or an administrator, can remove it");
         }
 
-        // Read the filename before the row goes; the cascade takes the row, not the file.
-        String photograph = pet.getImageUrl();
-        pets.delete(pet);
-        images.delete(photograph);
+        // Read the filenames before the rows go; the cascade takes the rows, not the files.
+        List<String> photographs = pet.getImages().stream().map(PetImage::getImageUrl).toList();
+        try {
+            pets.delete(pet);
+        } catch (OptimisticLockException e) {
+            throw concurrentEdit(e);
+        }
+        photographs.forEach(images::delete);
     }
 
     /**
-     * Replaces a listing's photograph. The old file is deleted only once the new one is attached.
+     * Adds a photograph to a listing. The first one a listing gets becomes its main image.
+     *
+     * <p>The image methods lock the pet row and write {@link PetImage} rows directly, never
+     * through {@code Pet.getImages()}: changing that list would bump the pet's version and turn
+     * an open edit form's next save into a 409.
      *
      * @param petId        the pet's id
-     * @param file         the uploaded file
-     * @param callerUserId the session user's id
-     * @return the pet, with its new photograph
-     * @throws AppException 404 if no such pet, 403 if not the owner
+     * @param content      the photograph's bytes; read, not closed
+     * @param contentType  its media type, such as {@code image/png}
+     * @param callerUserId the caller's id
+     * @return the stored image
+     * @throws AppException 404 if no such pet, 403 if not the owner, 409 if it already has
+     *                      {@value #MAX_IMAGES} photographs, 400 if the photograph is missing,
+     *                      too large or not a supported image type
      */
     @Transactional
-    public Pet attachImage(Long petId, Part file, Long callerUserId) {
-        Pet pet = requireById(petId);
+    public PetImage addImage(Long petId, InputStream content, String contentType,
+                             Long callerUserId) {
+        Pet pet = requireOwnedAndLocked(petId, callerUserId);
+
+        List<PetImage> existing = petImages.findByPet(petId);
+        if (existing.size() >= MAX_IMAGES) {
+            throw new AppException(409,
+                    "A listing can have at most " + MAX_IMAGES + " photographs");
+        }
+
+        String url = images.store(content, contentType);
+        PetImage image = new PetImage(pet, url, existing.isEmpty());
+        try {
+            petImages.persist(image);
+            petImages.flush();
+        } catch (RuntimeException notSaved) {
+            images.delete(url);
+            throw notSaved;
+        }
+        return image;
+    }
+
+    /**
+     * Deletes one photograph, file included. If it was the main one, the oldest remaining image
+     * becomes main.
+     *
+     * @param petId        the pet's id
+     * @param imageId      the image's id
+     * @param callerUserId the caller's id
+     * @throws AppException 404 if no such pet, or no such image on it; 403 if not the owner
+     */
+    @Transactional
+    public void deleteImage(Long petId, Long imageId, Long callerUserId) {
+        requireOwnedAndLocked(petId, callerUserId);
+        PetImage image = requireImage(petId, imageId);
+
+        boolean wasMain = image.isMain();
+        String url = image.getImageUrl();
+        petImages.remove(image);
+
+        if (wasMain) {
+            // The provider runs deletes after updates. Without this flush, the promotion below
+            // would reach the database while the old main row still exists, and
+            // ux_pet_image_main would reject it.
+            petImages.flush();
+            petImages.findByPet(petId).stream().findFirst()
+                    .ifPresent(oldest -> oldest.setMain(true));
+        }
+        petImages.flush();
+        images.delete(url);
+    }
+
+    /**
+     * Makes one photograph the main one. Choosing the current main image changes nothing.
+     *
+     * @param petId        the pet's id
+     * @param imageId      the image to make main
+     * @param callerUserId the caller's id
+     * @throws AppException 404 if no such pet, or no such image on it; 403 if not the owner
+     */
+    @Transactional
+    public void setMainImage(Long petId, Long imageId, Long callerUserId) {
+        requireOwnedAndLocked(petId, callerUserId);
+        PetImage target = requireImage(petId, imageId);
+        if (target.isMain()) {
+            return;
+        }
+
+        for (PetImage image : petImages.findByPet(petId)) {
+            if (image.isMain()) {
+                image.setMain(false);
+            }
+        }
+        // Both changes are updates, and the provider may write them in either order. If the
+        // new main were written first, two rows would be main for a moment and the partial
+        // unique index ux_pet_image_main would reject it; so the old main is cleared, flushed,
+        // and only then the new one set.
+        petImages.flush();
+        target.setMain(true);
+    }
+
+    /**
+     * Locks the pet for an image change and checks the caller owns it.
+     *
+     * @return the locked pet
+     * @throws AppException 404 if no such pet, 403 if not the owner
+     */
+    private Pet requireOwnedAndLocked(Long petId, Long callerUserId) {
+        Pet pet = pets.lockById(petId)
+                .orElseThrow(() -> new AppException(404, "No such pet: " + petId));
         if (!isSameUser(pet.getOwner(), callerUserId)) {
-            throw new AppException(403, "Only the owner of a listing can change its photo");
+            throw new AppException(403, "Only the owner of a listing can change its photographs");
         }
-        String previous = pet.getImageUrl();
-        pet.setImageUrl(images.store(file));
-        Pet saved = pets.save(pet);
-        if (previous != null) {
-            images.delete(previous);
-        }
-        return saved;
+        return pet;
+    }
+
+    /** @throws AppException 404 unless the image exists and belongs to that pet */
+    private PetImage requireImage(Long petId, Long imageId) {
+        return petImages.findInPet(petId, imageId).orElseThrow(() -> new AppException(404,
+                "No such photograph on this listing: " + imageId));
     }
 
     /**
@@ -235,24 +428,7 @@ public class PetService {
         if (ownerUserId == null) {
             return List.of();
         }
-        return pets.find(null, null, null, ownerUserId, false);
-    }
-
-    /**
-     * Whether a user owns a listing, so the views can decide what to draw.
-     *
-     * @param petId  the pet's id, may be null
-     * @param userId the user's id, may be null
-     * @return true only when both ids are present, the pet exists, and it belongs to that user
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public boolean isOwner(Long petId, Long userId) {
-        if (petId == null || userId == null) {
-            return false;
-        }
-        return pets.findById(petId)
-                .map(pet -> isSameUser(pet.getOwner(), userId))
-                .orElse(false);
+        return pets.find(null, null, null, null, null, null, ownerUserId, false);
     }
 
     /**

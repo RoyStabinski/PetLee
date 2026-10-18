@@ -8,7 +8,7 @@ import java.io.Serializable;
  * What the REST tier keeps about the caller between requests. A snapshot taken at login, holding
  * no password material; a role changed in the database takes effect at the user's next login.
  */
-public record SessionUser(Long userId, String username, String fullName, boolean admin)
+public record SessionUser(Long userId, String username, boolean admin)
         implements Serializable {
 
     /**
@@ -16,7 +16,6 @@ public record SessionUser(Long userId, String username, String fullName, boolean
      * @return the payload to store in the session
      */
     public static SessionUser of(User u) {
-        return new SessionUser(u.getUserId(), u.getUserName(), u.getFullName(),
-                u.getRole() == User.Role.ADMIN);
+        return new SessionUser(u.getUserId(), u.getUserName(), u.getRole() == User.Role.ADMIN);
     }
 }

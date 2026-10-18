@@ -3,12 +3,17 @@ package com.petlee.repository;
 import com.petlee.model.Pet;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+/** The listings: the gallery and dashboard query, single loads, row locks and writes. */
 @ApplicationScoped
 public class PetRepository {
 
@@ -16,14 +21,33 @@ public class PetRepository {
     private EntityManager em;
 
     /**
-     * The gallery query. LEFT JOIN FETCH on category and owner is load-bearing: the result
-     * is detached when the service transaction ends, and the views read both.
+     * The gallery query. LEFT JOIN FETCH on category, owner and images is load-bearing: the
+     * result is detached when the service transaction ends, the views read all three, and one
+     * query for the list beats one more per pet. DISTINCT folds the image rows back into one pet
+     * each.
+     *
+     * <p>Every filter is a named parameter; no value is ever concatenated into the JPQL. An age
+     * bound excludes listings whose age is unknown, since SQL compares null as unknown. The search
+     * text is matched as a case-insensitive substring of the name or the breed, its LIKE
+     * wildcards escaped by {@link #containsPattern} so they match only themselves.
+     *
+     * @param categoryId    the category, or null for any
+     * @param size          the size, or null for any
+     * @param gender        the gender, or null for any
+     * @param minAge        the youngest age to include, or null for no lower bound
+     * @param maxAge        the oldest age to include, or null for no upper bound
+     * @param search        text the name or the breed must contain, or null for any
+     * @param ownerId       the owner, or null for anyone's
+     * @param availableOnly whether to keep AVAILABLE listings only
+     * @return the matching pets, newest first
      */
     public List<Pet> find(Integer categoryId, Pet.PetSize size, Pet.PetGender gender,
-                          Long ownerId, boolean availableOnly) {
+                          Integer minAge, Integer maxAge, String search, Long ownerId,
+                          boolean availableOnly) {
         StringBuilder jpql = new StringBuilder(
                 "SELECT DISTINCT p FROM Pet p"
-                + " LEFT JOIN FETCH p.category LEFT JOIN FETCH p.owner WHERE 1 = 1");
+                + " LEFT JOIN FETCH p.category LEFT JOIN FETCH p.owner LEFT JOIN FETCH p.images"
+                + " WHERE 1 = 1");
         List<Object[]> params = new ArrayList<>();
         if (availableOnly) {
             jpql.append(" AND p.status = :status");
@@ -45,6 +69,19 @@ public class PetRepository {
             jpql.append(" AND p.gender = :gender");
             params.add(new Object[]{"gender", gender});
         }
+        if (minAge != null) {
+            jpql.append(" AND p.age >= :minAge");
+            params.add(new Object[]{"minAge", minAge});
+        }
+        if (maxAge != null) {
+            jpql.append(" AND p.age <= :maxAge");
+            params.add(new Object[]{"maxAge", maxAge});
+        }
+        if (search != null) {
+            jpql.append(" AND (LOWER(p.petName) LIKE :q ESCAPE '\\'"
+                    + " OR LOWER(p.breed) LIKE :q ESCAPE '\\')");
+            params.add(new Object[]{"q", containsPattern(search)});
+        }
         jpql.append(" ORDER BY p.createdAt DESC");
 
         TypedQuery<Pet> query = em.createQuery(jpql.toString(), Pet.class);
@@ -52,17 +89,76 @@ public class PetRepository {
         return query.getResultList();
     }
 
+    /**
+     * Turns search text into a LIKE pattern for "contains, ignoring case": lower-cased, with
+     * {@code \}, {@code %} and {@code _} escaped by a backslash, then wrapped in {@code %}. So
+     * "%" finds names that contain a percent sign, not every name.
+     *
+     * @param text the search text, not null
+     * @return the pattern, for use with {@code ESCAPE '\'}
+     */
+    static String containsPattern(String text) {
+        String escaped = text.toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escaped + "%";
+    }
+
+    /**
+     * Loads one pet with its category, owner and images, which the callers read after the
+     * transaction has ended.
+     *
+     * @param id the pet's id, may be null
+     * @return the pet, or empty for a null or unknown id
+     */
     public Optional<Pet> findById(Long id) {
         if (id == null) {
             return Optional.empty();
         }
         return em.createQuery(
-                        "SELECT p FROM Pet p LEFT JOIN FETCH p.category LEFT JOIN FETCH p.owner"
+                        "SELECT DISTINCT p FROM Pet p LEFT JOIN FETCH p.category"
+                        + " LEFT JOIN FETCH p.owner LEFT JOIN FETCH p.images"
                         + " WHERE p.petId = :id", Pet.class)
                 .setParameter("id", id)
                 .getResultStream().findFirst();
     }
 
+    /**
+     * Loads a pet with {@code SELECT ... FOR UPDATE}, without its images, so image changes for
+     * one pet run one at a time: two uploads cannot both pass the five-image check, and two
+     * first uploads cannot both become main. The lock does not touch the version.
+     *
+     * @param id the pet's id, may be null
+     * @return the locked pet, or empty
+     */
+    public Optional<Pet> lockById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(em.find(Pet.class, id, LockModeType.PESSIMISTIC_WRITE));
+    }
+
+    /**
+     * Counts listings per category in every status, independent of any filter.
+     *
+     * @return listing counts keyed by category id; a category with no listings is absent
+     */
+    public Map<Integer, Long> countByCategory() {
+        return em.createQuery(
+                        "SELECT p.category.categoryId, COUNT(p) FROM Pet p GROUP BY p.category.categoryId",
+                        Object[].class)
+                .getResultStream()
+                .collect(Collectors.toMap(row -> (Integer) row[0], row -> (Long) row[1]));
+    }
+
+    /**
+     * Inserts a new pet or merges a detached one, and flushes, so an optimistic-lock failure
+     * surfaces here, where the service turns it into a 409.
+     *
+     * @param pet the pet to save
+     * @return the managed pet
+     */
     public Pet save(Pet pet) {
         if (pet.getPetId() == null) {
             em.persist(pet);
@@ -74,6 +170,11 @@ public class PetRepository {
         return merged;
     }
 
+    /**
+     * Deletes a pet, its image rows going with it through the cascade, and flushes.
+     *
+     * @param pet the pet, managed or detached
+     */
     public void delete(Pet pet) {
         em.remove(em.contains(pet) ? pet : em.merge(pet));
         em.flush();

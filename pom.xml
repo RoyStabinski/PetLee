@@ -18,9 +18,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jakartaee.version>10.0.0</jakartaee.version>
         <postgresql.version>42.6.0</postgresql.version>
+        <junit.version>6.1.3</junit.version>
     </properties>
 
-    <!-- Both dependencies are 'provided': the server supplies them, so WEB-INF/lib stays empty. -->
+    <!-- The two 'provided' dependencies come from the server and JUnit is test-only, so
+         WEB-INF/lib stays empty. -->
     <dependencies>
         <dependency>
             <groupId>jakarta.platform</groupId>
@@ -35,6 +37,13 @@
             <version>${postgresql.version}</version>
             <scope>provided</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -46,6 +55,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
+            </plugin>
+
+            <!-- Runs the JUnit tests in the test phase, so 'mvn package' builds no WAR if one fails. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.6.0</version>
             </plugin>
 
             <plugin>

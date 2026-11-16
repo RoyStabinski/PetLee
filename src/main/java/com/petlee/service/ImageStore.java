@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Stores, deletes and resolves uploaded photographs: pets' photographs and members' profile photos. */
+/** Stores, deletes and resolves uploaded pet photographs. */
 @ApplicationScoped
 public class ImageStore {
 
